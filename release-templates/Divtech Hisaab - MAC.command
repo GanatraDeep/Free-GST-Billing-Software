@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Free GST Billing — macOS launcher.
+# Divtech Hisaab — macOS launcher.
 #
 # Double-click in Finder → macOS opens this in Terminal.app. We
 # detect state (Node? installed?) and offer a minimal menu, then
@@ -26,15 +26,15 @@ if [ -x "$SYSTEM_DIR/node/bin/node" ]; then export PATH="$SYSTEM_DIR/node/bin:$P
 clear
 echo
 echo "  ┌────────────────────────────────────────────────┐"
-echo "  │   Free GST Billing Software                    │"
-echo "  │   Open-source · Offline-first · No signup      │"
+echo "  │   Divtech Hisaab  ·  by Divtech                │"
+echo "  │   Offline-first · No signup                    │"
 echo "  └────────────────────────────────────────────────┘"
 echo
 
 # --- Sanity checks ---
 if [ ! -d "$SYSTEM_DIR" ]; then
   echo "  ⚠  _system folder is missing."
-  echo "     Please re-extract the ZIP or re-download from GitHub."
+  echo "     Please re-extract the ZIP, or ask Divtech for a fresh copy."
   echo
   read -p "  Press Enter to exit… "
   exit 1

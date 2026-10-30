@@ -1,5 +1,5 @@
 // npm run docs:zip - build the docs site and zip it for upload to
-// dicecodes.com, as release-build/docs-v<version>.zip.
+// divtech.in, as release-build/docs-v<version>.zip.
 //
 // Never zip it with PowerShell's Compress-Archive: it writes "\" paths and
 // the host unpacks flat files, so every link 404s (ERR-061). Windows' own
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const { version } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const OUT = join(ROOT, 'docs-site', 'out');
-const FOLDER = 'free-gst-software-documentation';
+const FOLDER = 'help';
 const zip = join(ROOT, 'release-build', `docs-v${version}.zip`);
 
 execFileSync(process.execPath, [join(ROOT, 'docs-site', 'build.mjs')], { stdio: 'inherit' });
@@ -28,4 +28,4 @@ if (process.platform === 'win32') {
 }
 execFileSync(process.execPath, [join(ROOT, 'scripts', 'check-zip-paths.mjs'), zip], { stdio: 'inherit' });
 console.log(`\nDocs ZIP ready: ${zip}`);
-console.log(`Upload it in place of /${FOLDER}/ on dicecodes.com and extract it there.`);
+console.log(`Upload it in place of /${FOLDER}/ on divtech.in and extract it there.`);

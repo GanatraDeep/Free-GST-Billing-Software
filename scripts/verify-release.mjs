@@ -65,7 +65,7 @@ function extract(zipPath, dest) {
   mkdirSync(dest, { recursive: true });
   // Argument arrays, never an interpolated shell string: no shell is spawned,
   // so nothing in a path is interpreted. It also just works for paths with
-  // spaces — and this project installs to folders like "Free GST Billing".
+  // spaces — and this project installs to folders like "Divtech Hisaab".
   const run = process.platform === 'win32'
     ? spawnSync('powershell', [
         '-NoProfile', '-NonInteractive', '-Command',

@@ -1,4 +1,4 @@
-/* Free GST Billing - start-up guard (v1.10.83). A plain script, loaded before
+/* Divtech Hisaab - start-up guard (v1.10.83). A plain script, loaded before
    the app, so it runs even when the app's code cannot load.
 
    After an update, the browser's offline cache can still hold the previous

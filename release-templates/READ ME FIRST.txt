@@ -1,27 +1,10 @@
 ===========================================================
-  FREE GST BILLING SOFTWARE
-  By DiceCodes - free, and yours to keep
+  DIVTECH HISAAB
+  GST billing, stock and accounts - by Divtech
 ===========================================================
 
   Your invoices, clients and data stay on THIS computer.
-  Nothing is uploaded. No account. No monthly fee.
-
-
------------------------------------------------------------
-  EASIEST: INSTALL WITH ONE LINE (no ZIP, no warnings)
------------------------------------------------------------
-
-  Windows: press Windows + R, paste this line, press Enter:
-
-    powershell -ExecutionPolicy Bypass -c "[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/install.ps1 | iex"
-
-  Mac / Linux: open Terminal, paste this line, press Return:
-
-    curl -fsSL https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/install.sh | bash
-
-  It installs the app, adds an icon and opens it. The same
-  line later updates it (your data is kept and backed up)
-  or repairs it. Or use this ZIP: follow the steps below.
+  Nothing is uploaded. No account.
 
 
 -----------------------------------------------------------
@@ -46,22 +29,22 @@
 
   Double-click the one that matches your computer:
 
-    Windows ..... Free GST Billing - WINDOWS
-    Mac ......... Free GST Billing - MAC
-    Linux / NAS . Free GST Billing - LINUX
+    Windows ..... Divtech Hisaab - WINDOWS
+    Mac ......... Divtech Hisaab - MAC
+    Linux / NAS . Divtech Hisaab - LINUX
 
   A small window opens with one button.
 
   MAC: install Node.js first (free): https://nodejs.org ->
   macOS Installer (LTS). Then hold Control, click
-  "Free GST Billing - MAC" and choose Open, then Open again.
+  "Divtech Hisaab - MAC" and choose Open, then Open again.
   A Terminal window asks "Install now? [Y/n]": press Return.
 
   LINUX: see the step-by-step guide below.
 
   STEP-BY-STEP GUIDES, for every computer, with every click
   explained (no technical knowledge needed):
-  https://dicecodes.com/free-gst-software-documentation/install.html
+  https://divtech.in
 
 
 -----------------------------------------------------------
@@ -82,8 +65,7 @@
   Windows outside this folder.
 
   Windows may warn "Windows protected your PC" because this
-  app is not code-signed (a certificate costs about $300 a
-  year, which would defeat the word "free"). Click
+  app is not code-signed. Click
   "More info", then "Run anyway".
 
 
@@ -91,7 +73,7 @@
   FROM NOW ON
 -----------------------------------------------------------
 
-  A "Free GST Billing" icon is put on your Desktop and in
+  A "Divtech Hisaab" icon is put on your Desktop and in
   the Start menu. Click it to open the app every day: it
   starts the app and opens it in its own window.
 
@@ -138,7 +120,7 @@
   Back it up with "More options -> Back up my data", which
   writes a ZIP to:
 
-    Documents\FreeGSTBill Backups
+    Documents\Divtech Hisaab Backups
 
   Updating the app NEVER touches your data, and the updater
   takes its own backup before it starts.
@@ -162,13 +144,13 @@
   appropriate access privileges"
       Open Terminal (Applications -> Utilities), type
       chmod +x  (with a space after it), drag the file
-      "Free GST Billing - MAC" into the Terminal window,
+      "Divtech Hisaab - MAC" into the Terminal window,
       press Enter, then open the file again.
 
   Mac: "cannot be opened because Apple cannot check it" /
   "unidentified developer"
       The app is not signed by Apple. Hold Control and click
-      "Free GST Billing - MAC", choose Open, then Open again.
+      "Divtech Hisaab - MAC", choose Open, then Open again.
       Only the first time. (Or: System Settings -> Privacy &
       Security -> Open Anyway.)
 
@@ -202,7 +184,7 @@
       nothing? Close the black window and open the app
       again from its icon.
 
-  "Free GST Billing is already installed on this computer"
+  "Divtech Hisaab is already installed on this computer"
       You extracted a new ZIP into a new folder. Your
       invoices are in the folder it names. Click "Update
       the installed copy" in the launcher, then delete the
@@ -210,7 +192,7 @@
 
   "The app cannot write to its own folder"
       Do not keep it in C:\Program Files. Move the whole
-      Free-GST-Billing folder to Documents or D:\ and open
+      Divtech-Hisaab folder to Documents or D:\ and open
       it from there.
 
   "Drive ... is almost full"
@@ -223,7 +205,7 @@
 
   "Cannot connect to server" / "This site can't be
   reached" / a blank page
-      The app is not running. Click the Free GST Billing
+      The app is not running. Click the Divtech Hisaab
       icon on your Desktop.
 
   The update finished but the app looks the same
@@ -235,18 +217,16 @@
       removed; your invoices are not touched.
 
   Still stuck?
-      Report it here, with a screenshot (hide your GSTIN and
-      bank details) and the message you see:
-      https://github.com/IamRamgarhia/Free-GST-Billing-Software/issues/new?template=bug_report.yml
+      Tell Divtech on WhatsApp, with a screenshot (hide your
+      GSTIN and bank details) and the message you see:
+      WhatsApp / call: +91 94299 11067
+      Email: hello@divtech.in
 
-      Fixes come in the Saturday update - one every week -
-      and anything urgent straight away.
-
-      The full guide, with every screen explained:
-      https://dicecodes.com/free-gst-software-documentation/
+      The full guide, with every screen explained, is inside
+      the app: click any ? button.
 
 
 ===========================================================
-  This software is free and open source (MIT licence).
-  If it saves you money, tell another shop owner about it.
+  Divtech Hisaab by Divtech - https://divtech.in
+  Updates need an active subscription; the app always works.
 ===========================================================

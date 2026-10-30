@@ -173,6 +173,7 @@ export default function SettingsView({ onSaved }) {
     toast('Updating… your data is backed up first. This takes about a minute.', 'info', 8000);
     const result = await runUpdateNow();
     setUpdatingNow(false);
+    if (result.subscriptionRequired) { toast(result.error, 'warning', 12000); return; }
     toast(result.ok ? 'Update finished. Reload the page to use the new version.' : `Update failed — ${result.error}`,
       result.ok ? 'success' : 'error', 10000);
   };
@@ -588,7 +589,7 @@ export default function SettingsView({ onSaved }) {
     try {
       const text = await file.text();
       const inspection = inspectBackup(text);
-      if (!inspection.valid) { toast("This file doesn't look like a Free GST Billing backup.", 'error'); return; }
+      if (!inspection.valid) { toast("This file doesn't look like a Divtech Hisaab backup.", 'error'); return; }
       setImportInspection(inspection);
       setImportJsonText(text);
       // Auto-tick only the parts that actually have data in the file
@@ -1772,10 +1773,21 @@ export default function SettingsView({ onSaved }) {
         {updateInfo?.updateAvailable && (
           <div className="update-available-box">
             <p><strong>New version v{updateInfo.latest} is available!</strong></p>
-            <p>Your data is backed up first and is not affected. Click below to update:</p>
-            <button type="button" className="btn btn-primary" disabled={updatingNow} onClick={handleSettingsUpdateNow} style={{ marginTop: '0.5rem', display: 'inline-flex' }}>
-              <Download size={18} /> {updatingNow ? 'Updating…' : 'Update Now'}
-            </button>
+            {updateInfo.subscriptionRequired ? (
+              <>
+                <p>{updateInfo.subscriptionMessage}</p>
+                <button type="button" className="btn btn-primary" onClick={() => window.dispatchEvent(new CustomEvent('divtech-open-view', { detail: 'support' }))} style={{ marginTop: '0.5rem', display: 'inline-flex' }}>
+                  Renew subscription
+                </button>
+              </>
+            ) : (
+              <>
+                <p>Your data is backed up first and is not affected. Click below to update:</p>
+                <button type="button" className="btn btn-primary" disabled={updatingNow} onClick={handleSettingsUpdateNow} style={{ marginTop: '0.5rem', display: 'inline-flex' }}>
+                  <Download size={18} /> {updatingNow ? 'Updating…' : 'Update Now'}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

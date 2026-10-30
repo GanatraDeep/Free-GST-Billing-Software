@@ -20,19 +20,15 @@ export default [
   <li><a href="#support"><strong>Support &amp; About</strong></a>, <strong>Control Panel</strong> and <strong>Settings</strong>.</li>
   <li>A dot on <b>Control Panel</b>: green when the app is running, red when it is not (hover over it to read which).</li>
 </ul>
-<p>At the end of the Dashboard, below the invoices, a small line shows the app's version, a link to DiceCodes and <a href="#support">Support</a>. It is never printed.</p>
+<p>At the end of the Dashboard, below the invoices, a small line shows the app's version, a link to Divtech and <a href="#support">Support</a>. It is never printed.</p>
 <p>The ☰ button beside the app name shrinks the sidebar to a slim strip of icons and gives the page more room; it is highlighted while the menu hides itself. Point at the strip to open it. Click ☰ again to keep the menu open.</p>
 <p><b>At the top right of every screen</b> are small buttons: <b>?</b> opens this User Guide in your browser (it needs internet), the 🔔 bell opens <a href="#notifications">Notifications</a>, the Wi-Fi button turns <a href="security.html#offline-mode">Offline mode</a> on or off and shows what it changes (it turns orange, with a line through it, while Offline mode is on), the moon or sun switches <a href="#dark-mode">dark mode</a>, and, when a <a href="settings.html#lock">PIN</a> is set, the padlock locks the app. On a phone they sit in the bar at the top, beside the ☰ menu button. You can hide or reorder them in <a href="settings.html#features-menu">Settings → Features</a>.</p>
 <p>On a narrow screen, the sidebar folds away behind the ☰ menu button.</p>
-<figure class="narrow"><img src="assets/img/dashboard-phone.png" alt="The Dashboard on a phone: the ☰ menu button, app name, business name and the ?, bell and moon buttons in the bar at the top, then the Dashboard buttons, the overdue banner and the total cards one under another." loading="lazy"><figcaption>The Dashboard at phone width.</figcaption></figure>
 </section>
 
 <section id="support">
-<h2>Support &amp; About</h2>
-<p>Who makes the app, and how to help it grow. Free ways come first: star it on GitHub, tell another business, report a bug or ask for a feature. If you want to give money, scan the UPI QR with any UPI app, for any amount. The page also lists what DiceCodes builds for businesses: custom software and web apps, changes to this app, setup and data migration, support plans, AI integration and automation, and mobile apps.</p>
-<p>The app stays free whatever you choose. Nothing is locked, and nothing is ever printed on your invoices. Once you have made 10 invoices, the Dashboard shows a small <a href="dashboard.html#support-card">support card</a> once a day; ${ui('Not today')} hides it until tomorrow and ${ui('Hide for 30 days')} for a month.</p>
-<p>Scanning the QR fills in the payment note "Free GST Billing support - <i>your business name</i>", so DiceCodes can thank you; untick <b>Include my business name</b> to leave it out. The page also shows how much users have given so far and what it is going towards.</p>
-<p>Once a month at most, a one-line note at the top of the app asks for a star on GitHub. ${ui('✕')} hides it for 30 days; ${ui('Star on GitHub')} or ${ui('Already starred')} hides it for good. It never appears while you are making an invoice.</p>
+<h2>Support &amp; Subscription</h2>
+<p>Near the bottom of the sidebar. It shows your subscription (active, ending soon or ended), where you enter or renew your license key, and how to reach Divtech on WhatsApp, phone or email. The subscription only brings updates; the app always works without it. See <a href="support.html">Support &amp; Subscription</a>.</p>
 </section>
 
 <section id="switch-business">
@@ -76,7 +72,6 @@ export default [
   <li><strong>Pick one</strong>Move with <kbd>↑</kbd> <kbd>↓</kbd> and press <kbd>Enter</kbd>, or click it. The box closes and the screen opens.</li>
 </ol>
 <p><kbd>Esc</kbd>, or a click outside the box, closes it. If nothing fits you see <b>Nothing matches "…"</b>: try fewer letters. ${ui('All shortcuts (Ctrl+/)')} at the bottom opens the list of <a href="#keyboard">keyboard shortcuts</a>.</p>
-<figure><img src="assets/img/app-palette.png" alt="Quick search finding a client and their invoices." loading="lazy"><figcaption>Quick search finding a client and their invoices.</figcaption></figure>
 </section>
 
 <section id="keyboard">
@@ -97,18 +92,17 @@ export default [
 <section id="dark-mode">
 <h2>Dark mode</h2>
 <p>The moon button at the top right of every screen switches the app to dark colours, and the sun button switches back. Invoices and PDFs always print in their normal colours.</p>
-<figure><img src="assets/img/dashboard-dark.png" alt="The Dashboard in dark mode: dark sidebar and cards, with the sun button at the top right to switch back." loading="lazy"><figcaption>The Dashboard in dark mode. The sun button at the top right switches back.</figcaption></figure>
 </section>
 
 <section id="install-as-app">
 <h2>Opening it like a desktop app</h2>
-<p>It already is one. The <b>Free GST Billing</b> icon (the blue <b>B</b>) on your Desktop and in the Start menu starts the app and opens it in its own window, with no tabs or address bar.</p>
+<p>It already is one. The <b>Divtech Hisaab</b> icon (the blue <b>B</b>) on your Desktop and in the Start menu starts the app and opens it in its own window, with no tabs or address bar.</p>
 <p>Don't use the browser's own ${ui('Install app')} button (in Chrome or Edge's address bar). That makes a second icon which opens a window but cannot start the app, so after a restart it only shows "Needs a Quick Start". If you have one, right-click it and choose ${ui('Uninstall')}.</p>
 </section>
 
 <section id="app-not-running">
 <h2>"Needs a Quick Start"</h2>
-<p>If the app's engine is not running, the page says <b>Free GST Billing Software Needs a Quick Start</b>. Your data is safe. Double-click the <b>Free GST Billing</b> icon on your Desktop or in the Start menu: it starts the app, and the page carries on by itself once it is running. An app icon made by Chrome or Edge cannot start the app; use ours, and remove the other one (right-click it, then ${ui('Uninstall')}).</p>
+<p>If the app's engine is not running, the page says <b>Divtech Hisaab Needs a Quick Start</b>. Your data is safe. Double-click the <b>Divtech Hisaab</b> icon on your Desktop or in the Start menu: it starts the app, and the page carries on by itself once it is running. An app icon made by Chrome or Edge cannot start the app; use ours, and remove the other one (right-click it, then ${ui('Uninstall')}).</p>
 </section>
 `,
 },
@@ -135,7 +129,7 @@ export default [
 <ol>
   <li>Close the launcher.</li>
   <li>Right-click the ZIP and choose ${ui('Extract All…')}.</li>
-  <li>Open the extracted <b>Free-GST-Billing</b> folder and double-click the launcher there. Keep the launcher and the <code>_system</code> folder together.</li>
+  <li>Open the extracted <b>Divtech-Hisaab</b> folder and double-click the launcher there. Keep the launcher and the <code>_system</code> folder together.</li>
   <li>Still missing? Download the ZIP again; the download may have been cut short.</li>
 </ol>
 <p>See <a href="install.html#extract-first">Step 2: Unzip (extract) it</a>.</p>
@@ -156,25 +150,25 @@ export default [
 <p>The black window shows <strong>PROBLEM:</strong> and what went wrong. Fix it, then click ${ui('Install')} again; it carries on where it stopped.</p>
 <ul>
   <li><strong>"The app cannot reach the internet to download its packages"</strong>, <strong>"Could not download Node.js"</strong> or <strong>"The download did not work"</strong>: the first install needs the internet. Check the connection (open any website). On an office network, a proxy or firewall may block it; ask whoever runs the network to allow <code>registry.npmjs.org</code> and <code>nodejs.org</code>.</li>
-  <li><strong>"The app packages did not install"</strong>: the internet, disk and folder look fine, so antivirus is the usual cause. Add the Free-GST-Billing folder to its exclusions and click ${ui('Install')} again.</li>
+  <li><strong>"The app packages did not install"</strong>: the internet, disk and folder look fine, so antivirus is the usual cause. Add the Divtech-Hisaab folder to its exclusions and click ${ui('Install')} again.</li>
   <li><strong>"Node.js could not be set up automatically"</strong>: install Node.js LTS yourself from <a href="https://nodejs.org">nodejs.org</a> (the page opens by itself), keep the default options, and open the launcher again. If antivirus removed it, add the folder to its exclusions.</li>
   <li><strong>"Windows can install Node.js LTS for this PC ... Install Node.js LTS now?"</strong>: the app could not download Node.js itself, so it offers Windows' own installer. Type <b>Y</b> and press <kbd>Enter</kbd> to accept (Windows may ask for permission), or anything else to install it yourself.</li>
   <li><strong>"This version of Windows is too old"</strong>: the app needs Windows 10 or 11. Node.js no longer runs on Windows 7 or 8.</li>
   <li><strong>"The app cannot write to its own folder"</strong>: see <a href="#no-permission">The app is not allowed to write</a>.</li>
   <li><strong>"Drive C:\\ is almost full"</strong>: the install needs about 400 MB. See <a href="#disk-full">The disk is full</a>.</li>
   <li><strong>"too old"</strong>, <strong><code>npm ERR!</code></strong> or <strong>"Unsupported engine"</strong>: see <a href="#old-node">Node.js is too old</a>.</li>
-  <li><strong>"Free GST Billing is already installed on this computer"</strong>: see <a href="#already-installed">Already installed on this computer</a>.</li>
+  <li><strong>"Divtech Hisaab is already installed on this computer"</strong>: see <a href="#already-installed">Already installed on this computer</a>.</li>
 </ul>
 <p>Never delete the <code>data</code> folder to fix an install.</p>
 </section>
 
 <section id="already-installed">
 <h3>"Already installed on this computer"</h3>
-<p>You may see: <strong>"Already installed on this computer"</strong> in the launcher, or <strong>"Free GST Billing is already installed on this computer, in: ..."</strong> in the black window.</p>
+<p>You may see: <strong>"Already installed on this computer"</strong> in the launcher, or <strong>"Divtech Hisaab is already installed on this computer, in: ..."</strong> in the black window.</p>
 <p>You extracted a new ZIP into a new folder. Your invoices are in the copy it names, so it does not make a second, empty copy.</p>
 <ol>
   <li>Click ${ui('Update the installed copy')}. It uses the files you just extracted, so no download is needed.</li>
-  <li>When it finishes, open the app from your <b>Free GST Billing</b> shortcut as usual.</li>
+  <li>When it finishes, open the app from your <b>Divtech Hisaab</b> shortcut as usual.</li>
   <li>The new folder is not needed after that. You can delete it.</li>
 </ol>
 </section>
@@ -211,10 +205,10 @@ export default [
 
 <section id="cannot-connect">
 <h3>"Failed to fetch", "App Not Running" or "Needs a Quick Start"</h3>
-<p>You may see: <strong>"Failed to fetch"</strong> (Chrome, Edge), <strong>"NetworkError when attempting to fetch resource"</strong> (Firefox) or <strong>"Load failed"</strong> (Safari), often after words like <i>Restore failed:</i> or <i>Export failed:</i>; a red dot on <b>Control Panel</b> in the menu; a page saying <strong>"Free GST Billing Software Needs a Quick Start"</strong>; <strong>"Could not check the PIN. Is the app still running?"</strong>; or the browser's own <strong>"This site can't be reached"</strong> or a blank page.</p>
+<p>You may see: <strong>"Failed to fetch"</strong> (Chrome, Edge), <strong>"NetworkError when attempting to fetch resource"</strong> (Firefox) or <strong>"Load failed"</strong> (Safari), often after words like <i>Restore failed:</i> or <i>Export failed:</i>; a red dot on <b>Control Panel</b> in the menu; a page saying <strong>"Divtech Hisaab Needs a Quick Start"</strong>; <strong>"Could not check the PIN. Is the app still running?"</strong>; or the browser's own <strong>"This site can't be reached"</strong> or a blank page.</p>
 <p>The app's engine (the server on your computer) is not running: the computer was restarted, the app was stopped, or it closed. Nothing already saved is lost.</p>
 <ol>
-  <li>Double-click the <b>Free GST Billing</b> icon on your Desktop or in the Start menu (Mac: <b>Free GST Billing - MAC</b>; Linux: the start command in <a href="install-linux.html#start">Step 3</a>). It starts the app if needed and opens the right address. If a small launcher window opens instead (an install from before version 1.10.83, the first time), click ${ui('Open App')}.</li>
+  <li>Double-click the <b>Divtech Hisaab</b> icon on your Desktop or in the Start menu (Mac: <b>Divtech Hisaab - MAC</b>; Linux: the start command in <a href="install-linux.html#start">Step 3</a>). It starts the app if needed and opens the right address. If a small launcher window opens instead (an install from before version 1.10.83, the first time), click ${ui('Open App')}.</li>
   <li>Wait up to a minute. The "Needs a Quick Start" page carries on by itself once the app is running; otherwise press <kbd>F5</kbd> to reload.</li>
   <li>Try what failed again.</li>
 </ol>
@@ -224,9 +218,9 @@ export default [
 <section id="port-in-use">
 <h3>"Port 47371 is busy" or "address already in use"</h3>
 <p>You may see: <strong>"Port 47371 is busy, trying 47372..."</strong>, <strong><code>EADDRINUSE</code></strong> or <strong>"address already in use"</strong>. These lines only appear when the app is started from a Terminal or Command Prompt.</p>
-<p>Another program, or a second copy of Free GST Billing, already uses that port (the "door" the browser knocks on). The app picks the next free one by itself and saves it in <code>data\\port.txt</code>; the launcher reads that file, so ${ui('Open App')} goes to the right address.</p>
+<p>Another program, or a second copy of Divtech Hisaab, already uses that port (the "door" the browser knocks on). The app picks the next free one by itself and saves it in <code>data\\port.txt</code>; the launcher reads that file, so ${ui('Open App')} goes to the right address.</p>
 <ol>
-  <li>Always open the app with its <b>Free GST Billing</b> icon (or the launcher's ${ui('Open App')}), not a bookmark of <code>localhost:47371</code>, which may now be the other program.</li>
+  <li>Always open the app with its <b>Divtech Hisaab</b> icon (or the launcher's ${ui('Open App')}), not a bookmark of <code>localhost:47371</code>, which may now be the other program.</li>
   <li>If the launcher says it has not answered, close it and click ${ui('Open App')} once more: it reads the new port.</li>
   <li>The <a href="control-panel.html#about">Control Panel</a> shows the port the app is using.</li>
   <li>Two copies of the app on one computer? Keep using the one with your invoices; see <a href="#already-installed">Already installed</a>.</li>
@@ -239,8 +233,8 @@ export default [
 <p>The <a href="settings.html#lock">PIN lock</a> asks for the PIN once per browser tab. "Could not check the PIN" means the app is not running: see <a href="#cannot-connect">Failed to fetch</a>.</p>
 <p><b>Forgot the PIN?</b> It can be removed on this computer without losing anything:</p>
 <ol>
-  <li>Open the <b>Free-GST-Billing</b> folder, the one with the launcher in it.</li>
-  <li>Make a new empty file there named <code>RESET-PIN</code>. On Windows: right-click an empty space, ${ui('New')} → ${ui('Text Document')}, and name it <code>RESET-PIN</code> (<code>RESET-PIN.txt</code> also works). On a Mac or Linux, in the Terminal: <code>touch ~/Free-GST-Billing/RESET-PIN</code> (change the path if your folder is elsewhere).</li>
+  <li>Open the <b>Divtech-Hisaab</b> folder, the one with the launcher in it.</li>
+  <li>Make a new empty file there named <code>RESET-PIN</code>. On Windows: right-click an empty space, ${ui('New')} → ${ui('Text Document')}, and name it <code>RESET-PIN</code> (<code>RESET-PIN.txt</code> also works). On a Mac or Linux, in the Terminal: <code>touch ~/Divtech-Hisaab/RESET-PIN</code> (change the path if your folder is elsewhere).</li>
   <li>Reload the app's page. The PIN is removed and the file deleted by itself. Your invoices are not touched.</li>
   <li>Set a new PIN in <a href="settings.html#lock">Settings</a> if you want one.</li>
 </ol>
@@ -254,7 +248,9 @@ export default [
 <section id="update-failed">
 <h3>An update went wrong</h3>
 <p>You may see: <strong>"Update failed — ..."</strong> in the app, <strong>"ERROR: could not reach GitHub. Are you online?"</strong>, <strong>"Could not check for updates. Check internet connection."</strong>, or <strong>"The new version is in place, but it is not ready to run yet"</strong>.</p>
-<p>Your data folder is never changed by an update, and a backup was saved in <code>Documents\\FreeGSTBill Backups</code> before it started.</p>
+<p>Your data folder is never changed by an update, and a backup was saved in <code>Documents\\Divtech Hisaab Backups</code> before it started.</p>
+<div class="note tip"><strong>"This update needs an active Divtech Hisaab subscription"</strong>
+<p>Nothing is wrong and nothing was changed. Your subscription has no key, has ended, or ended before this update came out. The app keeps working as it is. Renew with Divtech and enter the new key: see <a href="support.html#license-key">Entering your license key</a>.</p></div>
 <ol>
   <li>Check the internet, then run the update again. This fixes most problems.</li>
   <li>If the window showed a <strong>PROBLEM:</strong>, fix that first (see <a href="#install-failed">The install stopped with an error</a>), then click ${ui('Open App')}: it finishes the install by itself.</li>
@@ -279,7 +275,7 @@ export default [
 <p>The browser kept parts of the old version after an update. The app normally reloads itself once to fix this.</p>
 <ol>
   <li>Press <kbd>Ctrl</kbd> + <kbd>F5</kbd> (Mac: <kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>).</li>
-  <li>If it comes back, close every tab of the app, then open it again from its <b>Free GST Billing</b> icon.</li>
+  <li>If it comes back, close every tab of the app, then open it again from its <b>Divtech Hisaab</b> icon.</li>
 </ol>
 </section>
 
@@ -305,8 +301,8 @@ export default [
 <ol>
   <li>Click ${ui('Try again')}.</li>
   <li>If the panel comes back, click ${ui('Go to Dashboard')} and carry on with other work.</li>
-  <li>Click ${ui('Report this problem')} so it gets fixed. The report is filled in for you, and private details (GSTIN, PAN, phone, email, UPI ID and bank account numbers) are removed before it leaves. You can read it before you submit it on GitHub.</li>
-  <li>No GitHub account? Click ${ui('Copy details')} and paste them into an email or WhatsApp message; see <a href="#copy-details">Sending the details another way</a>.</li>
+  <li>Click ${ui('Report this problem')} so it gets fixed. The report is filled in for you, and private details (GSTIN, PAN, phone, email, UPI ID and bank account numbers) are removed before it leaves. It opens WhatsApp to Divtech, and you can read it before you send it.</li>
+  <li>No WhatsApp on this computer? Click ${ui('Copy details')} and paste them into an email; see <a href="#copy-details">Sending the details another way</a>.</li>
 </ol>
 </section>
 
@@ -339,7 +335,7 @@ export default [
 <p>The drive the app is on has no free space, so the app could not write. The app writes each file in full or not at all, so nothing already saved is lost or half-written.</p>
 <ol>
   <li>Free some space: empty the Recycle Bin (Mac: Bin), delete old downloads and videos you do not need.</li>
-  <li>Backups you have already copied somewhere else can be deleted from <code>Documents\\FreeGSTBill Backups</code>.</li>
+  <li>Backups you have already copied somewhere else can be deleted from <code>Documents\\Divtech Hisaab Backups</code>.</li>
   <li>Try again.</li>
 </ol>
 </section>
@@ -350,9 +346,9 @@ export default [
 <p>Windows or antivirus is stopping the app from changing its own files. Usual causes: the app folder is inside <code>C:\\Program Files</code>, on a read-only or synced drive, or antivirus <b>Controlled folder access</b> blocks it.</p>
 <ol>
   <li>Stop the app (launcher, ${ui('More options')} → ${ui('Stop the app')}).</li>
-  <li>Move the whole <b>Free-GST-Billing</b> folder to <b>Documents</b> or <code>D:\\</code>, and open the launcher from there. The old Desktop shortcut points at the old place: right-click the launcher → ${ui('Send to')} → ${ui('Desktop (create shortcut)')} for a new one.</li>
+  <li>Move the whole <b>Divtech-Hisaab</b> folder to <b>Documents</b> or <code>D:\\</code>, and open the launcher from there. The old Desktop shortcut points at the old place: right-click the launcher → ${ui('Send to')} → ${ui('Desktop (create shortcut)')} for a new one.</li>
   <li>If antivirus blocks it, allow the app: in <b>Windows Security → Virus &amp; threat protection → Ransomware protection</b>, use <b>Allow an app through Controlled folder access</b>, or add the folder to your antivirus's exclusions.</li>
-  <li><strong>Mac or Linux:</strong> the folder may belong to another user (for example after using <code>sudo</code>). In the Terminal: <code>sudo chown -R $(whoami) ~/Free-GST-Billing</code> (change the path if your folder is elsewhere).</li>
+  <li><strong>Mac or Linux:</strong> the folder may belong to another user (for example after using <code>sudo</code>). In the Terminal: <code>sudo chown -R $(whoami) ~/Divtech-Hisaab</code> (change the path if your folder is elsewhere).</li>
 </ol>
 </section>
 
@@ -501,7 +497,7 @@ export default [
 
 <section id="restore-failed">
 <h3>A backup or restore failed</h3>
-<p>You may see: <strong>"This file doesn't look like a Free GST Billing backup."</strong>, <strong>"Could not read the file"</strong>, <strong>"Import failed: ..."</strong>, <strong>"Restore failed: ..."</strong>, <strong>"Backup failed: ..."</strong> or <strong>"No data folder found - nothing to back up."</strong></p>
+<p>You may see: <strong>"This file doesn't look like a Divtech Hisaab backup."</strong>, <strong>"Could not read the file"</strong>, <strong>"Import failed: ..."</strong>, <strong>"Restore failed: ..."</strong>, <strong>"Backup failed: ..."</strong> or <strong>"No data folder found - nothing to back up."</strong></p>
 <p>A restore saves what you have now first, so a failed one changes nothing.</p>
 <ol>
   <li>Read the end of the message: <a href="#cannot-connect">Failed to fetch</a>, <a href="#payload-too-large">Request body too large</a>, <a href="#disk-full">disk full</a> and <a href="#no-permission">permission</a> each have their own entry.</li>
@@ -543,7 +539,7 @@ export default [
   <li>Open the data folder: ${ui('Open Data Folder')} in the <a href="control-panel.html#actions">Control Panel</a>.</li>
   <li>Open <code>backups</code>, then the newest date folder, then the same subfolder (<code>bills</code>). Copy that file.</li>
   <li>Paste it into the same subfolder of the data folder, replacing the damaged one, and reload the page.</li>
-  <li>No good copy there? Look in the ZIPs in <code>Documents\\FreeGSTBill Backups</code>, or move the damaged file to your Desktop (everything else keeps working) and <a href="#report-problem">send it to us</a>.</li>
+  <li>No good copy there? Look in the ZIPs in <code>Documents\\Divtech Hisaab Backups</code>, or move the damaged file to your Desktop (everything else keeps working) and <a href="#report-problem">send it to us</a>.</li>
 </ol>
 <p>Restoring a whole day from <b>Settings, Backup Management</b> also works, but it puts all your data back to that day. See <a href="backup.html#automatic-backups">Automatic daily backups</a>.</p>
 </section>
@@ -556,8 +552,8 @@ export default [
 <section id="mac-blocked">
 <h3>The Mac will not open the launcher</h3>
 <ul>
-  <li><strong>"could not be executed because you do not have appropriate access privileges"</strong>: open <b>Terminal</b> (Applications → Utilities), type <code>chmod +x </code> with a space after it, drag <b>Free GST Billing - MAC</b> into the Terminal window, press <kbd>Return</kbd>, and open the file again. Downloads from v1.10.82 do not need this. See <a href="terminal.html#example">the step-by-step example</a>.</li>
-  <li><strong>"cannot be opened because Apple cannot check it for malicious software"</strong> or <strong>"unidentified developer"</strong>: the app is not signed by Apple. Hold <kbd>Control</kbd>, click <b>Free GST Billing - MAC</b>, choose <b>Open</b>, then <b>Open</b> again. Only the first time. Or use <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</li>
+  <li><strong>"could not be executed because you do not have appropriate access privileges"</strong>: open <b>Terminal</b> (Applications → Utilities), type <code>chmod +x </code> with a space after it, drag <b>Divtech Hisaab - MAC</b> into the Terminal window, press <kbd>Return</kbd>, and open the file again. Downloads from v1.10.82 do not need this. See <a href="terminal.html#example">the step-by-step example</a>.</li>
+  <li><strong>"cannot be opened because Apple cannot check it for malicious software"</strong> or <strong>"unidentified developer"</strong>: the app is not signed by Apple. Hold <kbd>Control</kbd>, click <b>Divtech Hisaab - MAC</b>, choose <b>Open</b>, then <b>Open</b> again. Only the first time. Or use <b>System Settings → Privacy &amp; Security → Open Anyway</b>.</li>
   <li><strong>"Node.js is not installed"</strong> or <strong>too old</strong>: see <a href="#old-node">Node.js is too old</a>.</li>
 </ul>
 <p>Updating on a Mac: never drag a new download over the old folder; see <a href="update.html#mac">Mac: other ways</a>.</p>
@@ -570,9 +566,9 @@ export default [
 
 <section id="linux-permission">
 <h3>"Permission denied" or "bash: not found"</h3>
-<p>You may see: <strong>"Permission denied"</strong> when starting <code>./Free GST Billing - LINUX.sh</code>, or <strong>"bash: not found"</strong> on a NAS.</p>
+<p>You may see: <strong>"Permission denied"</strong> when starting <code>./Divtech Hisaab - LINUX.sh</code>, or <strong>"bash: not found"</strong> on a NAS.</p>
 <ol>
-  <li>Start it through bash, which needs no permission change: <code>cd ~/Free-GST-Billing &amp;&amp; bash "Free GST Billing - LINUX.sh"</code>.</li>
+  <li>Start it through bash, which needs no permission change: <code>cd ~/Divtech-Hisaab &amp;&amp; bash "Divtech Hisaab - LINUX.sh"</code>.</li>
   <li>No bash (Alpine, some NAS systems): install it, for example <code>sudo apk add bash</code>.</li>
   <li>"Permission denied" while the app writes files: see <a href="#no-permission">The app is not allowed to write</a>.</li>
 </ol>
@@ -586,7 +582,7 @@ export default [
   <li><strong>"Could not download the update"</strong>: check the internet and try again.</li>
   <li><strong>"could not be extracted (damaged download, or the disk is full)"</strong>: free some space (see <a href="#disk-full">The disk is full</a>) and try again.</li>
   <li><strong>"Update Node.js as shown above"</strong>: see <a href="#old-node">Node.js is too old</a>.</li>
-  <li><strong>"npm install failed."</strong>: check the internet and the free space, then run <code>sh ~/Free-GST-Billing/_system/update-unix.sh</code> again.</li>
+  <li><strong>"npm install failed."</strong>: check the internet and the free space, then run <code>sh ~/Divtech-Hisaab/_system/update-unix.sh</code> again.</li>
   <li><strong>"This copy runs from a git checkout"</strong>: update it with <code>git pull &amp;&amp; npm install &amp;&amp; npm run build</code>.</li>
 </ul>
 <p>After <strong>"[OK] Update complete"</strong>, restart the app (or its Docker container or service).</p>
@@ -600,8 +596,8 @@ export default [
   <tr><th>On the card</th><th>What it is or does</th></tr>
   <tr><td>The list</td><td>Newest first. Each line shows the date and time, the screen it happened on, and the message. If the app was talking to its server, the request and its answer (for example <code>POST /api/bills (500)</code>, or <i>no answer</i>) come first.</td></tr>
   <tr><td><b>How to fix</b></td><td>Shown on a line the app recognises (a full disk, a damaged file, a blocked pop-up…). It opens the matching fix on this Troubleshooting page.</td></tr>
-  <tr><td>${ui('Copy')} / ${ui('Report')} on a line</td><td>Copy that one problem as text, or open the GitHub report form already filled in. See <a href="#report-problem">Reporting a problem</a>.</td></tr>
-  <tr><td>${ui('Copy all')}</td><td>Copies every problem, newest first, plus the server log lines, ready to paste into an email or a GitHub issue.</td></tr>
+  <tr><td>${ui('Copy')} / ${ui('Report')} on a line</td><td>Copy that one problem as text, or open WhatsApp to Divtech with it already filled in. See <a href="#report-problem">Reporting a problem</a>.</td></tr>
+  <tr><td>${ui('Copy all')}</td><td>Copies every problem, newest first, plus the server log lines, ready to paste into an email or a WhatsApp message.</td></tr>
   <tr><td>${ui('Clear log')}</td><td>Empties the list once the problem is solved. It does not touch your invoices or any other data.</td></tr>
   <tr><td><b>Server log</b></td><td>Click to open. The app server's last lines from the <code>errors.log</code> file in your data folder. Known problems found in it are listed above the lines, each with a <b>How to fix</b> link.</td></tr>
 </table></div>
@@ -616,16 +612,15 @@ export default [
 <h3>Reporting a problem</h3>
 <ol>
   <li>In the Problem log, click ${ui('Report')} next to the problem (or ${ui('Report this problem')} on the panel that showed it).</li>
-  <li>GitHub's <a href="${SITE.repo}/issues/new?template=bug_report.yml">Report a problem</a> form opens, already filled in with the version, your computer and the error details. Private details (GSTIN, PAN, phone, email, UPI ID, bank account) are removed first.</li>
-  <li>Add what you did just before it happened, check the text, and submit. This needs a free GitHub account.</li>
+  <li>WhatsApp opens with a message to Divtech (+91 94299 11067), already filled in with the version, your computer and the error details. Private details (GSTIN, PAN, phone, email, UPI ID, bank account) are removed first.</li>
+  <li>Add what you did just before it happened, check the text, and send.</li>
 </ol>
-<p>Reporting without the Problem log: the form asks for the version (bottom of the Dashboard, or <b>Settings, App Updates</b>), your computer, what you did and what you saw, and a screenshot (hide your GSTIN and bank details). If the app does not start, add what <code>node -v</code> and <code>npm -v</code> show in Command Prompt; see <a href="terminal.html#windows">Using the Terminal</a>.</p>
-<p>Problems are fixed in the <a href="support.html#weekly">Saturday update</a>, and anything urgent, such as the app not opening, straight away. For a new feature use <a href="${SITE.repo}/issues/new?template=feature_request.yml">Ask for a feature</a>.</p>
+<p>Reporting without the Problem log: tell Divtech the version (bottom of the Dashboard, or <b>Settings, App Updates</b>), what you did and what you saw, with a screenshot (hide your GSTIN and bank details). If the app does not start, add what <code>node -v</code> and <code>npm -v</code> show in Command Prompt; see <a href="terminal.html#windows">Using the Terminal</a>.</p>
 </section>
 
 <section id="copy-details">
 <h3>Sending the details another way</h3>
-<p>No GitHub account? Click ${ui('Copy details')} (or ${ui('Copy')} in the Problem log), paste it into an email to <a href="mailto:contact@dicecodes.com">contact@dicecodes.com</a> or a WhatsApp message, and add what you did just before it happened. Read it before sending; it is plain text.</p>
+<p>Click ${ui('Copy details')} (or ${ui('Copy')} in the Problem log), paste it into an email to <a href="mailto:hello@divtech.in">hello@divtech.in</a> or a WhatsApp message, and add what you did just before it happened. Read it before sending; it is plain text.</p>
 </section>
 
 <section id="questions">

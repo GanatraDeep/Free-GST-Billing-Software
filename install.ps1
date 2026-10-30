@@ -1,7 +1,7 @@
-# Free GST Billing - one-line install, update and repair for Windows.
+# Divtech Hisaab - one-line install, update and repair for Windows.
 #
 #   Press Windows + R, paste this line, press Enter:
-#   powershell -ExecutionPolicy Bypass -c "[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/install.ps1 | iex"
+#   powershell -ExecutionPolicy Bypass -c "[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/GanatraDeep/free-gst-billing-software/main/install.ps1 | iex"
 #
 # v1.10.83 - a file PowerShell fetches carries no "downloaded from the
 # internet" mark, so Windows SmartScreen shows no warning; and the release
@@ -11,7 +11,7 @@
 # registry, no service: everything stays under the user's own profile.
 #
 # To remove the app (it asks before deleting any data):
-#   powershell -ExecutionPolicy Bypass -c "[Net.ServicePointManager]::SecurityProtocol='Tls12'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/install.ps1))) -Uninstall"
+#   powershell -ExecutionPolicy Bypass -c "[Net.ServicePointManager]::SecurityProtocol='Tls12'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/GanatraDeep/free-gst-billing-software/main/install.ps1))) -Uninstall"
 #
 # `iex` cannot pass parameters, so settings come from environment variables:
 #   FREEGSTBILL_DIR   install into (or update) this folder
@@ -33,7 +33,7 @@ $ProgressPreference = 'SilentlyContinue'
 # PowerShell 5.1 may still default to TLS 1.0, which GitHub refuses.
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$ZipUrl = 'https://github.com/IamRamgarhia/Free-GST-Billing-Software/releases/latest/download/Free-GST-Billing.zip'
+$ZipUrl = 'https://github.com/GanatraDeep/free-gst-billing-software/releases/latest/download/Divtech-Hisaab.zip'
 $Test = $env:FREEGSTBILL_TEST
 $NeedFreeMB = 600   # the ZIP, its unpacked copy, Node.js, and room to spare
 $script:KnownProblem = $false
@@ -60,8 +60,8 @@ function Get-IconFolders {
   return @{ Desktop = [Environment]::GetFolderPath('Desktop'); Programs = [Environment]::GetFolderPath('Programs'); Startup = [Environment]::GetFolderPath('Startup') }
 }
 
-# The app folder a "Free GST Billing" shortcut opens. The launcher's runs
-# "...\Free GST Billing - WINDOWS.hta", this installer's runs
+# The app folder a "Divtech Hisaab" shortcut opens. The launcher's runs
+# "...\Divtech Hisaab - WINDOWS.hta", this installer's runs
 # "...\_system\start-windows.ps1": the first quoted path either way.
 function Get-LinkRoot([string]$lnk) {
   $a = [string](New-Object -ComObject WScript.Shell).CreateShortcut($lnk).Arguments
@@ -81,13 +81,13 @@ function Find-Install {
   foreach ($dir in @($f.Desktop, $f.Programs)) {
     # One unreadable shortcut must not stop the other being checked.
     try {
-      $lnk = Join-Path $dir 'Free GST Billing.lnk'
+      $lnk = Join-Path $dir 'Divtech Hisaab.lnk'
       if (-not (Test-Path -LiteralPath $lnk)) { continue }
       $r = Get-LinkRoot $lnk
       if ($r -and (Test-Path -LiteralPath (Join-Path $r '_system\server.js'))) { return $r }
     } catch { }
   }
-  return (Join-Path $env:LOCALAPPDATA 'Programs\Free GST Billing')
+  return (Join-Path $env:LOCALAPPDATA 'Programs\Divtech Hisaab')
 }
 
 function Test-Writable([string]$dir) {
@@ -122,7 +122,7 @@ function Test-Online {
 function Save-Url([string]$url, [string]$out) {
   try {
     $req = [Net.HttpWebRequest]::Create($url)
-    $req.UserAgent = 'FreeGSTBill-Installer'
+    $req.UserAgent = 'DivtechHisaab-Installer'
     if ($req.Proxy) { $req.Proxy.Credentials = [Net.CredentialCache]::DefaultCredentials }
     $res = $req.GetResponse()
   } catch {
@@ -178,7 +178,7 @@ function Stop-App([string]$sys) {
 function Backup-Data([string]$sys) {
   $data = Join-Path $sys 'data'
   if (@(Get-ChildItem -LiteralPath $data -Recurse -File -Force -ErrorAction SilentlyContinue).Count -eq 0) { return $null }
-  $home_ = if ($Test) { Join-Path $Test 'Backups' } else { Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'FreeGSTBill Backups' }
+  $home_ = if ($Test) { Join-Path $Test 'Backups' } else { Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Divtech Hisaab Backups' }
   New-Item -ItemType Directory -Path $home_ -Force | Out-Null
   $zip = Join-Path $home_ "pre-update-$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').zip"
   Compress-Archive -Path (Join-Path $data '*') -DestinationPath $zip -Force
@@ -195,25 +195,25 @@ function New-AppShortcut([string]$path, [string]$sys) {
   $sc.WorkingDirectory = $sys
   $sc.WindowStyle = 7
   $sc.IconLocation = "$(Join-Path $sys 'app-icon.ico'),0"
-  $sc.Description = 'Free GST Billing Software'
+  $sc.Description = 'Divtech Hisaab'
   $sc.Save()
 }
 
 function Install-App {
   Write-Host ''
-  Write-Host '  Free GST Billing - install or update'
+  Write-Host '  Divtech Hisaab - install or update'
   Write-Host ''
 
   # --- [1/4] -----------------------------------------------------------------
   Step '[1/4] Checking this computer'
   if ([Environment]::OSVersion.Version.Major -lt 10) {
-    Fail 'This computer runs an old Windows.' 'Free GST Billing needs Windows 10 or 11 (Node.js no longer runs on Windows 7 or 8).'
+    Fail 'This computer runs an old Windows.' 'Divtech Hisaab needs Windows 10 or 11 (Node.js no longer runs on Windows 7 or 8).'
   }
   $dest = Find-Install
   $sys = Join-Path $dest '_system'
   $isUpdate = Test-Path -LiteralPath (Join-Path $sys 'server.js')
   if (-not (Test-Writable $dest)) {
-    Fail "This folder cannot be written to: $dest" 'Close any program using it, or choose another folder: $env:FREEGSTBILL_DIR = ''D:\Free GST Billing'' and run the line again.'
+    Fail "This folder cannot be written to: $dest" 'Close any program using it, or choose another folder: $env:FREEGSTBILL_DIR = ''D:\Divtech Hisaab'' and run the line again.'
   }
   $free = Get-FreeMB $dest
   if ($free -lt $NeedFreeMB) {
@@ -225,7 +225,7 @@ function Install-App {
   # Left over by an install that was interrupted.
   Get-ChildItem -LiteralPath $dest -Directory -Force -Filter '.install-tmp-*' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
   Ok
-  if ($isUpdate) { Write-Host "        Found Free GST Billing in $dest - updating it. Your data stays as it is." }
+  if ($isUpdate) { Write-Host "        Found Divtech Hisaab in $dest - updating it. Your data stays as it is." }
 
   # --- [2/4] -----------------------------------------------------------------
   # Unpacked inside the app folder itself: the same drive, so the files can be
@@ -233,7 +233,7 @@ function Install-App {
   $tmp = Join-Path $dest ".install-tmp-$([Guid]::NewGuid().ToString('N').Substring(0, 4))"
   New-Item -ItemType Directory -Path $tmp -Force | Out-Null
   try {
-    $zip = Join-Path $tmp 'Free-GST-Billing.zip'
+    $zip = Join-Path $tmp 'Divtech-Hisaab.zip'
     if ($env:FREEGSTBILL_ZIP) {
       Step '[2/4] Using the package on this computer'
       Copy-Item -LiteralPath $env:FREEGSTBILL_ZIP -Destination $zip
@@ -250,13 +250,13 @@ function Install-App {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     try { [IO.Compression.ZipFile]::ExtractToDirectory($zip, $unpacked) } catch {
       if ($_.Exception.InnerException -is [IO.PathTooLongException] -or $_.Exception -is [IO.PathTooLongException]) {
-        Fail "The folder path is too long for Windows: $dest" 'Install to a shorter one: run $env:FREEGSTBILL_DIR = ''C:\Free GST Billing'' in PowerShell, then the install line there.'
+        Fail "The folder path is too long for Windows: $dest" 'Install to a shorter one: run $env:FREEGSTBILL_DIR = ''C:\Divtech Hisaab'' in PowerShell, then the install line there.'
       }
       Fail 'The downloaded file could not be unpacked (damaged download, or the disk is full).' 'Run the same line again.'
     }
     $inner = Get-ChildItem -LiteralPath $unpacked -Directory | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName '_system\server.js') } | Select-Object -First 1
     if (-not $inner -or -not (Test-Path -LiteralPath (Join-Path $inner.FullName '_system\node_modules\express\package.json'))) {
-      Fail 'The downloaded file is not a complete Free GST Billing package.' 'Run the same line again. If it happens again, report it: https://github.com/IamRamgarhia/Free-GST-Billing-Software/issues'
+      Fail 'The downloaded file is not a complete Divtech Hisaab package.' 'Run the same line again. If it happens again, report it: https://github.com/GanatraDeep/free-gst-billing-software/issues'
     }
     $newSys = Join-Path $inner.FullName '_system'
     $backup = if ($isUpdate) { Backup-Data $sys } else { $null }
@@ -281,7 +281,7 @@ function Install-App {
     } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
     $rootNames = @(Get-ChildItem -LiteralPath $inner.FullName -File -Force | ForEach-Object { $_.Name })
     Get-ChildItem -LiteralPath $dest -File -Force | Where-Object {
-      ($_.Name -like 'Free GST Billing - *' -or $_.Name -eq 'READ ME FIRST.txt') -and $rootNames -notcontains $_.Name
+      ($_.Name -like 'Divtech Hisaab - *' -or $_.Name -eq 'READ ME FIRST.txt') -and $rootNames -notcontains $_.Name
     } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
     foreach ($f in Get-ChildItem -LiteralPath $inner.FullName -File -Force) {
       Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $dest $f.Name) -Force
@@ -313,20 +313,20 @@ function Install-App {
   $f = Get-IconFolders
   foreach ($d in @($f.Desktop, $f.Programs)) {
     New-Item -ItemType Directory -Path $d -Force | Out-Null
-    New-AppShortcut (Join-Path $d 'Free GST Billing.lnk') $sys
+    New-AppShortcut (Join-Path $d 'Divtech Hisaab.lnk') $sys
   }
   Ok
-  if (-not $isUpdate -and (Ask 'Open Free GST Billing by itself when this computer starts?')) {
+  if (-not $isUpdate -and (Ask 'Open Divtech Hisaab by itself when this computer starts?')) {
     New-Item -ItemType Directory -Path $f.Startup -Force | Out-Null
-    New-AppShortcut (Join-Path $f.Startup 'Free GST Billing.lnk') $sys
+    New-AppShortcut (Join-Path $f.Startup 'Divtech Hisaab.lnk') $sys
     Write-Host '        It will open by itself when this computer starts.'
   }
 
   Write-Host ''
-  Write-Host '  Done! Opening Free GST Billing...' -ForegroundColor Green
+  Write-Host '  Done! Opening Divtech Hisaab...' -ForegroundColor Green
   & (Join-Path $sys 'start-windows.ps1') -AppWindow
   Write-Host ''
-  Write-Host '  Next time, click the Free GST Billing icon on your Desktop or in the Start menu.'
+  Write-Host '  Next time, click the Divtech Hisaab icon on your Desktop or in the Start menu.'
   Write-Host ''
   if (-not $Test) { Start-Sleep -Seconds 10 }
 }
@@ -334,13 +334,13 @@ function Install-App {
 function Uninstall-App {
   $dest = Find-Install
   $sys = Join-Path $dest '_system'
-  if (-not (Test-Path -LiteralPath (Join-Path $sys 'server.js'))) { Fail "Free GST Billing is not installed in $dest." 'Nothing was changed.' }
+  if (-not (Test-Path -LiteralPath (Join-Path $sys 'server.js'))) { Fail "Divtech Hisaab is not installed in $dest." 'Nothing was changed.' }
   Write-Host ''
-  Write-Host "  Removing Free GST Billing from $dest"
+  Write-Host "  Removing Divtech Hisaab from $dest"
   Stop-App $sys
   $f = Get-IconFolders
   foreach ($d in @($f.Desktop, $f.Programs, $f.Startup)) {
-    $lnk = Join-Path $d 'Free GST Billing.lnk'
+    $lnk = Join-Path $d 'Divtech Hisaab.lnk'
     try { if ((Test-Path -LiteralPath $lnk) -and ((Get-LinkRoot $lnk) -eq $dest.TrimEnd('\'))) { Remove-Item -LiteralPath $lnk -Force } } catch { }
   }
   # The program goes; the books stay unless the user says otherwise.
@@ -349,7 +349,7 @@ function Uninstall-App {
   # Only the app's own files beside _system: the folder may be one the user
   # chose (FREEGSTBILL_DIR, D:\, Documents) with their own files in it. The
   # same rule as uninstall-windows.ps1.
-  Get-ChildItem -LiteralPath $dest -Force | Where-Object { $_.Name -like 'Free GST Billing - *' -or $_.Name -eq 'READ ME FIRST.txt' } | Remove-Item -Recurse -Force
+  Get-ChildItem -LiteralPath $dest -Force | Where-Object { $_.Name -like 'Divtech Hisaab - *' -or $_.Name -eq 'READ ME FIRST.txt' } | Remove-Item -Recurse -Force
   Write-Host '  The app and its icons are removed.' -ForegroundColor Green
   Write-Host ''
   Write-Host "  Your invoices, clients and settings are still in $sys"
@@ -374,7 +374,7 @@ try {
   if (-not $script:KnownProblem) {
     $diskFull = ($_.Exception.HResult -eq -2147024784) -or ($msg -match 'not enough space')
     if ($diskFull) { $msg = "The disk is full.`n    Free some space, then run the same line again." }
-    else { $msg = "$msg`n    Close Free GST Billing if it is open, then run the same line again; it carries on where it stopped." }
+    else { $msg = "$msg`n    Close Divtech Hisaab if it is open, then run the same line again; it carries on where it stopped." }
   }
   Write-Host "  PROBLEM: $msg" -ForegroundColor Red
   Write-Host '    Your invoices and settings were not changed.'

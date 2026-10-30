@@ -577,7 +577,7 @@ export const runUpdateNow = async () => {
       body: JSON.stringify({ action: 'update' }),
     });
     const data = await res.json();
-    if (!data.ok) return { ok: false, error: data.error || data.stderr || 'The update script did not finish.' };
+    if (!data.ok) return { ok: false, subscriptionRequired: !!data.subscriptionRequired, error: data.error || data.stderr || 'The update script did not finish.' };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };

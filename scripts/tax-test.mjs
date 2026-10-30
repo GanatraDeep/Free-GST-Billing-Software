@@ -66,7 +66,6 @@ import {
 import { splitPurchaseTax } from '../src/utils.js';
 import { buildXlsx, colName } from '../src/utils/xlsx.js';
 import { bulkRowToProduct, closingStock, stockValueOf } from '../src/utils/products.js';
-import { upiNote, parseSupporters, shouldShowSupportNudge } from '../src/utils/supporters.js';
 import { parseChangelog, inlineParts } from '../src/utils/changelog.js';
 import { unzipSync, strFromU8 } from 'fflate';
 import {
@@ -694,8 +693,8 @@ console.log('\n[V73] Customize options, order details, Quotation, docs links');
   eq(INVOICE_TYPES.quotation.prefix, 'QUO', 'Quotations number as QUO');
   eq(salesSign({ invoiceType: 'quotation', totalAmount: 100 }), 0, 'A quotation is not a sale');
 
-  eq(docsLink('invoices#toolbar'), 'https://dicecodes.com/free-gst-software-documentation/invoices.html#toolbar', 'Help links go to the docs section');
-  eq(docsLink('index'), 'https://dicecodes.com/free-gst-software-documentation/', 'The docs home link');
+  eq(docsLink('invoices#toolbar'), '/help/invoices.html#toolbar', 'Help links go to the docs section');
+  eq(docsLink('index'), '/help/', 'The docs home link');
   eq(TCS_SECTIONS.some((t) => t.code === '206C(1H)'), false, '206C(1H) (omitted from 1 April 2025) is not offered on new invoices');
 }
 
@@ -829,9 +828,9 @@ console.log('\n[V77] #86 choosing Unpaid takes back the "Paid" payment');
 
 console.log('\n[V77] #84 duplicate business profiles, terms line breaks');
 {
-  const saved = [{ id: 'a', businessName: 'Anant Exports', gstin: '09AABCU9355J1ZS' }, { id: 'b', businessName: 'DiceCodes', gstin: '' }];
+  const saved = [{ id: 'a', businessName: 'Anant Exports', gstin: '09AABCU9355J1ZS' }, { id: 'b', businessName: 'Divtech', gstin: '' }];
   eq(findSameBusiness(saved, { businessName: 'ANANT EXPORTS PVT', gstin: '09aabcu9355j1zs' })?.id, 'a', 'Same GSTIN under another spelling is the same business');
-  eq(findSameBusiness(saved, { businessName: '  dicecodes ', gstin: '' })?.id, 'b', 'No GSTIN: the same name (case and spaces ignored)');
+  eq(findSameBusiness(saved, { businessName: '  divtech ', gstin: '' })?.id, 'b', 'No GSTIN: the same name (case and spaces ignored)');
   eq(findSameBusiness(saved, { businessName: 'Anant Exports', gstin: '27AAAAA0000A1Z5' }), null, 'Same name but a different GSTIN is a different business');
   eq(findSameBusiness(saved, { businessName: 'Anant Exports', gstin: '' }), null, 'No GSTIN never overwrites a saved profile that has one');
   eq(findSameBusiness(saved, { businessName: 'Anant Exports', gstin: '09AABCU9355J1ZT' }, saved[0])?.id, 'a', 'Loaded profile with a corrected GSTIN typo: that profile is updated');
@@ -910,19 +909,19 @@ console.log('\n[V79] #96 quantities, #95 places of supply and per-business numbe
   eq([fmt({}, 'INV', 7), fmt({ ...brand, showFinYear: false }, 'INV', 7), fmt(brand, 'RPT', 3, { explicitPrefix: true })],
     ['INV/2026-27/0007', 'ACME/0007', 'RPT/2026-27/0003'], 'No brand: type prefix; no FY; a Print Settings per-type prefix is used as is');
 
-  const dicecodes = { businessName: 'DiceCodes', gstin: '29abcde1234f1zw' };
+  const divtech = { businessName: 'Divtech', gstin: '29abcde1234f1zw' };
   const anant = { businessName: '  Anant  Exports ', gstin: '' };
-  eq([businessKeyOf(dicecodes), businessKeyOf(anant), businessKeyOf(null)], ['29ABCDE1234F1ZW', 'NAME:anant exports', ''], 'A business is known by its GSTIN, else its name');
+  eq([businessKeyOf(divtech), businessKeyOf(anant), businessKeyOf(null)], ['29ABCDE1234F1ZW', 'NAME:anant exports', ''], 'A business is known by its GSTIN, else its name');
   const shared = { brandPrefix: '', startNumber: 1 };
   const map = { [businessKeyOf(anant)]: { brandPrefix: 'AE', startNumber: 502 } };
-  const a = numberSeriesFor(shared, map, businessKeyOf(dicecodes));
+  const a = numberSeriesFor(shared, map, businessKeyOf(divtech));
   const b = numberSeriesFor(shared, map, businessKeyOf(anant));
   eq([a.own, b.own, b.brandPrefix, b.startNumber, b.separator], [false, true, 'AE', 502, '/'], 'A business without its own numbering uses the shared one; one with it uses its own');
-  eq([counterKeyFor('INV', a, businessKeyOf(dicecodes)), counterKeyFor('INV', b, businessKeyOf(anant))], ['counter_INV', 'counter_INV@NAME:anant exports'], 'Each own series has its own counters');
+  eq([counterKeyFor('INV', a, businessKeyOf(divtech)), counterKeyFor('INV', b, businessKeyOf(anant))], ['counter_INV', 'counter_INV@NAME:anant exports'], 'Each own series has its own counters');
   eq([fmt(a, 'INV', nextCounterValue(1225, startFor('tax-invoice', a))), fmt(b, 'INV', nextCounterValue(undefined, startFor('tax-invoice', b)))],
     ['INV/2026-27/1226', 'AE/2026-27/0502'], '#95: firm A continues at 1226, firm B starts its own series at 0502');
 
-  const ctx = { shared: { brandPrefix: 'ACME' }, seriesMap: map, businessKey: businessKeyOf(dicecodes), customPrefixes: { 'tax-invoice': 'RPT' } };
+  const ctx = { shared: { brandPrefix: 'ACME' }, seriesMap: map, businessKey: businessKeyOf(divtech), customPrefixes: { 'tax-invoice': 'RPT' } };
   eq([!!ownPrefixProblem('', ctx), !!ownPrefixProblem('inv', ctx), !!ownPrefixProblem('ACME', ctx), !!ownPrefixProblem('AE', ctx), !!ownPrefixProblem('RPT', ctx), ownPrefixProblem('KS', ctx)],
     [true, true, true, true, true, ''], 'An own prefix must be set and unlike any other series (type prefixes, shared, other businesses, Print Settings)');
   eq(ownPrefixProblem('AE', { ...ctx, businessKey: businessKeyOf(anant) }), '', 'A business may keep its own prefix when it saves again');
@@ -1007,42 +1006,6 @@ console.log('\n[Audit 2026-10] Income tax marginal relief');
   // §234B: tax paid after 31 March is not advance tax.
   const sched = computeAdvanceTaxSchedule(100000, 0, [{ date: '2026-06-10', amount: 100000 }], 'regular', '2025-26');
   approx(compute234BInterest(sched, '2026-06-10'), 3000, '234B: ₹1L all paid in June -> 1% x 3 months (paying late no longer wipes it out)');
-}
-
-console.log('\n[V80] Support page: UPI payment note and the supporters tracker');
-{
-  eq(upiNote('DiceCodes'), 'Free GST Billing support - DiceCodes', 'The payment note names the business that paid');
-  eq(upiNote(''), 'Free GST Billing support', 'No business name: the plain note');
-  eq(upiNote('M/S Sharma & Sons #12'), 'Free GST Billing support - M S Sharma Sons 12', 'Characters some UPI apps refuse are dropped');
-  eq(upiNote('A Very Long Business Name Private Limited Company of India').length <= 50, true, 'The note is kept to 50 characters');
-
-  const t = parseSupporters({ totalReceived: 12450.4, supporters: 37, goal: { amount: 50000, label: 'Balance sheet' }, thanks: ['Asha', '  Ravi  ', 42, ''], updated: '2026-10-19' });
-  eq([t.totalReceived, t.supporters, t.goal, t.thanks, t.updated], [12450, 37, { amount: 50000, label: 'Balance sheet' }, ['Asha', 'Ravi'], '2026-10-19'], 'The tracker file is read: total, supporters, goal, names');
-  eq([parseSupporters(null), parseSupporters([]), parseSupporters({ totalReceived: -5 }), parseSupporters({ totalReceived: 'lots' })], [null, null, null, null], 'A missing or broken file shows nothing');
-  const odd = parseSupporters({ totalReceived: 10, supporters: 'many', goal: { amount: 0 }, thanks: 'Asha', updated: 'yesterday' });
-  eq([odd.supporters, odd.goal, odd.thanks, odd.updated], [null, null, [], ''], 'Odd values are left out, never shown as they are');
-  eq(parseSupporters({ totalReceived: 1, thanks: ['<img src=x onerror=alert(1)>'.repeat(5)] }).thanks[0].length, 60, 'Names are cut to 60 characters (and shown as text, never HTML)');
-
-  // Daily support card on the Dashboard.
-  const day = new Date(2026, 9, 24, 10, 0);
-  const show = (n, st, at = day) => shouldShowSupportNudge(n, st, at);
-  eq([show(9, {}), show(10, {})], [false, true], 'The daily card waits for 10 invoices');
-  eq(show(50, { hiddenOn: '2026-10-24' }), false, '"Not today" hides it for the rest of the day');
-  eq(show(50, { hiddenOn: '2026-10-24' }, new Date(2026, 9, 25, 0, 5)), true, 'It is back the next morning (local date, not UTC)');
-  eq([show(50, { snoozedUntil: day.getTime() + 1 }), show(50, { snoozedUntil: day.getTime() - 1 })], [false, true], '"Hide for 30 days" holds until the date passes');
-  eq(show(500, { never: true }), false, 'The old "Don\'t show again" is still honoured');
-  eq(show(50, { snoozedAt: day.getTime() }), true, 'The old 120-day snooze no longer hides it');
-}
-
-console.log('\n[V83] Supporters with their amounts');
-{
-  const t = parseSupporters({ totalReceived: 804, supporters: 2, thanks: ['A', 'B'], people: [
-    { name: 'Kuldeep Suthar', amount: 101, date: '2026-10-29' }, { name: '  Niraj  Kumar ', amount: 501.4 },
-    { name: '', amount: 5 }, { name: 'Bad', amount: -1 }, { name: 'Text', amount: 'lots' }, 'junk', null,
-  ] });
-  eq(t.people, [{ name: 'Kuldeep Suthar', amount: 101, date: '2026-10-29' }, { name: 'Niraj Kumar', amount: 501, date: '' }],
-    'Each supporter with amount and date; blank, negative and broken entries are left out');
-  eq(parseSupporters({ totalReceived: 10, thanks: ['A'] }).people, [], 'An older file (names only) still works: no amounts');
 }
 
 console.log('\n[V83] #117 Purchases: CGST + SGST, or IGST');

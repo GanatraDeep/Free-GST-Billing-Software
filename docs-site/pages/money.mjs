@@ -137,7 +137,6 @@ export default [
   <tr><td><a href="#gstr-1-summary">GSTR-1 Summary Totals</a></td><td>-</td><td>B2B and B2C together, less credit notes</td></tr>
 </table></div>
 <p>Exports to clients abroad are not in these tables or in the GSTR-1 file. The red box lists them: add them in Table 6A on the portal with the shipping bill details.</p>
-<figure><img src="assets/img/app-gstr1.png" alt="The GSTR-1 tab for one month." loading="lazy"><figcaption>The GSTR-1 tab for one month.</figcaption></figure>
 </section>
 
 <section id="b2b">
@@ -224,7 +223,6 @@ export default [
 <ul>
   <li><strong>Exports</strong>: an invoice to a client whose country is not India. It is kept out of B2B and B2C and out of the JSON file, because the portal's export table (6A) can need the shipping bill number, date and port code, which the app does not record. The <b>Exports — Table 6A</b> table on the GSTR-1 tab lists them, ready to type into Table 6A on the portal: type <b>WPAY</b> (IGST paid) or <b>WOPAY</b> (under a LUT, no IGST), invoice number and date, rate, taxable value, IGST and invoice value. ${ui('Exports')} saves the same rows as <code>GSTR1_Exports_6A.csv</code>. For services no shipping bill is needed; for goods add it on the portal.</li>
 </ul>
-<figure><img src="assets/img/gstr1-exports.png" alt="The Exports — Table 6A table on the GSTR-1 tab: one invoice to a US client, type WOPAY, billed in USD at a rate of 84.2, with taxable value, IGST of zero and invoice value in rupees." loading="lazy"><figcaption>An export under a LUT (WOPAY), in rupees at the rate saved on the invoice.</figcaption></figure>
 <ul>
   <li><strong>SEZ units</strong>: a client with <b>SEZ</b> ticked is a B2B sale, always inter-state. In the JSON it is an SEZ supply with payment of tax, or without payment if the invoice is under LUT.</li>
   <li><strong>GSTR-3B</strong>: both exports and SEZ supplies are zero-rated, so their value (and IGST, if paid) goes in Table 3.1(b), not 3.1(a). See <a href="#gstr-3b">GSTR-3B</a>.</li>
@@ -302,7 +300,6 @@ export default [
 <p>The portal now fills most of GSTR-3B from your GSTR-1. Use the app's figures to check what it shows before you pay and file.</p>
 <div class="note warn"><strong>Check the credit against GSTR-2B</strong>
 <p>The credit here is everything you entered. Usually only what appears in your GSTR-2B can be claimed. Use the <a href="#gstr-2b">GSTR-2B Reconciliation</a> tab to check.</p></div>
-<figure><img src="assets/img/app-gstr3b.png" alt="The GSTR-3B tab." loading="lazy"><figcaption>The GSTR-3B tab.</figcaption></figure>
 <p id="zero-rated">Table <b>3.1(b) Zero-rated supplies</b> holds exports and supplies to SEZ units or developers, with or without IGST, in rupees. Supplies to an SEZ used to be counted in 3.1(a) with the other B2B sales; CBIC Circular 147/03/2021-GST (paragraph 3) treats that as a mistake that blocks the IGST refund, so they are now in 3.1(b). The IGST on them still counts in the tax you pay. Their credit notes reduce 3.1(b).</p>
 </section>
 

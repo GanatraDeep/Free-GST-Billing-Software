@@ -58,9 +58,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'og-preview.png'],
       manifest: {
-        name: 'Free GST Billing Software',
-        short_name: 'GST Billing',
-        description: 'Open-source, offline GST invoicing for India and 21 other countries. Tax invoices, GSTR-1 / GSTR-3B / GSTR-2B, TDS / TCS, multi-currency, multi-account payments, recurring billing. Your data stays on your computer. Free forever.',
+        name: 'Divtech Hisaab',
+        short_name: 'Hisaab',
+        description: 'Divtech Hisaab by Divtech: GST billing, stock, accounts and returns. Your data stays on your computer.',
         theme_color: '#1e40af',
         background_color: '#f8fafc',
         display: 'standalone',
@@ -168,7 +168,7 @@ export default defineConfig({
         // silently skip them and offline-second-use OCR would break.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/help\//],
         // v1.10.33 — Was `false` on both. Kept the prompt-mode reload
         // deferral in main.jsx but flipped these to true because:
         //   1. skipWaiting=true lets the new SW take over on install

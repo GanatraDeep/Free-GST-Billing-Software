@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 const key = (...k) => k.map((x) => `<kbd>${x}</kbd>`).join(' + ');
 
 export default [
@@ -182,7 +181,6 @@ export default [
   <tr><td><b>Paid</b> (green)</td><td>The payments add up to the bill (less any TDS you keep back). Nothing is due.</td></tr>
 </table></div>
 <p>You do not set the status by hand: it follows the payments. Record a payment and it changes; delete one and it changes back.</p>
-<figure><img src="${img('purchase-status.png')}" alt="Purchase Records with a Status dropdown on each row"></figure>
 <p>The status does not change the GST credit: credit depends on the bill, not on whether you have paid it yet. (By law you must pay the supplier within 180 days to keep the credit.)</p>
 <div class="note info"><strong>Bills from before payments could be recorded</strong>
 <p>A bill you marked <b>Paid</b> in an older version has no payments on it. It stays <b>Paid</b> and owes nothing; you do not need to do anything. A bill marked <b>Partial</b> stays Partly paid, but the app does not know how much was paid, so its Balance due shows the whole amount until you record the payments you made.</p></div>

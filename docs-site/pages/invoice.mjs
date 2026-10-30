@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 
 export default [
 // =============================================================================
@@ -22,13 +21,11 @@ export default [
 </ol>
 <p>The totals are not typed anywhere. They are worked out as you type and shown in the <a href="#preview">live preview</a>.</p>
 <p>Every card title has a small ${ui('?')} next to it. It opens this guide at the part about that card.</p>
-<figure><img src="assets/img/app-invoice-editor.png" alt="The invoice screen: the form on the left, the live preview on the right." loading="lazy"><figcaption>The invoice screen: the form on the left, the live preview on the right.</figcaption></figure>
 </section>
 
 <section id="toolbar">
 <h2>The toolbar</h2>
 <p>The toolbar stays at the top of the screen as you scroll, so Save, Print and the rest are always in reach on a long invoice.</p>
-<figure><img src="${img('toolbar.png')}" alt="The invoice toolbar: Save, Save and Download, Print, WhatsApp, E-Way Bill, Customize, Hide Preview"></figure>
 <div class="table-wrap"><table>
   <tr><th>Button</th><th>What it does</th></tr>
   <tr><td>${ui('←')} ${ui('Back')}</td><td>Leaves the invoice. If you have changed something that is not saved, you are asked first (see <a href="#leaving">Leaving with unsaved changes</a>).</td></tr>
@@ -184,7 +181,6 @@ export default [
   <li><strong>Ticked</strong>: the supply is zero-rated. No IGST (and no cess) is charged, the items keep their GST rate for the returns, and the total is the taxable value. The invoice prints, word for word, the declaration Rule 46 requires: <i>SUPPLY MEANT FOR EXPORT/SUPPLY TO SEZ UNIT OR SEZ DEVELOPER FOR AUTHORISED OPERATIONS UNDER BOND OR LETTER OF UNDERTAKING WITHOUT PAYMENT OF INTEGRATED TAX - LUT ARN AD290426123456X (FY 2026-27)</i>. Every invoice design prints it, the thermal receipt too.</li>
   <li><strong>Not ticked</strong>: IGST is charged ("with payment of IGST"), which you claim back later as a refund. The invoice prints the matching declaration <i>…ON PAYMENT OF INTEGRATED TAX</i>.</li>
 </ul>
-<figure><img src="assets/img/invoice-lut-export.png" alt="An export invoice to a client in the United States, billed in US dollars: Export under LUT under the place of supply, IGST 0%, and the LUT declaration with the ARN under the total." loading="lazy" style="max-width:min(600px,100%)"><figcaption>An export under a LUT: no IGST, and the Rule 46 declaration with the ARN printed under the total.</figcaption></figure>
 <p>On a new invoice the box is ticked for you when your business has a LUT saved in <a href="settings.html#lut">Settings, Company</a> for the financial year of the invoice date. Untick it to charge IGST instead. An invoice saved earlier keeps its own choice. The ARN and year are copied onto the invoice when you tick it, so a new LUT next year never changes an old invoice.</p>
 <p>Under the box:</p>
 <ul>
@@ -401,7 +397,6 @@ export default [
 </ul>
 <h3>The exchange rate</h3>
 <p>For any currency other than rupees, a second box asks <b>1 USD = ? INR</b>. Type how many rupees one unit was worth on the invoice date, such as 84.10. Use your bank's rate for that day or the RBI reference rate. The app does not fetch rates from the internet.</p>
-<figure><img src="assets/img/invoice-currency.png" alt="The Currency box set to $ USD, the rate box 1 USD = ? INR filled in with 84.2, and the total in rupees shown below." loading="lazy" style="max-width:min(480px,100%)"><figcaption>A US dollar invoice: the currency, the rate for the invoice date, and the total in rupees under them.</figcaption></figure>
 <ul>
   <li>Under the boxes the app shows the invoice total in rupees, for example <b>≈ ₹84,100.00 in all</b>.</li>
   <li>The rate is saved with the invoice. GST returns, reports, the Dashboard and income tax turn the invoice into rupees with this rate, never with today's, so a return you filed last month gives the same figures today.</li>
@@ -618,7 +613,6 @@ export default [
 <p>Open the panel with ${ui('Customize')} in the invoice toolbar. Whatever you change here is used for this invoice <strong>and remembered for your next new invoice</strong>, including the title, reverse charge, TDS and TCS. If a setting was only meant for one invoice, change it back afterwards.</p>
 <p>A saved invoice keeps the options it was saved with.</p>
 <p>These are per-invoice settings. The app-wide look, such as fonts, watermarks, copies and translated labels, is in <a href="print-settings.html">Print and PDF settings</a>.</p>
-<figure><img src="assets/img/app-customize.png" alt="The Customize panel opens inside the Invoice Type card." loading="lazy"><figcaption>The Customize panel opens inside the Invoice Type card.</figcaption></figure>
 </section>
 
 <section id="title-currency">
@@ -680,11 +674,6 @@ export default [
   <tr><td>Boxed grid</td><td>Every section in ruled boxes: your name large at the top, seller and document details side by side, Billing To and Shipping To, a Work Details line, and an item table filled with empty rows to a fixed height, like a printed quotation pad.</td></tr>
   <tr><td>Tally style</td><td>The Tally layout: reference and dispatch boxes beside your details, state names with their codes, taxes inside the item table, amount in words with E. &amp; O.E, an HSN/SAC tax summary, tax amount in words, your PAN, a declaration, and a "Customer's Seal and Signature" box.</td></tr>
 </table>
-<figure class="pair">
-  <img src="assets/img/design-tally.png" alt="A tax invoice in Tally style" loading="lazy">
-  <img src="assets/img/design-boxed.png" alt="A quotation in the Boxed grid design" loading="lazy">
-  <figcaption>Tally style (left) and Boxed grid (right), with a made-up business.</figcaption>
-</figure>
 <p>Boxed grid and Tally style pad the item table to fill the page. If that padding alone would push the invoice onto a second page, the PDF trims it so the terms, bank details and signature stay on page 1. The boxes for <a href="invoices.html#order-details">order, dispatch and reference details</a> are filled from Invoice Details.</p>
 </section>
 

@@ -6,10 +6,10 @@
 // launcher files. This script combines them into a distributable
 // with the "one visible file" flat layout the user asked for:
 //
-//   Free-GST-Billing/
-//   ├── Free GST Billing - WINDOWS.hta
-//   ├── Free GST Billing - MAC.command
-//   ├── Free GST Billing - LINUX.sh
+//   Divtech-Hisaab/
+//   ├── Divtech Hisaab - WINDOWS.hta
+//   ├── Divtech Hisaab - MAC.command
+//   ├── Divtech Hisaab - LINUX.sh
 //   └── _system/
 //       ├── package.json
 //       ├── server.js
@@ -38,10 +38,10 @@ const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(__filename, '..', '..');
 const outArg = process.argv.find(a => a.startsWith('--outDir='));
 const OUT_DIR = resolve(REPO_ROOT, outArg ? outArg.split('=')[1] : 'release-build');
-const STAGING = join(OUT_DIR, 'Free-GST-Billing');
+const STAGING = join(OUT_DIR, 'Divtech-Hisaab');
 const SYSTEM = join(STAGING, '_system');
 
-console.log('\n  Free GST Billing — Release ZIP Builder\n');
+console.log('\n  Divtech Hisaab — Release ZIP Builder\n');
 
 // --- Sanity checks ---
 const distPath = join(REPO_ROOT, 'dist');
@@ -122,6 +122,7 @@ const includeAtSystem = [
   'package.json',
   'package-lock.json',
   'server.js',
+  'license.js',
   'README.md',
   'LICENSE',
   'CHANGELOG.md',
@@ -330,7 +331,7 @@ function assertNoDeadProtocolLinks() {
 assertNoDeadProtocolLinks();
 
 // --- ZIP it up ---
-const zipName = `Free-GST-Billing-v${version}.zip`;
+const zipName = `Divtech-Hisaab-v${version}.zip`;
 const zipPath = join(OUT_DIR, zipName);
 console.log(`  → Creating ${zipName}…`);
 assertUnixLineEndings([STAGING, SYSTEM]);
@@ -341,7 +342,7 @@ try {
     // Compress-Archive stores entry names with BACKSLASHES, which the ZIP
     // specification forbids. Windows tolerates that; unzip on Linux and macOS
     // warns, and BusyBox or Archive Utility create single files literally
-    // named "Free-GST-Billing\_system\server.js". Every Linux / NAS install,
+    // named "Divtech-Hisaab\_system\server.js". Every Linux / NAS install,
     // and the new update-unix.sh, had to fight the package itself (#59).
     const tarExe = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
     if (!existsSync(tarExe)) {
@@ -349,10 +350,10 @@ try {
       process.exit(1);
     }
     // Argument arrays, no shell: nothing in a path is ever interpreted.
-    execFileSync(tarExe, ['-a', '-c', '-f', zipPath, '-C', OUT_DIR, 'Free-GST-Billing'], { stdio: 'inherit' });
+    execFileSync(tarExe, ['-a', '-c', '-f', zipPath, '-C', OUT_DIR, 'Divtech-Hisaab'], { stdio: 'inherit' });
   } else {
     // Use system zip if available (macOS + most Linux).
-    execFileSync('zip', ['-qr', zipName, 'Free-GST-Billing'], { cwd: OUT_DIR, stdio: 'inherit' });
+    execFileSync('zip', ['-qr', zipName, 'Divtech-Hisaab'], { cwd: OUT_DIR, stdio: 'inherit' });
   }
 } catch (e) {
   console.error('  ❌ Zip step failed:', e.message);
@@ -363,7 +364,7 @@ assertPortableZip(zipPath);
 
 /**
  * v1.10.82 (#120) - Windows has no "executable" bit, so tar.exe stores every
- * file as 0666. macOS then refused the launcher: "Free GST Billing -
+ * file as 0666. macOS then refused the launcher: "Divtech Hisaab -
  * MAC.command could not be executed because you do not have appropriate
  * access privileges" (Archive Utility restores the mode stored in the ZIP),
  * and the Linux launcher and scripts came out the same. The Unix mode lives in
@@ -453,8 +454,8 @@ function assertPortableZip(file) {
     console.error('\n    Linux, macOS and NAS unzip tools cannot unpack that into folders.\n');
     process.exit(1);
   }
-  if (!names.includes('Free-GST-Billing/_system/server.js')) {
-    console.error('\n  x Free-GST-Billing/_system/server.js is not in the ZIP - the layout is wrong.\n');
+  if (!names.includes('Divtech-Hisaab/_system/server.js')) {
+    console.error('\n  x Divtech-Hisaab/_system/server.js is not in the ZIP - the layout is wrong.\n');
     process.exit(1);
   }
   console.log(`  → Verified ${names.length} ZIP entries use portable "/" paths`);

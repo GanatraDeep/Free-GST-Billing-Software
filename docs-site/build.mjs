@@ -42,7 +42,7 @@ const OUT = join(HERE, 'out', SITE.folder);
 const IMG_SRC = join(HERE, 'assets', 'img');
 const PAGES = [...start, ...gstBasics, ...install, ...invoice, ...daily, ...clients, ...products, ...payments, ...buying, ...money, ...reports, ...incomeTax, ...setup, ...print, ...help, ...about, ...security];
 const TODAY = new Date().toISOString().slice(0, 10);
-const BRAND = 'Free GST Billing Software';
+const BRAND = 'Divtech Hisaab';
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
@@ -146,18 +146,17 @@ const withImages = (html) => html.replace(/<img src="assets\/img\/([^"]+)\.png"/
 });
 
 async function makeSocialImage(file) {
-  const shot = await sharp(join(IMG_SRC, 'app-dashboard.png')).resize({ width: 600 }).png().toBuffer();
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
     <rect width="1200" height="630" fill="#f6f8fb"/>
     <rect x="0" y="0" width="14" height="630" fill="#2563eb"/>
-    <text x="64" y="170" font-family="Segoe UI, Arial, sans-serif" font-size="52" font-weight="700" fill="#15233f">Free GST</text>
-    <text x="64" y="240" font-family="Segoe UI, Arial, sans-serif" font-size="52" font-weight="700" fill="#15233f">Billing Software</text>
+    <text x="64" y="170" font-family="Segoe UI, Arial, sans-serif" font-size="52" font-weight="700" fill="#15233f">Divtech</text>
+    <text x="64" y="240" font-family="Segoe UI, Arial, sans-serif" font-size="52" font-weight="700" fill="#15233f">Hisaab</text>
     <text x="64" y="310" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="#44526d">GST invoices, payments, stock</text>
     <text x="64" y="352" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="#44526d">and GSTR-1 / GSTR-3B.</text>
-    <text x="64" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="700" fill="#0e7a5c">Free · Offline · No signup</text>
+    <text x="64" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="700" fill="#0e7a5c">Offline · No signup · by Divtech</text>
     <text x="64" y="560" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#44526d">Documentation</text>
   </svg>`;
-  await sharp(Buffer.from(svg)).composite([{ input: shot, left: 560, top: 140 }]).png().toFile(file);
+  await sharp(Buffer.from(svg)).png().toFile(file);
 }
 
 // ---- structured data ----------------------------------------------------------
@@ -182,12 +181,8 @@ function jsonLd(p, title, description) {
       applicationSubCategory: 'GST billing and invoicing',
       operatingSystem: 'Windows 10, Windows 11, macOS, Linux',
       softwareVersion: SITE.version,
-      license: 'https://opensource.org/licenses/MIT',
-      isAccessibleForFree: true,
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
       downloadUrl: SITE.download,
       url: SITE.url,
-      sameAs: [SITE.repo],
       description,
       publisher,
     }, {
@@ -306,8 +301,8 @@ ${body}
       ${next ? `<a class="next" href="${next.slug}.html"><span>Next</span>${esc(next.nav || next.title)}</a>` : '<span></span>'}
     </nav>
     <footer class="foot">
-      <p>${esc(BRAND)} is free and open source under the MIT licence, made by <a href="${SITE.publisher.url}">${esc(SITE.publisher.name)}</a>. Something wrong or missing on this page?
-      <a href="${SITE.repo}/issues">Tell us on GitHub</a>.</p>
+      <p>${esc(BRAND)} is made by <a href="${SITE.publisher.url}">${esc(SITE.publisher.name)}</a>. Something wrong or missing on this page?
+      Tell us on <a href="https://wa.me/919429911067">WhatsApp</a> or at <a href="mailto:hello@divtech.in">hello@divtech.in</a>.</p>
     </footer>
   </main>
   <aside class="toc" aria-label="On this page">
@@ -347,12 +342,11 @@ function llmsTxt() {
   const lines = [
     `# ${BRAND}`,
     '',
-    `> Free, open-source GST billing and invoicing software for small businesses in India, also usable in 20 currencies. It runs on the user's own Windows, macOS or Linux computer and opens in the web browser; there is no account, no subscription and no cloud. Version ${SITE.version}, made by ${SITE.publisher.name}.`,
+    `> GST billing and invoicing software for small businesses in India by ${SITE.publisher.name}, also usable in 20 currencies. It runs on the user's own Windows, macOS or Linux computer and opens in the web browser; there is no account and no cloud. Version ${SITE.version}.`,
     '',
     'It makes GST tax invoices, bills of supply, proforma estimates, credit notes and delivery challans; works out CGST, SGST, UTGST and IGST; tracks payments, clients, products and stock, purchases and expenses; and prepares GSTR-1 and GSTR-3B JSON for the GST portal. It does not file returns itself and does not generate e-invoice IRNs.',
     '',
     `- Download (always the latest version): ${SITE.download}`,
-    `- Source code and issues: ${SITE.repo}`,
     `- Everything in one file: ${SITE.url}llms-full.txt`,
   ];
   for (const g of NAV) {
@@ -403,7 +397,7 @@ ${order.map((slug) => `  <url><loc>${pageUrl(slug)}</loc><lastmod>${TODAY}</last
 </urlset>
 `);
 // Search engines only read robots.txt at the root of the domain. This copy is
-// a ready-made block to add to https://dicecodes.com/robots.txt.
+// a ready-made block to add to https://divtech.in/robots.txt.
 writeFileSync(join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${SITE.url}sitemap.xml\n`);
 writeFileSync(join(OUT, 'llms.txt'), llmsTxt());
 writeFileSync(join(OUT, 'llms-full.txt'), llmsFullTxt());

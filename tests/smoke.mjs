@@ -1856,7 +1856,7 @@ try {
     await sleep(2500);
     await dismissFirstRun(page);
     const noteText = await page.getByText(/^Payment note:/).first().innerText().catch(() => '');
-    const expected = ('Free GST Billing support - ' + String(prof80.businessName || '').replace(/[^A-Za-z0-9 .-]+/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 50).trim();
+    const expected = ('Divtech Hisaab support - ' + String(prof80.businessName || '').replace(/[^A-Za-z0-9 .-]+/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 50).trim();
     check('v80 the UPI payment note names the business', !!prof80.businessName && noteText.includes(expected), noteText);
   }
 

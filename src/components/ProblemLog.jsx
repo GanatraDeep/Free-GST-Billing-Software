@@ -25,7 +25,7 @@ export default function ProblemLog() {
     return () => { live = false; };
   }, []);
 
-  const copy = async (text) => toast(await copyText(text) ? 'Copied. Paste it into an email or a GitHub issue.' : 'Could not copy. Select the text and press Ctrl+C.', 'info');
+  const copy = async (text) => toast(await copyText(text) ? 'Copied. Paste it into WhatsApp or an email to Divtech.' : 'Could not copy. Select the text and press Ctrl+C.', 'info');
   const copyAll = () => copy(items.slice().reverse().map(reportText).join('\n\n')
     + (serverLines?.length ? `\n\nServer log (last ${serverLines.length} lines):\n\`\`\`\n${serverLines.join('\n')}\n\`\`\`` : ''));
 

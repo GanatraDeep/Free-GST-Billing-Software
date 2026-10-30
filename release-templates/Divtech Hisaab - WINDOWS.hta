@@ -3,7 +3,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>Free GST Billing</title>
+  <title>Divtech Hisaab</title>
   <HTA:APPLICATION
     ID="fgstbill"
     APPLICATIONNAME="FreeGSTBillLauncher"
@@ -169,9 +169,9 @@
 <div id="brand">
   <img class="mark" id="mark" alt=""
        onerror="this.style.display='none'; document.getElementById('markFb').style.display='inline-block';" />
-  <div class="markFb" id="markFb">B</div>
-  <h1>Free GST Billing</h1>
-  <p id="tagline">Free and offline. Your invoices stay on this computer.</p>
+  <div class="markFb" id="markFb">DH</div>
+  <h1>Divtech Hisaab</h1>
+  <p id="tagline">by Divtech. Works offline. Your invoices stay on this computer.</p>
 </div>
 
 <div id="state">
@@ -189,12 +189,12 @@
 <footer>
   <a href="#" onclick="openFolder(); return false;">Open this folder</a>
   &nbsp;&middot;&nbsp;
-  <a href="#" onclick="openGitHub(); return false;">Get help</a>
+  <a href="#" onclick="openHelp(); return false;">Get help</a>
   <span id="where"></span>
 </footer>
 
 <script>
-  // Free GST Billing - HTA Launcher (v1.10.69)
+  // Divtech Hisaab - HTA Launcher (v1.10.69)
   //
   // The one file a Windows user ever double-clicks. It installs the app,
   // opens it, and updates it - so it only ever shows what makes sense now:
@@ -265,7 +265,7 @@
   function runScript(name, args) {
     var scriptPath = SYSTEM + '\\' + name;
     if (!fso.FileExists(scriptPath)) {
-      alert('Missing file: ' + name + '\n\nPlease download the app again from GitHub.');
+      alert('Missing file: ' + name + '\n\nPlease ask Divtech (+91 94299 11067) for a fresh copy.');
       return false;
     }
     var cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + scriptPath + '"' + (args ? ' ' + args : '');
@@ -282,7 +282,8 @@
     if (fso.FileExists(readmePath)) shell.Run('notepad.exe "' + readmePath + '"', 1, false);
     else openGitHub();
   }
-  function openGitHub() { shell.Run('https://github.com/IamRamgarhia/Free-GST-Billing-Software', 1, false); }
+  function openGitHub() { shell.Run('https://github.com/GanatraDeep/free-gst-billing-software/releases/latest', 1, false); }
+  function openHelp() { shell.Run('https://wa.me/919429911067', 1, false); }
 
   // Is node.exe on PATH, or in the usual place?
   //
@@ -330,7 +331,7 @@
   }
 
   // v1.10.75 - is the app already installed in ANOTHER folder? Reported: a
-  // new ZIP extracts to a new folder (Downloads\Free-GST-Billing-v1.10.74),
+  // new ZIP extracts to a new folder (Downloads\Divtech-Hisaab-v1.10.74),
   // Install there made a second, empty copy, and the shortcuts moved to it,
   // so the invoices seemed to vanish. The shortcuts the installer makes say
   // where the real install is; so does the one-command installer's folder.
@@ -346,12 +347,12 @@
     var roots = [];
     var places = [shell.SpecialFolders('Desktop'), shell.SpecialFolders('Programs')];
     for (var i = 0; i < places.length; i++) {
-      var lnk = places[i] + '\\Free GST Billing.lnk';
+      var lnk = places[i] + '\\Divtech Hisaab.lnk';
       if (!fso.FileExists(lnk)) continue;
       try {
         // v1.10.83 - the one-line install's shortcut runs
         // "...\_system\start-windows.ps1" -AppWindow, the launcher's runs
-        // "...\Free GST Billing - WINDOWS.hta": the first quoted path either way.
+        // "...\Divtech Hisaab - WINDOWS.hta": the first quoted path either way.
         var args = String(shell.CreateShortcut(lnk).Arguments);
         var q = /"([^"]+)"/.exec(args);
         var target = q ? q[1] : args.replace(/^\s+|\s+$/g, '');
@@ -361,7 +362,7 @@
         if (root) roots.push(root);
       } catch (e) { }
     }
-    roots.push(shell.ExpandEnvironmentStrings('%LOCALAPPDATA%\\Programs\\Free GST Billing'));
+    roots.push(shell.ExpandEnvironmentStrings('%LOCALAPPDATA%\\Programs\\Divtech Hisaab'));
     for (var j = 0; j < roots.length; j++) {
       var r = roots[j];
       if (!r || r.toLowerCase() === here || !installedAt(r)) continue;
@@ -389,7 +390,7 @@
     if (!runScript('update-windows.ps1', '-InstallTo "' + other.root + '"')) return;
     setState('Updating&hellip;',
       'A black window is updating the copy in <b>' + esc(other.root) + '</b>. When it says ' +
-      '<b>Update complete</b>, open the app from your <b>Free GST Billing</b> shortcut. Your invoices stay where they are.', 'warn');
+      '<b>Update complete</b>, open the app from your <b>Divtech Hisaab</b> shortcut. Your invoices stay where they are.', 'warn');
     setPrimary(null);
     setSteps('<ol><li>Afterwards this folder is not needed. You can delete it.</li></ol>');
     setMore(null);
@@ -515,13 +516,13 @@
   // does: the same script, run from a temp copy (it deletes _system, itself
   // included), told to wait for this window to close first.
   function showRemove() {
-    setState('Remove Free GST Billing?',
+    setState('Remove Divtech Hisaab?',
       'The app, its Desktop and Start-menu icons and its start-up entry are removed. ' +
       'Tick what else should go. Anything not ticked stays in <b>' + esc(SYSTEM) + '</b>.', 'warn');
     setSteps(
       '<label style="display:block;margin:4px 0"><input type="checkbox" id="rmData"> My invoices, clients, products and settings</label>' +
       '<label style="display:block;margin:4px 0"><input type="checkbox" id="rmPdfs"> Saved invoice PDFs</label>' +
-      '<label style="display:block;margin:4px 0"><input type="checkbox" id="rmBackups"> All backup files in Documents\\FreeGSTBill Backups</label>' +
+      '<label style="display:block;margin:4px 0"><input type="checkbox" id="rmBackups"> All backup files in Documents\\Divtech Hisaab Backups</label>' +
       '<p style="margin:8px 0 0">If you delete your data but keep the backups, a last copy of it is saved in the backups folder first.</p>');
     setPrimary('Remove the app', 'Closes the app first', doRemove, false);
     setMore([{ label: 'Cancel, keep the app', run: render }]);
@@ -586,8 +587,8 @@
         setSteps(
           '<ol>' +
           '<li>Close this window.</li>' +
-          '<li>Right-click the <b>Free-GST-Billing</b> ZIP and choose <b>Extract All&hellip;</b>.</li>' +
-          '<li>Open the new folder and double-click <b>Free GST Billing - WINDOWS</b>.</li>' +
+          '<li>Right-click the <b>Divtech-Hisaab</b> ZIP and choose <b>Extract All&hellip;</b>.</li>' +
+          '<li>Open the new folder and double-click <b>Divtech Hisaab - WINDOWS</b>.</li>' +
           '</ol>');
         setMore([{ label: 'Download the app again', run: openGitHub }]);
         return;
@@ -607,13 +608,13 @@
       var other = findOtherInstall();
       if (other) {
         setState('Already installed on this computer',
-          'Free GST Billing is installed in <b>' + esc(other.root) + '</b>' +
+          'Divtech Hisaab is installed in <b>' + esc(other.root) + '</b>' +
           (other.version ? ' (version ' + esc(other.version) + ')' : '') +
           ', with <b>' + other.invoices + '</b> invoice' + (other.invoices === 1 ? '' : 's') + '. ' +
           'Keep using that copy so all your invoices stay together. To get the newest version, update it.', 'warn');
         setPrimary('Update the installed copy', 'With the files in this folder - no download',
           function () { updateOther(other); }, true);
-        setSteps('<ol><li>When the update finishes, open the app from your <b>Free GST Billing</b> shortcut as usual.</li>' +
+        setSteps('<ol><li>When the update finishes, open the app from your <b>Divtech Hisaab</b> shortcut as usual.</li>' +
           '<li>This folder is not needed after that. You can delete it.</li></ol>');
         setMore([
           { label: 'Open the installed copy', run: function () { openOther(other); } },

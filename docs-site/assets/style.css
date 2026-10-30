@@ -1,4 +1,4 @@
-/* Free GST Billing docs.
+/* Divtech Hisaab docs.
    Paper, ink and the red margin rule of an Indian account book. The rule is
    the one bold thing on the page; everything else stays quiet. */
 
@@ -75,12 +75,6 @@ img { max-width: 100%; height: auto; }
 /* Support page */
 .upi-box { display: flex; gap: 1.4rem; align-items: center; flex-wrap: wrap; margin: 1rem 0 1.4rem; padding: 1rem 1.2rem;
   border: 1px solid var(--rule); border-radius: 12px; background: var(--sheet); }
-.supporters-bar { height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; margin: .35rem 0 0; }
-.supporters-bar span { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--brand); }
-.supporters-goal-text { margin: 0; font-size: .9rem; }
-.supporters-total { margin: .2rem 0 .15rem; font-size: 1.15rem; font-weight: 650; }
-.supporters-meta { margin: 0 0 .9rem; color: var(--ink-faint); font-size: .9rem; }
-.supporters-thanks { margin: .9rem 0 0; }
 .upi-qr { width: 190px; padding: 8px; border-radius: 10px; background: #fff; line-height: 0; }
 .upi-qr svg { width: 100%; height: auto; display: block; }
 .upi-text { flex: 1 1 220px; min-width: 0; }

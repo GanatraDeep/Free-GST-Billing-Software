@@ -1,4 +1,4 @@
-/* Free GST Billing - imported into the service worker (vite.config.js,
+/* Divtech Hisaab - imported into the service worker (vite.config.js,
    workbox.importScripts). v1.10.83.
 
    When a NEW version of the app takes over, reload every open window of the

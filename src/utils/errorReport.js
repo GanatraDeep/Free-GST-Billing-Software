@@ -4,12 +4,12 @@
 //
 // Why redact twice (here AND on the server): an error message can quote
 // whatever was on screen - a client's GSTIN, a phone number typed into a
-// field. A report goes to a public GitHub issue, so nothing that identifies a
+// field. A report goes to Divtech on WhatsApp, so nothing that identifies a
 // business or a person may survive into it.
 
-export const ISSUE_NEW_URL = 'https://github.com/IamRamgarhia/Free-GST-Billing-Software/issues/new';
-export const TROUBLESHOOTING_URL = 'https://dicecodes.com/free-gst-software-documentation/troubleshooting.html';
-export const MAX_ISSUE_URL = 7500;
+export const ISSUE_NEW_URL = 'https://wa.me/919429911067';
+export const TROUBLESHOOTING_URL = '/help/troubleshooting.html';
+export const MAX_ISSUE_URL = 4000;
 export const MAX_LOG_ENTRIES = 50;
 
 // Order matters: emails before UPI ids (both have @), GSTIN before PAN (a
@@ -75,7 +75,7 @@ export const KNOWN_PROBLEMS = [
   { id: 'app-out-of-date', test: /dynamically imported module|Loading chunk|Importing a module script failed/i,
     fix: 'The browser kept an old copy of the app after an update. Press Ctrl+F5 to reload it.' },
   { id: 'cannot-connect', test: /failed to fetch|networkerror|load failed|network request failed|ECONNREFUSED|ERR_CONNECTION_REFUSED|app not running/i,
-    fix: "The app's engine is not running. Click the Free GST Billing icon on your Desktop." },
+    fix: "The app's engine is not running. Click the Divtech Hisaab icon on your Desktop." },
   { id: 'payload-too-large', test: /request body too large|payload too large|entity too large|-> 413\b|status 413/i,
     fix: 'What you saved is too big, usually a large logo or signature image. Use a smaller image.' },
   { id: 'disk-full', test: /ENOSPC|no space left|disk is full/i,
@@ -150,16 +150,16 @@ const issueBody = (details) =>
 
 export const reportText = (e) => issueBody(formatDetails(e));
 
-// GitHub issue-form prefill: each query param fills the field with that id in
-// .github/ISSUE_TEMPLATE/bug_report.yml. Long URLs are refused by browsers and
-// GitHub, so the stack is trimmed until the URL fits.
+// Divtech Hisaab: "Report" opens WhatsApp to Divtech with the problem already
+// written (private details are removed first). Long links are refused by
+// browsers and WhatsApp, so the stack is trimmed until the link fits.
 export function buildIssueUrl(e, maxLen = MAX_ISSUE_URL) {
   const title = `[Problem] ${String(e.message || 'Something went wrong').replace(/\s+/g, ' ').slice(0, 80)}`;
   const make = (what) => {
-    const p = [['template', 'bug_report.yml'], ['title', title], ['version', e.version || '']];
-    if (e.system) p.push(['system', e.system]);
-    p.push(['what', what]);
-    return `${ISSUE_NEW_URL}?${p.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')}`;
+    const lines = ['Divtech Hisaab problem report', title, `Version: ${e.version || '?'}`];
+    if (e.system) lines.push(`Computer: ${e.system}`);
+    lines.push('', what);
+    return `${ISSUE_NEW_URL}?text=${encodeURIComponent(lines.join('\n'))}`;
   };
   for (let n = 8; n >= 0; n -= 1) {
     const url = make(issueBody(formatDetails(e, { stackLines: n })));

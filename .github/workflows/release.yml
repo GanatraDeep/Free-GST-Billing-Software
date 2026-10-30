@@ -1,0 +1,47 @@
+# Divtech Hisaab - build the setup ZIP and publish it as a GitHub release.
+# Run it by pushing a version tag:  git tag v1.11.1 && git push origin --tags
+# The tag must match "version" in package.json.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Tag matches package.json
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+
+      - name: Tools for the ZIP
+        run: sudo apt-get update && sudo apt-get install -y zip unzip
+
+      - run: npm ci
+
+      - name: Lint, test, build and package
+        run: npm run release:zip
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          cp "release-build/Divtech-Hisaab-v$V.zip" release-build/Divtech-Hisaab.zip
+          # Release notes: the newest CHANGELOG entry (what the app's update window shows).
+          awk '/^## \[/{n++} n==1 && !/^---$/' CHANGELOG.md > release-notes.md
+          gh release create "$GITHUB_REF_NAME" \
+            "release-build/Divtech-Hisaab-v$V.zip" \
+            release-build/Divtech-Hisaab.zip \
+            --title "Divtech Hisaab v$V" \
+            --notes-file release-notes.md

@@ -1,10 +1,10 @@
-# Free GST Billing - Windows stop-server.
+# Divtech Hisaab - Windows stop-server.
 #
 # Finds any node.exe process listening on our port and kills it.
 # Safe if nothing is running (no error, quick exit).
 
 $ErrorActionPreference = 'SilentlyContinue'
-$Host.UI.RawUI.WindowTitle = 'Free GST Billing - Stop Server'
+$Host.UI.RawUI.WindowTitle = 'Divtech Hisaab - Stop Server'
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $portFile = Join-Path $ScriptDir 'data\port.txt'

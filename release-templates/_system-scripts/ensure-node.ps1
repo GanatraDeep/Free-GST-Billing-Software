@@ -1,4 +1,4 @@
-# Free GST Billing - check this PC has what the app needs, fix what can be
+# Divtech Hisaab - check this PC has what the app needs, fix what can be
 # fixed safely, and say in plain words what to do about the rest.
 #
 # Dot-sourced by install-windows.ps1, update-windows.ps1 and start-windows.ps1.
@@ -88,7 +88,7 @@ function Find-GoodNode {
 function Test-WindowsVersion {
   if ([Environment]::OSVersion.Version.Major -ge 10) { return $true }
   Write-Problem 'This version of Windows is too old.' @(
-    'Free GST Billing needs Windows 10 or Windows 11.',
+    'Divtech Hisaab needs Windows 10 or Windows 11.',
     'Node.js, which the app runs on, no longer works on Windows 7 or 8.')
   return $false
 }
@@ -104,7 +104,7 @@ function Test-AppFolderWritable {
       "Folder: $(Split-Path -Parent $PSScriptRoot)",
       'This happens inside C:\Program Files, on a read-only drive, or when',
       'antivirus "controlled folder access" blocks it.',
-      'Move the Free-GST-Billing folder to Documents or D:\ and open it from there.')
+      'Move the Divtech-Hisaab folder to Documents or D:\ and open it from there.')
     return $false
   }
 }
@@ -180,8 +180,8 @@ function Show-NodeHelp {
     'The app needs Node.js 18 or newer. To install it yourself:',
     '  1. Open https://nodejs.org (opening it now) and download the LTS version.',
     '  2. Run the installer and keep the default options.',
-    '  3. Open Free GST Billing again.',
-    'If your antivirus removed it, add the Free-GST-Billing folder to its exclusions.')
+    '  3. Open Divtech Hisaab again.',
+    'If your antivirus removed it, add the Divtech-Hisaab folder to its exclusions.')
   try { Start-Process 'https://nodejs.org/en/download' } catch { }
 }
 
@@ -230,9 +230,9 @@ function Show-InstallHelp {
   if (-not (Test-InstallReady)) { return }   # said which one
   Write-Problem 'The app packages did not install.' @(
     'The internet, the disk and the folder all look fine, so the usual cause is',
-    'antivirus blocking files as they are written. Add the Free-GST-Billing folder',
+    'antivirus blocking files as they are written. Add the Divtech-Hisaab folder',
     'to its exclusions and try again. If it keeps failing, open an issue at',
-    'https://github.com/IamRamgarhia/Free-GST-Billing-Software/issues with a',
+    'https://github.com/GanatraDeep/free-gst-billing-software/issues with a',
     'photo of this window.')
 }
 

@@ -1,4 +1,4 @@
-# Free GST Billing - Windows updater.
+# Divtech Hisaab - Windows updater.
 #
 # Pulls the latest release ZIP from GitHub, extracts _system/ over
 # the existing one, re-runs npm install. Data folder is preserved.
@@ -19,7 +19,7 @@
 param([string]$InstallTo = '')
 
 $ErrorActionPreference = 'Stop'
-$Host.UI.RawUI.WindowTitle = 'Free GST Billing - Update'
+$Host.UI.RawUI.WindowTitle = 'Divtech Hisaab - Update'
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SystemDir = $ScriptDir
@@ -38,14 +38,14 @@ if ($InstallTo) {
 
 Write-Host ''
 Write-Host '  ============================================================'
-Write-Host '   Free GST Billing Software - Update'
+Write-Host '   Divtech Hisaab - Update'
 Write-Host '  ============================================================'
 Write-Host ''
 
 # --- Step 1: Belt-and-braces backup of data folder BEFORE anything ---
 $dataDir = Join-Path $SystemDir 'data'
 if (Test-Path $dataDir) {
-  $backupsHome = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'FreeGSTBill Backups'
+  $backupsHome = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Divtech Hisaab Backups'
   if (-not (Test-Path $backupsHome)) { New-Item -ItemType Directory -Path $backupsHome | Out-Null }
   $stamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
   $preUpdateBackup = Join-Path $backupsHome "pre-update-$stamp.zip"
@@ -63,7 +63,7 @@ if ($FromFolder) {
 # --- Step 2: Find latest release ---
 Write-Host '  Checking latest release from GitHub...'
 try {
-  $api = Invoke-RestMethod -Uri 'https://api.github.com/repos/IamRamgarhia/Free-GST-Billing-Software/releases/latest' -Headers @{ 'User-Agent' = 'FreeGSTBill-Updater' }
+  $api = Invoke-RestMethod -Uri 'https://api.github.com/repos/GanatraDeep/free-gst-billing-software/releases/latest' -Headers @{ 'User-Agent' = 'DivtechHisaab-Updater' }
   $tag = $api.tag_name
   $zipAsset = $api.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
   if (-not $zipAsset) {
@@ -77,6 +77,30 @@ try {
   Write-Host "  ERROR: could not reach GitHub. Are you online?" -ForegroundColor Red
   Read-Host '  Press Enter to close'
   exit 1
+}
+
+# --- Divtech Hisaab: subscription check ---
+# The app always works; only updates need a subscription. A license key
+# covers every release published on or before its expiry date.
+. (Join-Path $SystemDir 'ensure-node.ps1')
+$licNode = Use-GoodNode
+$licJs = Join-Path $SystemDir 'license.js'
+if (-not $licNode -or -not (Test-Path -LiteralPath $licJs)) {
+  Write-Host '  ERROR: could not check the subscription (Node.js or license.js missing).' -ForegroundColor Red
+  Write-Host '  Contact Divtech: hello@divtech.in / +91 94299 11067'
+  Read-Host '  Press Enter to close'
+  exit 1
+}
+$published = $api.published_at
+if ($published -is [datetime]) { $published = $published.ToUniversalTime().ToString('o') } else { $published = [string]$published }
+$licMsg = & $licNode $licJs --allows $published
+if ($LASTEXITCODE -ne 0) {
+  Write-Host ''
+  Write-Host "  $($licMsg -join ' ')" -ForegroundColor Yellow
+  Write-Host ''
+  Write-Host '  Nothing was changed. Your software and data are as they were.'
+  Read-Host '  Press Enter to close'
+  exit 3
 }
 
 # --- Step 3: Download + extract to a staging folder ---
@@ -93,8 +117,8 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $tmp)
 
 # The extract may contain either the pretty release structure
-# (root has Free GST Billing - WINDOWS.hta + _system/) or the source zipball
-# (root has IamRamgarhia-Free-GST-Billing-Software-HASH/).
+# (root has Divtech Hisaab - WINDOWS.hta + _system/) or the source zipball
+# (root has GanatraDeep-free-gst-billing-software-HASH/).
 $extracted = Get-ChildItem -Path $tmp -Directory | Select-Object -First 1
 $candidateSystem = Join-Path $extracted.FullName '_system'
 if (Test-Path $candidateSystem) {
@@ -123,7 +147,7 @@ Get-ChildItem -Path $newSystem -Force | Where-Object { $keep -notcontains $_.Nam
   Copy-Item -Path $_.FullName -Destination $dest -Recurse -Force
 }
 # If the new release ships new launcher/HTA files at root, refresh those too
-Get-ChildItem -Path $sourceRoot -File | Where-Object { $_.Extension -match '\.(hta|command|sh)$' -or $_.Name -match '^Free GST Billing' } | ForEach-Object {
+Get-ChildItem -Path $sourceRoot -File | Where-Object { $_.Extension -match '\.(hta|command|sh)$' -or $_.Name -match '^Divtech Hisaab' } | ForEach-Object {
   Copy-Item -Path $_.FullName -Destination (Join-Path $RootDir $_.Name) -Force
 }
 # v1.10.83 - a clean update: files an older version had and this one does not
@@ -137,7 +161,7 @@ if ($shipped) {
   } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
   $rootNames = @(Get-ChildItem -Path $sourceRoot -File | ForEach-Object { $_.Name })
   Get-ChildItem -Path $RootDir -File | Where-Object {
-    ($_.Name -like 'Free GST Billing - *' -or $_.Name -eq 'READ ME FIRST.txt') -and $rootNames -notcontains $_.Name
+    ($_.Name -like 'Divtech Hisaab - *' -or $_.Name -eq 'READ ME FIRST.txt') -and $rootNames -notcontains $_.Name
   } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
 }
 

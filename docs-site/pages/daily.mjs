@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 
 export default [
 // =============================================================================
@@ -21,19 +20,6 @@ export default [
   <tr><td>${ui('New Invoice')}</td><td>Starts a blank invoice. See <a href="invoices.html">Making an invoice</a>.</td></tr>
 </table>
 <p>From top to bottom the screen then shows: the welcome note and the Getting started list (new users only), the support card, the red overdue banner (only when something is overdue), the four totals, the low-stock strip (only when a product is running low), and the invoice list with its filters.</p>
-<figure><img src="assets/img/app-dashboard.png" alt="The Dashboard: CSV import / export, Import IRN and New Invoice at the top right, a red banner for two overdue invoices, the four total cards in rupees and dollars, low stock, and the invoice list." loading="lazy"><figcaption>The Dashboard with two overdue invoices, the four totals, low stock and the buttons at the top right.</figcaption></figure>
-</section>
-
-<section id="welcome-card">
-<h2>The welcome note</h2>
-<p>A new install shows a large note at the top: <b>Thank you for choosing Free GST Billing</b>. It says the app is free for good, your data stays on your own computer and works offline, a new update comes every Saturday, and support is welcome but never needed.</p>
-<table>
-  <tr><th>Button</th><th>What it does</th></tr>
-  <tr><td>${ui('Support with any amount')}</td><td>Opens <a href="shortcuts.html#support">Support &amp; About</a>, where you can pay any amount by <a href="support.html#upi">UPI</a>. Nothing is charged unless you pay yourself.</td></tr>
-  <tr><td>${ui('Share on WhatsApp')}</td><td>Opens WhatsApp with a short message about the app and its download link, so you can send it to a friend or your CA.</td></tr>
-  <tr><td>${ui('Start billing')} or ${ui('✕')}</td><td>Closes the note for good on this computer and browser.</td></tr>
-</table>
-<p>It shows only while the business has fewer than 10 documents. From 10 on, the smaller <a href="#support-card">support card</a> takes its place, so the two never show together.</p>
 </section>
 
 <section id="getting-started">
@@ -53,27 +39,10 @@ export default [
   <li><strong>First invoice</strong>Pick the client, add the items, and the GST is worked out for you. See <a href="first-invoice.html">Your first invoice</a>.</li>
 </ol>
 <p>The list disappears by itself once all four are done. ${ui('✕')} at the top right hides it for good on this computer even if steps are left. <b>Read the 5-minute guide</b> at the bottom opens this documentation in your browser.</p>
-<figure><img src="${img('getting-started.png')}" alt="The Getting started list with three of four steps done"></figure>
 <div class="note tip"><strong>Something wrong?</strong>
 <p>A step stays unticked after you did it? Make sure you clicked ${ui('Save')} in Settings (see <a href="settings.html#save-bar">Saving your changes</a>), then come back to the Dashboard: the list is checked again each time the Dashboard opens. The bank step needs an account number or a UPI ID, not only a bank name.</p></div>
 </section>
 
-<section id="support-card">
-<h2>The support card</h2>
-<p>Once the business has 10 or more documents, and the Getting started list is finished or hidden, a small card at the top shows how many invoices you have made with the app, a different short line each day about how the app is kept free, and, when the computer is online, how much users have given so far (with a progress bar when there is a goal).</p>
-<table>
-  <tr><th>Button</th><th>What it does</th></tr>
-  <tr><td>${ui('Support with UPI')}</td><td>Opens <a href="shortcuts.html#support">Support &amp; About</a>, and hides the card for the rest of the day.</td></tr>
-  <tr><td>${ui('Not today')}</td><td>Hides it until tomorrow.</td></tr>
-  <tr><td>${ui('Hide for 30 days')}</td><td>Hides it for a month.</td></tr>
-</table>
-<p>It never blocks your work, is never a pop-up, and is never printed on an invoice. It is remembered per browser, so a different browser or computer may show it again.</p>
-</section>
-
-<section id="star-banner">
-<h3>The "star on GitHub" line</h3>
-<p>A few days after you start using the app, a slim blue line may appear at the top of most screens: <b>Finding Free GST Billing useful? A star on GitHub helps other businesses find it.</b> ${ui('Star on GitHub')} opens the app's GitHub page (a free account is needed to give a star) and hides the line for good. ${ui('Already starred')} also hides it for good. ${ui('✕')} hides it for 30 days. It is never shown on the new invoice screen.</p>
-</section>
 
 <section id="overdue">
 <h2>Overdue invoices and reminders</h2>
@@ -221,7 +190,6 @@ export default [
 <p><b>TDS.</b> If the invoice already shows TDS (see <a href="invoices.html#tds-tcs">TDS and TCS</a>), the balance here is already less that TDS, and paying that balance makes the invoice Paid. If the client deducted TDS the invoice does not show, record it here: see <a href="#payment-tds">TDS when recording a payment</a>.</p>
 <p><b>Overpayment.</b> If the amount is more than the balance, you are asked <b>Record as overpayment?</b>. ${ui('Yes, record overpayment')} keeps the extra as the client's credit, to use on <a href="invoices.html#client-credit">their next invoice</a>. The window then shows <b>Overpaid</b> in blue instead of a balance.</p>
 <p><b>Cancelled invoice.</b> A cancelled invoice cannot take a payment: you see "This invoice is cancelled. Change its status back before recording a payment." Undo the cancel first. On a cancelled or converted document that already has payments, the ${ui('₹')} button is called <b>Payment history</b> and opens the same window so you can see, reprint or fix them.</p>
-<figure><img src="assets/img/app-payment.png" alt="Recording the rest of a part-paid invoice. The earlier payment is under Payment History." loading="lazy"><figcaption>Recording the rest of a part-paid invoice. The earlier payment is under Payment History.</figcaption></figure>
 <div class="note tip"><strong>Something wrong?</strong>
 <p>"Enter a positive payment amount": the amount is empty, zero or not a number. A message "Reconciled 1 orphaned payment…" when the Dashboard opens means a receipt saved earlier had lost its link to the invoice; the app put the payment back on the invoice for you, and nothing else is needed. To record one payment that covers several invoices, record it on each invoice for its share.</p></div>
 </section>

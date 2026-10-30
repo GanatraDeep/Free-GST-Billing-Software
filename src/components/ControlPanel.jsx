@@ -126,7 +126,7 @@ export default function ControlPanel() {
       <div className="dashboard-container">
         <div className="glass-panel p-6" style={{ maxWidth: 560, margin: '3rem auto' }}>
           <h2 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CheckCircle size={22} color="#22c55e" /> Free GST Billing is being removed
+            <CheckCircle size={22} color="#22c55e" /> Divtech Hisaab is being removed
           </h2>
           <p>The app has closed and its files and icons are being deleted. You can close this window.</p>
           {removed.kept && (
@@ -136,7 +136,7 @@ export default function ControlPanel() {
             </p>
           )}
           {removed.data && !removed.backups && (
-            <p>A last copy of your data was saved in <code>Documents/FreeGSTBill Backups</code> as <code>before-removal-…</code>.</p>
+            <p>A last copy of your data was saved in <code>Documents/Divtech Hisaab Backups</code> as <code>before-removal-…</code>.</p>
           )}
         </div>
       </div>
@@ -178,7 +178,7 @@ export default function ControlPanel() {
           <div>
             <strong>Update and backup scripts not found.</strong> <HelpButton title="Update and backup scripts not found" doc="control-panel#scripts-missing" size={16} /> They come with the downloaded ZIP, in the
             <code> _system</code> folder next to the app. If you started the app from source code, or copied it
-            without those files, download the latest ZIP from GitHub. Your data can still be saved from
+            without those files, ask Divtech for the latest setup ZIP. Your data can still be saved from
             <em> Settings → Data Management → Export Backup</em>.
           </div>
         </div>
@@ -198,7 +198,7 @@ export default function ControlPanel() {
         <ActionCard
           icon={<RefreshCw size={22} />}
           title="Update Software" doc="control-panel#update"
-          body="Pull the latest release from GitHub. Your data folder is snapshotted first and never touched."
+          body="Download the latest release from Divtech (needs an active subscription). Your data folder is snapshotted first and never touched."
           buttonLabel={label('update', 'Update Now', 'Updating…')}
           disabled={!!busy || !can('update')}
           onClick={() => launchScript('update')}
@@ -207,7 +207,7 @@ export default function ControlPanel() {
         <ActionCard
           icon={<Download size={22} />}
           title="Backup Data" doc="control-panel#backup"
-          body="Zips your data folder into ~/Documents/FreeGSTBill Backups/ with a timestamp."
+          body="Zips your data folder into ~/Documents/Divtech Hisaab Backups/ with a timestamp."
           buttonLabel={label('backup', 'Create Backup', 'Backing up…')}
           disabled={!!busy || !can('backup')}
           onClick={() => runAction('backup')}
@@ -239,7 +239,7 @@ export default function ControlPanel() {
         <ActionCard
           icon={<FolderOpen size={22} />}
           title="Open Backups Folder"
-          body="Opens ~/Documents/FreeGSTBill Backups/ where every automatic and manual backup ZIP is stored."
+          body="Opens ~/Documents/Divtech Hisaab Backups/ where every automatic and manual backup ZIP is stored."
           buttonLabel="Open"
           disabled={!!busy}
           onClick={() => runAction('open-backups-folder')}
@@ -278,7 +278,7 @@ export default function ControlPanel() {
 
       {removeOpen && status?.canRemove && (
         <div id="remove-app" className="glass-panel p-6" style={{ marginTop: '1.5rem', border: '1px solid #dc2626' }}>
-          <h3 style={{ margin: '0 0 0.4rem' }}>Remove Free GST Billing from this computer</h3>
+          <h3 style={{ margin: '0 0 0.4rem' }}>Remove Divtech Hisaab from this computer</h3>
           <p style={{ margin: '0 0 0.8rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Tick what else should be deleted. Anything not ticked stays in <code>{status.appFolder}</code>.
           </p>
@@ -287,7 +287,7 @@ export default function ControlPanel() {
             {[
               ['data', 'My invoices, clients, products and settings (and the daily backups inside the app)'],
               ['pdfs', 'Saved invoice PDFs (the Saved Invoices and Trash folders)'],
-              ['backups', 'All backup files in Documents/FreeGSTBill Backups'],
+              ['backups', 'All backup files in Documents/Divtech Hisaab Backups'],
             ].map(([key, text]) => (
               <label key={key}>
                 <input type="checkbox" checked={removeOpts[key]}
@@ -296,7 +296,7 @@ export default function ControlPanel() {
             ))}
           </div>
           {removeOpts.data && !removeOpts.backups && (
-            <p style={{ fontSize: '0.82rem', margin: '0.8rem 0 0' }}>A last copy of your data is saved in <code>Documents/FreeGSTBill Backups</code> first.</p>
+            <p style={{ fontSize: '0.82rem', margin: '0.8rem 0 0' }}>A last copy of your data is saved in <code>Documents/Divtech Hisaab Backups</code> first.</p>
           )}
           {removeOpts.data && removeOpts.backups && (
             <p style={{ fontSize: '0.82rem', margin: '0.8rem 0 0', color: '#ef4444' }}><b>Nothing will be left. This cannot be undone.</b> Export a backup first if you may want your books again.</p>

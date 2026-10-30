@@ -36,7 +36,6 @@ export default [
 <h2>Business type</h2>
 <p>The first tab. Pick what kind of business you run, and the app shows the screens and features that business needs and hides the rest, so the menu stays short. Use it when you first set the app up, or when the menu shows things you never use.</p>
 <p>The card shows <b>Your business type:</b> with the type that is saved now, or <b>Not chosen yet</b>.</p>
-<figure><img src="assets/img/settings-business-type.png" alt="Settings, Business type tab: the row of Settings tabs at the top and seven business type cards, with Everything picked." loading="lazy"><figcaption>The Business type tab. The saved type is shown in blue; the Save all changes bar is at the bottom.</figcaption></figure>
 <ol class="steps">
   <li><strong>Pick a type</strong>Click one of the seven cards. Each says in one line who it is for.</li>
   <li><strong>Check what will change</strong>A yellow box, <b>Not saved yet</b>, lists what will be turned on (<i>Turn on: …</i>) and turned off (<i>Turn off: …</i>). The tick boxes on the Features tab are filled in to match.</li>
@@ -110,7 +109,6 @@ export default [
 <h2>LUT for exports and SEZ supplies</h2>
 <p>A second grey box inside Company Details, shown only when the country is India. Fill it in if you export, or sell to units in a Special Economic Zone (SEZ), <b>without charging IGST</b>.</p>
 <p><b>What a LUT is.</b> A Letter of Undertaking (form <b>GST RFD-11</b>) is a promise to the GST department that you will follow the export rules. With a LUT, exports and SEZ supplies are billed without IGST (they are "zero-rated"), so you do not pay the tax and then wait months for a refund. Without one, you must charge IGST and claim it back. It is free, filed online in a few minutes, and valid for <b>one financial year</b>: file a fresh one every April, before your first export of the year. How to file it, step by step: <a href="gst-basics.html#lut">GST basics: LUT</a>.</p>
-<figure><img src="assets/img/settings-lut.png" alt="The LUT for exports and SEZ supplies box: LUT ARN AD290426123456X, financial year FY 2026-27 and the date filed." loading="lazy"><figcaption>The LUT box in Settings, Company, filled in.</figcaption></figure>
 <div class="table-wrap"><table>
   <tr><th>Field</th><th>What to put in</th></tr>
   <tr><td>LUT ARN (acknowledgement number)</td><td>The ARN the GST portal gave you when you filed the LUT, such as <code>AD290426123456X</code>: usually 15 letters and digits starting with AD. Spaces are removed and letters made capital for you. If it does not look like an ARN, an amber note asks you to check it, but it is still saved.</td></tr>
@@ -143,7 +141,6 @@ export default [
 <p>To use a different account on one invoice, pick it under <a href="invoice-options.html#tds-tcs-account">Customize</a> on the invoice screen.</p>
 <p><b>PAN Number (business-level)</b> sits below the list, for Indian businesses. It is your 10-character PAN, such as <code>AAAAA1234A</code>, and prints in the bank details block. Unlike the accounts, it needs ${ui('Save Profile')} or ${ui('Save all changes')}.</p>
 <p>If you entered bank details in an older version, a yellow box says <b>Your existing bank details are still on this profile</b>. Click ${ui('Import &amp; continue →')} to turn them into your first account.</p>
-<figure><img src="assets/img/app-settings-accounts.png" alt="A payment account, and the invoice number format with its preview." loading="lazy"><figcaption>A payment account, and the invoice number format with its preview.</figcaption></figure>
 <h3>Something wrong?</h3>
 <ul>
   <li><b>No QR code on the invoice</b>: the account used on that invoice has no UPI ID, the invoice is not in rupees, or <b>UPI QR code</b> is switched off in <a href="#features">Features</a>.</li>
@@ -249,7 +246,7 @@ export default [
 <p>${ui('Change Logo')}, ${ui('Change Signature')} and ${ui('Change Stamp')} pick a new picture; the red bin on a picture removes it (save to keep the change). Saving a logo or signature also ticks <b>Show logo</b> and <b>Show signature</b> for new invoices.</p>
 <p><b>Tips for good pictures.</b> Large photos are made smaller for you (to 1024 pixels on the longer side). For the signature and stamp, a PNG with a transparent background looks best, so the paper shows through; sign on white paper, photograph it in good light, and crop it close. A logo photo (PNG or JPG) is saved with a white background, so it prints cleanly on any printer.</p>
 <p>On a long invoice the signature and stamp always move to the next page together, never split.</p>
-<p><b>Your name and logo in the menu.</b> Tick <b>Show my business name and logo in the app's menu</b> under the logo, then save: the top of the menu shows your logo (or your first letter) and business name instead of "GST Billing". With several businesses, it shows the one that is open. "by DiceCodes" stays under it. New installs ask this during the first setup.</p>
+<p><b>Your name and logo in the menu.</b> Tick <b>Show my business name and logo in the app's menu</b> under the logo, then save: the top of the menu shows your logo (or your first letter) and business name instead of "GST Billing". With several businesses, it shows the one that is open. "by Divtech" stays under it. New installs ask this during the first setup.</p>
 <h3>Something wrong?</h3>
 <ul>
   <li><b>"Could not decode this image"</b>: often an iPhone photo in HEIC format. Share it as JPEG first, or set the iPhone camera to <i>Most Compatible</i>.</li>
@@ -335,7 +332,6 @@ export default [
   <li><strong>Save</strong>Click ${ui('Save all changes')} at the bottom. Only then does the menu change. ${ui('Discard')} undoes your ticks.</li>
 </ol>
 <p>Unticked things disappear from the menu and the screens. <b>Nothing is deleted</b>: your data is kept, and ticking it again brings it all back. Each switch has a line saying what it does.</p>
-<figure><img src="assets/img/settings-features.png" alt="Settings, Features tab: tick boxes for the top of the menu, the bottom of the menu and the buttons at the top right, each with arrows to change the order." loading="lazy"><figcaption>The Features tab. Tick what you want in the menu, and use the arrows to change its order.</figcaption></figure>
 <p>${ui('Reset to my business type')}, at the top right, sets every switch back to what your <a href="#business-type">business type</a> gives; save to apply it. Before a business type is chosen, the button is ${ui('Reset to default')}.</p>
 <p>When <b>Cost centres</b> is on, a <b>Cost centres</b> card appears under Features on this tab, to add your branches, sites or projects: see <a href="reports.html#cost-centres">Cost centres</a>.</p>
 <h3>Something wrong?</h3>
@@ -429,13 +425,13 @@ export default [
 <ul>
   <li><b>"The two PINs do not match"</b> or <b>"The PIN must be 6 digits"</b>: type the same PIN, of the length you chose, in both boxes.</li>
   <li><b>"Current PIN is wrong"</b>: check Caps Lock is not the problem (PINs are digits only) and try again; after five tries, wait 30 seconds.</li>
-  <li><b>Forgot the PIN?</b> Open the Free-GST-Billing folder (where you start the app), make a new empty file there named <code>RESET-PIN</code>, and reload the app. The PIN is removed and the file deleted. Your invoices are not touched.</li>
+  <li><b>Forgot the PIN?</b> Open the Divtech-Hisaab folder (where you start the app), make a new empty file there named <code>RESET-PIN</code>, and reload the app. The PIN is removed and the file deleted. Your invoices are not touched.</li>
 </ul>
 </section>
 
 <section id="privacy-internet">
 <h2>Privacy &amp; internet</h2>
-<p>The ${ui('Privacy &amp; internet')} tab says, in one table, everything the app uses the internet for and when. Tick <b>Offline mode</b> and the app never goes online by itself: no update check, no supporters list, no automatic copy of each PDF to Google Drive. ${ui('Check for Updates')} and other things you click still work when you click them. It also tells you how to check this yourself in two minutes. The full answer is on <a href="security.html#offline-mode">Is it safe?</a>.</p>
+<p>The ${ui('Privacy &amp; internet')} tab says, in one table, everything the app uses the internet for and when. Tick <b>Offline mode</b> and the app never goes online by itself: no update check, no automatic copy of each PDF to Google Drive. ${ui('Check for Updates')} and other things you click still work when you click them. It also tells you how to check this yourself in two minutes. The full answer is on <a href="security.html#offline-mode">Is it safe?</a>.</p>
 </section>
 
 <section id="backups">
@@ -556,11 +552,11 @@ export default [
   <li><strong>Type a folder</strong>On another drive, a USB disk or a synced folder, such as <code>D:\\FreeGSTBill</code> or <code>E:\\</code>.</li>
   <li><strong>Save it</strong>Click ${ui('Save folder')}. The app checks it can write there and copies today's backup at once. The message says where the copies go.</li>
 </ol>
-<p>Each daily backup is then also copied into <code>FreeGSTBill Backups\\<i>date</i></code> inside that folder, keeping 30 days. The line under the box shows where. If a copy fails (a USB disk not plugged in), the card says so in red. ${ui('Stop copying')} turns it off; copies already made stay.</p>
+<p>Each daily backup is then also copied into <code>Divtech Hisaab Backups\\<i>date</i></code> inside that folder, keeping 30 days. The line under the box shows where. If a copy fails (a USB disk not plugged in), the card says so in red. ${ui('Stop copying')} turns it off; copies already made stay.</p>
 <p><b>If the computer fails</b>: install the app again, set the same folder here, and its backups appear in the list with ${ui('Restore')}.</p>
 <p>Or by hand:</p>
 <ul>
-  <li><strong>One click</strong>: ${ui('Create Backup')} in the <a href="control-panel.html">Control Panel</a>, or ${ui('Back up my data')} in the launcher under ${ui('More options')}, saves a ZIP in <code>Documents\\FreeGSTBill Backups</code>. Copy it to a pen drive or cloud storage.</li>
+  <li><strong>One click</strong>: ${ui('Create Backup')} in the <a href="control-panel.html">Control Panel</a>, or ${ui('Back up my data')} in the launcher under ${ui('More options')}, saves a ZIP in <code>Documents\\Divtech Hisaab Backups</code>. Copy it to a pen drive or cloud storage.</li>
   <li><strong>One file you choose</strong>: see <a href="#export-import">Export Backup</a>.</li>
   <li><strong>Google Drive</strong>: see <a href="settings.html#google-drive">Cloud Backup (Google Drive)</a>.</li>
 </ul>
@@ -617,7 +613,7 @@ export default [
 <p>Records in the file <b>replace the matching records</b> in the app; records the file does not have are left alone, and parts you did not tick are untouched. Export your current data first, just in case.</p>
 <h3>Something wrong?</h3>
 <ul>
-  <li><b>"This file doesn't look like a Free GST Billing backup"</b>: you picked a different file. Backups are named <code>freegstbill-backup-<i>date</i>.json</code>. A ZIP from the Control Panel is restored there, with ${ui('Choose Backup ZIP')}.</li>
+  <li><b>"This file doesn't look like a Divtech Hisaab backup"</b>: you picked a different file. Backups are named <code>freegstbill-backup-<i>date</i>.json</code>. A ZIP from the Control Panel is restored there, with ${ui('Choose Backup ZIP')}.</li>
   <li><b>Restored, but I do not see it</b>: reload the page, and check the business selected at the top of the sidebar.</li>
 </ul>
 </section>
@@ -653,7 +649,7 @@ export default [
   <li>${ui('Update Now')} in the <a href="control-panel.html">Control Panel</a>.</li>
   <li>In the launcher, ${ui('More options')}, then ${ui('Update to the latest version')}.</li>
 </ul>
-<p>Every update first saves a backup of your data in <code>Documents\\FreeGSTBill Backups</code>, then replaces the app. It never touches your data folder or your saved PDFs. It takes about a minute; reload the page when it finishes.</p>
+<p>Every update first saves a backup of your data in <code>Documents\\Divtech Hisaab Backups</code>, then replaces the app. It never touches your data folder or your saved PDFs. It takes about a minute; reload the page when it finishes.</p>
 <p>To update by hand instead: download the ZIP, stop the app, extract the ZIP over your app folder replacing the files, and open the launcher again.</p>
 <p>If you extract a new ZIP into a different folder by mistake, its launcher does not install a second copy. It shows <b>Already installed on this computer</b>, with the folder, version and number of invoices, and offers ${ui('Update the installed copy')} and ${ui('Open the installed copy')}. The update uses the files in the folder you extracted, so it needs no download and works without internet; your invoices, saved PDFs and trash stay as they are. The new folder can then be deleted.</p>
 <p>Updating also removes files that older versions left behind, such as launchers under their old names, once their replacements are in place. Your data, backups and Node.js are never touched.</p>
@@ -677,17 +673,16 @@ export default [
 <div class="table-wrap"><table>
   <tr><th>Card</th><th>Button</th><th>What it does</th></tr>
   <tr><td><a href="#update">Update Software</a></td><td>${ui('Update Now')}</td><td>Downloads the latest version. Your data is backed up first and never touched.</td></tr>
-  <tr><td><a href="#backup">Backup Data</a></td><td>${ui('Create Backup')}</td><td>Saves your data as a dated ZIP in <code>Documents\\FreeGSTBill Backups</code>.</td></tr>
+  <tr><td><a href="#backup">Backup Data</a></td><td>${ui('Create Backup')}</td><td>Saves your data as a dated ZIP in <code>Documents\\Divtech Hisaab Backups</code>.</td></tr>
   <tr><td><a href="#restore">Restore Backup</a></td><td>${ui('Choose Backup ZIP')}</td><td>Pick a backup ZIP to restore. What you have now is saved first, as a safety net.</td></tr>
   <tr><td><a href="#move">Move to Another PC</a></td><td>${ui('Export for Move')}</td><td>Saves your data and settings as one ZIP on your Desktop. See <a href="backup.html#move-pc">Moving to a new computer</a>.</td></tr>
   <tr><td>Open Data Folder</td><td>${ui('Open')}</td><td>Opens the folder with your bills, clients, products and settings.</td></tr>
-  <tr><td>Open Backups Folder</td><td>${ui('Open')}</td><td>Opens <code>Documents\\FreeGSTBill Backups</code>.</td></tr>
+  <tr><td>Open Backups Folder</td><td>${ui('Open')}</td><td>Opens <code>Documents\\Divtech Hisaab Backups</code>.</td></tr>
   <tr><td><a href="#restart">Restart the App</a></td><td>${ui('Restart')}</td><td>Restarts the app when something is not working, then reloads the page.</td></tr>
   <tr><td><a href="#stop">Stop Server</a></td><td>${ui('Stop Server')}</td><td>Stops the app. Open it again from the launcher or shortcut.</td></tr>
   <tr><td><a href="#remove">Remove the App</a></td><td>${ui('Remove…')}</td><td>Uninstalls the app. You tick whether your data, PDFs and backups are deleted too. Where it cannot remove itself, the button reads ${ui('How to remove it')} and opens the steps.</td></tr>
 </table></div>
 <p>After each action a panel shows whether it worked, with the details underneath if something went wrong. See <a href="#result">The result panel</a>. Each button is explained step by step below.</p>
-<figure><img src="assets/img/app-control-panel.png" alt="The Control Panel." loading="lazy"><figcaption>The Control Panel.</figcaption></figure>
 </section>
 
 <section id="each">
@@ -698,11 +693,11 @@ export default [
 <section id="update">
 <h3>Update Software</h3>
 <p><b>What it does.</b> Downloads the newest version from GitHub and puts it in place of the old one. Your data folder is not changed.</p>
-<p><b>When to use it.</b> When a new version is out (we ship one most Saturdays) or a problem you reported has been fixed. You need internet.</p>
+<p><b>When to use it.</b> When a new version is out or a problem you reported has been fixed. You need internet.</p>
 <ol>
   <li>Click ${ui('Update Now')}. The button shows <b>Updating...</b>; wait until it finishes. It can take a few minutes.</li>
-  <li><b>Windows:</b> a black window opens. It first saves a backup of your data, <code>pre-update-<i>date</i>.zip</code>, in <code>Documents\\FreeGSTBill Backups</code>, then downloads and applies the update. It ends with <b>[OK] Update complete!</b></li>
-  <li><b>Mac and Linux:</b> it does the same, saving the backup as <code>pre-update-<i>date</i>.tar.gz</code> in <code>Documents/FreeGSTBill Backups</code>. If you already have the newest version it says so and changes nothing. It ends with <b>[OK] Update complete</b> and the old and new version numbers.</li>
+  <li><b>Windows:</b> a black window opens. It first saves a backup of your data, <code>pre-update-<i>date</i>.zip</code>, in <code>Documents\\Divtech Hisaab Backups</code>, then downloads and applies the update. It ends with <b>[OK] Update complete!</b></li>
+  <li><b>Mac and Linux:</b> it does the same, saving the backup as <code>pre-update-<i>date</i>.tar.gz</code> in <code>Documents/Divtech Hisaab Backups</code>. If you already have the newest version it says so and changes nothing. It ends with <b>[OK] Update complete</b> and the old and new version numbers.</li>
   <li>Restart the app to run the new version: click ${ui('Stop Server')} (see <a href="#stop">Stop Server</a>), then open the app again from its icon or launcher. Then press <kbd>Ctrl</kbd> + <kbd>F5</kbd> (Mac: <kbd>&#8984;</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd>).</li>
 </ol>
 <p><b>Is it safe?</b> Yes. Your data is backed up first and the update never touches the data folder. On Mac and Linux, if the update fails half way, the old app files are put back.</p>
@@ -716,7 +711,7 @@ export default [
 
 <section id="backup">
 <h3>Backup Data</h3>
-<p><b>What it does.</b> Saves all your bills, clients, products and settings as one dated ZIP file, <code>backup-<i>date_time</i>.zip</code>, in the <code>Documents\\FreeGSTBill Backups</code> folder (Mac and Linux: <code>Documents/FreeGSTBill Backups</code>).</p>
+<p><b>What it does.</b> Saves all your bills, clients, products and settings as one dated ZIP file, <code>backup-<i>date_time</i>.zip</code>, in the <code>Documents\\Divtech Hisaab Backups</code> folder (Mac and Linux: <code>Documents/Divtech Hisaab Backups</code>).</p>
 <p><b>When to use it.</b> Before a big change, at the end of the month, or any time you want a copy to keep on a pen drive. The app also makes its own daily backup; this is an extra one at a moment you choose.</p>
 <ol>
   <li>Click ${ui('Create Backup')}. It shows <b>Backing up...</b> for a moment.</li>
@@ -732,7 +727,7 @@ export default [
 <p><b>What it does.</b> Replaces the data in the app with the data from a backup ZIP you choose.</p>
 <p><b>When to use it.</b> After moving to a new computer, or to go back to how things were on an earlier day. It works with ZIPs made by ${ui('Create Backup')} or ${ui('Export for Move')}.</p>
 <ol>
-  <li><b>Windows.</b> Click ${ui('Choose Backup ZIP')}. A file window opens in your <code>FreeGSTBill Backups</code> folder. Pick the ZIP and click <b>Open</b>. (Close the window to cancel; nothing changes.)</li>
+  <li><b>Windows.</b> Click ${ui('Choose Backup ZIP')}. A file window opens in your <code>Divtech Hisaab Backups</code> folder. Pick the ZIP and click <b>Open</b>. (Close the window to cancel; nothing changes.)</li>
   <li>The app first saves what you have now as <code>pre-restore-<i>date</i>.zip</code> in the same folder. This is your way back if you chose the wrong file.</li>
   <li>It then replaces the data with the backup's contents and shows <b>[OK] Restore complete!</b> Press <b>Enter</b> to close the black window.</li>
   <li>Restart the app (<a href="#stop">Stop Server</a>, then open it again) to see the restored data.</li>
@@ -776,7 +771,7 @@ export default [
   <li>Finish and save any bill you are typing. Then click ${ui('Stop Server')}.</li>
   <li><b>Windows:</b> it finds the app's process on your port and ends it. <b>Mac and Linux:</b> the app stops itself a moment after replying; the result panel says <b>Stopped. Open the app again from its icon or launcher.</b></li>
   <li>The browser page will then show errors such as "Failed to fetch". That is normal.</li>
-  <li>Open the app again: double-click <b>Free GST Billing</b> on your Desktop (Mac: <b>Free GST Billing - MAC</b>; Linux: your start command).</li>
+  <li>Open the app again: double-click <b>Divtech Hisaab</b> on your Desktop (Mac: <b>Divtech Hisaab - MAC</b>; Linux: your start command).</li>
 </ol>
 <p><b>Is it safe?</b> Yes. Everything is saved as you work, so nothing already saved is lost. A bill still being typed and not saved is not kept. If the app runs as a service or in Docker, it may start again by itself.</p>
 <p><b>Something wrong?</b> If it will not start again, see <a href="troubleshooting.html#cannot-connect">Failed to fetch, App Not Running</a> and <a href="troubleshooting.html#not-answered">the server has not answered</a>. Mac and Linux: <a href="troubleshooting.html#mac">Mac</a>, <a href="troubleshooting.html#linux">Linux and NAS</a>.</p>
@@ -784,19 +779,19 @@ export default [
 
 <section id="remove">
 <h3>Remove the App</h3>
-<p><b>What it does.</b> Uninstalls Free GST Billing from this computer in one go: the app, its Desktop and Start-menu icons (Mac: the app in Applications; Linux: the menu entry) and the start-with-computer entry. You choose what else goes.</p>
+<p><b>What it does.</b> Uninstalls Divtech Hisaab from this computer in one go: the app, its Desktop and Start-menu icons (Mac: the app in Applications; Linux: the menu entry) and the start-with-computer entry. You choose what else goes.</p>
 <ol>
   <li>Click ${ui('Remove…')}. A list opens below the cards. (On Windows the launcher window has the same: <b>More options</b> → ${ui('Remove the app...')}.)</li>
   <li>Tick what to delete as well. Nothing is ticked at first, so by default <b>only the program goes and your books stay</b>:
     <ul>
       <li><b>My invoices, clients, products and settings</b>: the data folder, with the daily backups inside it.</li>
       <li><b>Saved invoice PDFs</b>: the <code>Saved Invoices</code> and <code>Trash</code> folders.</li>
-      <li><b>All backup files</b> in <code>Documents\\FreeGSTBill Backups</code>.</li>
+      <li><b>All backup files</b> in <code>Documents\\Divtech Hisaab Backups</code>.</li>
     </ul>
     ${ui('Select everything')} ticks all three, for a computer you are giving away.</li>
   <li>Click ${ui('Remove the app')}. If your data is ticked, it asks once more. The app closes and the page says it is being removed. Close the window.</li>
 </ol>
-<p><b>Is it safe?</b> If you delete your data but keep the backups, a last copy, <code>before-removal-<i>date</i>.zip</code> (Mac and Linux: <code>.tar.gz</code>), is saved in <code>Documents\\FreeGSTBill Backups</code> first. If that copy cannot be made, your data is kept. Whatever you keep stays in the app folder; install the app into the same folder again and it is all there. Other files you put in the app folder yourself are not touched, and neither is a second backup folder you chose in Settings.</p>
+<p><b>Is it safe?</b> If you delete your data but keep the backups, a last copy, <code>before-removal-<i>date</i>.zip</code> (Mac and Linux: <code>.tar.gz</code>), is saved in <code>Documents\\Divtech Hisaab Backups</code> first. If that copy cannot be made, your data is kept. Whatever you keep stays in the app folder; install the app into the same folder again and it is all there. Other files you put in the app folder yourself are not touched, and neither is a second backup folder you chose in Settings.</p>
 <p><b>Something wrong?</b> If the button reads ${ui('How to remove it')}, the app is running from source code or an old ZIP and cannot remove itself; the button opens <a href="install.html#uninstall">Removing the app</a> with the other ways. On Windows, if a file is in use, a message names the folder to delete by hand after a restart.</p>
 </section>
 

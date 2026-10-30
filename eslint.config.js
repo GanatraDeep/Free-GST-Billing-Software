@@ -41,7 +41,7 @@ export default defineConfig([
   },
   // The server and the build / test scripts run in Node, not the browser.
   {
-    files: ['server.js', 'scripts/**/*.{js,mjs}', 'tests/**/*.{js,mjs}', 'docs-site/*.mjs', 'docs-site/pages/*.mjs'],
+    files: ['server.js', 'license.js', 'scripts/**/*.{js,mjs}', 'tests/**/*.{js,mjs}', 'docs-site/*.mjs', 'docs-site/pages/*.mjs'],
     languageOptions: { globals: { ...globals.node } },
   },
 ])

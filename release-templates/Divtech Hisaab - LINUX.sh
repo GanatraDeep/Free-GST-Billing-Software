@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Free GST Billing — Linux launcher.
+# Divtech Hisaab — Linux launcher.
 #
 # Mark this executable once (chmod +x) and either double-click in
 # most file managers (Nautilus, Dolphin, Nemo — prompt to run) or
-# run from a terminal: `./Free\ GST\ Billing.sh`
+# run from a terminal: `./Divtech\ Hisaab\ -\ LINUX.sh`
 #
 # Same design as the .command variant for macOS: detect state,
 # offer a minimal menu, hand off to _system/*.sh. All post-install
@@ -21,14 +21,14 @@ if [ -x "$SYSTEM_DIR/node/bin/node" ]; then export PATH="$SYSTEM_DIR/node/bin:$P
 clear
 echo
 echo "  ┌────────────────────────────────────────────────┐"
-echo "  │   Free GST Billing Software                    │"
-echo "  │   Open-source · Offline-first · No signup      │"
+echo "  │   Divtech Hisaab  ·  by Divtech                │"
+echo "  │   Offline-first · No signup                    │"
 echo "  └────────────────────────────────────────────────┘"
 echo
 
 if [ ! -d "$SYSTEM_DIR" ]; then
   echo "  ⚠  _system folder is missing."
-  echo "     Please re-extract the ZIP or re-download from GitHub."
+  echo "     Please re-extract the ZIP, or ask Divtech for a fresh copy."
   echo
   read -rp "  Press Enter to exit… "
   exit 1

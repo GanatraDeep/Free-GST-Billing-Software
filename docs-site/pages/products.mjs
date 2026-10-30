@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 const key = (...k) => k.map((x) => `<kbd>${x}</kbd>`).join(' + ');
 
 export default [
@@ -13,7 +12,6 @@ export default [
 <section id="product-list">
 <h2>The product list</h2>
 <p>${ui('Products')} in the sidebar opens your catalogue: the goods and services you sell or buy, with their prices, GST rate and stock. Save an item here once, and on every invoice you just type a few letters of its name to fill in the HSN, rate, unit and GST.</p>
-<figure><img src="${img('app-products.png')}" alt="The product list. Low stock shows in amber, none in red." loading="lazy"><figcaption>The product list. Low stock shows in amber, none in red.</figcaption></figure>
 <p>The buttons at the top of the screen:</p>
 <div class="table-wrap"><table>
   <tr><th>Button</th><th>What it does</th></tr>
@@ -231,7 +229,7 @@ Demo Printing service,Service,998912,Page,,5,18,,Sample service row - a service 
 
 <section id="mfg-example">
 <h3>Worked example</h3>
-<p>DiceCodes makes chairs. One chair takes 4 chair legs (₹50 each), 1 seat (₹300) and 0.2 kg screws (₹400 a kg), so the cost per unit is 4 × 50 + 300 + 0.2 × 400 = <b>₹580</b>. Stock before: 100 legs, 20 seats, 5 kg screws, 3 chairs.</p>
+<p>Divtech makes chairs. One chair takes 4 chair legs (₹50 each), 1 seat (₹300) and 0.2 kg screws (₹400 a kg), so the cost per unit is 4 × 50 + 300 + 0.2 × 400 = <b>₹580</b>. Stock before: 100 legs, 20 seats, 5 kg screws, 3 chairs.</p>
 <div class="table-wrap"><table>
   <tr><th>Make 10 chairs</th><th>Used</th><th>Stock after</th></tr>
   <tr><td>Chair leg</td><td>40</td><td>60</td></tr>

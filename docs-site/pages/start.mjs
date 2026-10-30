@@ -1,18 +1,16 @@
-import { SITE } from '../site.mjs';
 
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 
 export default [
 // =============================================================================
 {
   slug: 'index',
-  title: 'Free GST Billing documentation',
+  title: 'Divtech Hisaab documentation',
   nav: 'Welcome',
-  lead: 'Make GST invoices, keep track of who owes you, and prepare your GST returns. On your own computer, with no account and no monthly fee.',
+  lead: 'Make GST invoices, keep track of who owes you, and prepare your GST returns. On your own computer, with no account.',
   body: `
-<div class="note tip"><strong>Free forever. Works on your computer, even offline. No tracking. No ads.</strong>
-<p>Your invoices never leave your computer, there is no account to make, and nothing is ever sold to you inside the app. Don't take our word for it: <a href="security.html#check-yourself">check it yourself in two minutes</a>.</p></div>
+<div class="note tip"><strong>Works on your computer, even offline. No tracking. No ads.</strong>
+<p>Your invoices never leave your computer and there is no account to make. Don't take our word for it: <a href="security.html#check-yourself">check it yourself in two minutes</a>.</p></div>
 <ul class="doors">
   <li><a href="install.html"><b>Install it</b><span>Download, extract, click Install. About three minutes, no admin rights needed.</span></a></li>
   <li><a href="first-invoice.html"><b>Make your first invoice</b><span>From a blank app to a GST tax invoice you can send, in five minutes.</span></a></li>
@@ -21,7 +19,7 @@ export default [
 
 <section id="what-it-does">
 <h2>What it does</h2>
-<p>Free GST Billing is invoicing and GST software for small businesses in India, and for anyone billing in other currencies: 20 are supported. It runs on your computer and opens in your web browser, the way a website does, but nothing leaves your machine.</p>
+<p>Divtech Hisaab is invoicing and GST software for small businesses in India, and for anyone billing in other currencies: 20 are supported. It runs on your computer and opens in your web browser, the way a website does, but nothing leaves your machine.</p>
 <ul>
   <li><strong>Invoices</strong>: tax invoices, bills of supply, proforma estimates, credit notes and delivery challans, with CGST, SGST, IGST and UTGST worked out for you.</li>
   <li><strong>Getting paid</strong>: record payments, print receipts, see who is overdue and by how much.</li>
@@ -48,13 +46,13 @@ export default [
 </section>
 
 <section id="is-it-free">
-<h2>Is it really free?</h2>
-<p>Yes. It is open source under the MIT licence. There is no trial, no invoice limit, no feature that unlocks for money, and no advertising. The code is public on <a href="${SITE.repo}">GitHub</a>, so anyone can check what it does. Is it safe? See <a href="security.html">Security and privacy</a>.</p>
+<h2>Do I need a subscription?</h2>
+<p>Only for updates. Everything in the app works without one, and nothing is locked. A subscription from Divtech brings every new update released while it is active: new features, GST changes and fixes. See <a href="support.html">Support &amp; Subscription</a>. Is it safe? See <a href="security.html">Security and privacy</a>.</p>
 </section>
 
 <section id="get-help">
 <h2>Getting help</h2>
-<p>Every screen in the app with a ${ui('?')} button links to the matching part of these pages. If something is missing here, or the app does something these pages don't describe, <a href="${SITE.repo}/issues">open an issue on GitHub</a> with a screenshot. Many features began as someone's request.</p>
+<p>Every screen in the app with a ${ui('?')} button links to the matching part of these pages. If something is missing here, or the app does something these pages don't describe, tell Divtech on <a href="https://wa.me/919429911067">WhatsApp (+91 94299 11067)</a> or at <a href="mailto:hello@divtech.in">hello@divtech.in</a> with a screenshot.</p>
 </section>
 `,
 },
@@ -69,7 +67,7 @@ export default [
 <section id="welcome">
 <h2>Step 1 of the welcome: where you invoice from</h2>
 <p>The first screen explains what the app does, and asks <b>Where will you be invoicing from?</b></p>
-<p>A small <b>Safe and private</b> box on it sums up how your data is kept: on this computer, with no account, working offline, in open-source code anyone can check. Its ${ui('How we keep it safe')} link opens <a href="security.html">Is it safe? Security and privacy</a>.</p>
+<p>A small <b>Safe and private</b> box on it sums up how your data is kept: on this computer, with no account, working offline. Its ${ui('How we keep it safe')} link opens <a href="security.html">Is it safe? Security and privacy</a>.</p>
 <table>
   <tr><td>🇮🇳 India</td><td>GST, GSTR-1 and 3B, UPI. The default.</td></tr>
   <tr><td>🌍 Outside India</td><td>VAT and other local taxes</td></tr>
@@ -127,7 +125,6 @@ export default [
 <section id="wizard-business-type">
 <h3>What kind of business do you run?</h3>
 <p>Click the card that fits you best; it turns blue. Each card has a one-line hint:</p>
-<figure><img src="assets/img/setup-business-type.png" alt="Step 1 of the setup window: seven business type cards, with Freelancer / consultant picked and shown in blue." loading="lazy" style="max-width:min(480px,100%)"><figcaption>Step 1 of 3: the picked card turns blue. ${ui('Continue')} moves to paper size and language.</figcaption></figure>
 <div class="table-wrap"><table>
   <tr><th>Card</th><th>For</th></tr>
   <tr><td>Retail shop / kirana</td><td>Selling from a counter, keeping stock, buying from suppliers.</td></tr>
@@ -190,7 +187,6 @@ export default [
   <li><strong>Check the tax</strong>The preview on the right shows the totals. Same state as you: CGST and SGST. Another state: IGST. You do not need to choose.</li>
   <li><strong>Save and download</strong>Click ${ui('Save &amp; Download')}. The invoice gets its number, is saved to your records, and downloads as a PDF.</li>
 </ol>
-<figure><img src="${img('toolbar.png')}" alt="The invoice toolbar: Save, Save and Download, Print, WhatsApp, E-Way Bill, Customize, Hide Preview"><figcaption>The invoice toolbar stays at the top of the screen as you scroll.</figcaption></figure>
 </section>
 
 <section id="send">

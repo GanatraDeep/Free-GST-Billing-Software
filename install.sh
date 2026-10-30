@@ -1,8 +1,8 @@
 #!/bin/sh
-# Free GST Billing - one-line install, update and repair for macOS and Linux.
+# Divtech Hisaab - one-line install, update and repair for macOS and Linux.
 #
 #   Open Terminal, paste this line, press Return:
-#   curl -fsSL https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/GanatraDeep/free-gst-billing-software/main/install.sh | bash
 #
 # v1.10.83 - a file curl fetches carries no quarantine mark, so macOS
 # Gatekeeper shows no warning; and the release ZIP now carries its own
@@ -12,7 +12,7 @@
 # official build from nodejs.org is put inside the app folder (no sudo).
 #
 # To remove the app (it asks before deleting any data):
-#   curl -fsSL https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/install.sh | bash -s -- --uninstall
+#   curl -fsSL https://raw.githubusercontent.com/GanatraDeep/free-gst-billing-software/main/install.sh | bash -s -- --uninstall
 #
 # Settings (environment variables, set for the shell that runs this):
 #   FREEGSTBILL_DIR   install into (or update) this folder
@@ -27,7 +27,7 @@
 
 set -eu
 
-ZIP_URL='https://github.com/IamRamgarhia/Free-GST-Billing-Software/releases/latest/download/Free-GST-Billing.zip'
+ZIP_URL='https://github.com/GanatraDeep/free-gst-billing-software/releases/latest/download/Divtech-Hisaab.zip'
 NODE_VERSION=v20.19.0
 NEED_FREE_MB=600
 TEST=${FREEGSTBILL_TEST:-}
@@ -113,7 +113,7 @@ stop_app() {
 
 backup_data() {
   [ -n "$(ls -A "$SYS/data" 2>/dev/null)" ] || return 0
-  if [ -n "$TEST" ]; then home_dir="$TEST/Backups"; else home_dir="$HOME/Documents/FreeGSTBill Backups"; fi
+  if [ -n "$TEST" ]; then home_dir="$TEST/Backups"; else home_dir="$HOME/Documents/Divtech Hisaab Backups"; fi
   mkdir -p "$home_dir" || fail "Could not create $home_dir for the backup." 'Check the free space, then run the install line again.'
   BACKUP="$home_dir/pre-update-$(date +%Y-%m-%d_%H-%M-%S).tar.gz"
   tar -czf "$BACKUP" -C "$SYS" data || fail 'The backup of your data failed, so nothing was changed.' 'Check the free space, then run the install line again.'
@@ -158,7 +158,7 @@ JS
 }
 
 make_mac_app() {
-  if [ -n "$TEST" ]; then APP="$TEST/Free GST Billing.app"; else APP="$HOME/Applications/Free GST Billing.app"; fi
+  if [ -n "$TEST" ]; then APP="$TEST/Divtech Hisaab.app"; else APP="$HOME/Applications/Divtech Hisaab.app"; fi
   rm -rf "$APP"
   mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
   printf '#!/bin/sh\nexec /bin/sh "%s/open-app.sh"\n' "$SYS" > "$APP/Contents/MacOS/launch"
@@ -179,9 +179,9 @@ make_mac_app() {
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Free GST Billing</string>
-<key>CFBundleDisplayName</key><string>Free GST Billing</string>
-<key>CFBundleIdentifier</key><string>com.dicecodes.freegstbilling</string>
+<key>CFBundleName</key><string>Divtech Hisaab</string>
+<key>CFBundleDisplayName</key><string>Divtech Hisaab</string>
+<key>CFBundleIdentifier</key><string>in.divtech.hisaab</string>
 <key>CFBundleExecutable</key><string>launch</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
@@ -197,7 +197,7 @@ PLIST
 }
 
 autostart_file() {
-  if [ "$OS" = Darwin ]; then printf '%s\n' "$HOME/Library/LaunchAgents/com.dicecodes.freegstbilling.plist"
+  if [ "$OS" = Darwin ]; then printf '%s\n' "$HOME/Library/LaunchAgents/in.divtech.hisaab.plist"
   else printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/free-gst-billing.desktop"; fi
 }
 menu_file() { printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}/applications/free-gst-billing.desktop"; }
@@ -207,7 +207,7 @@ write_desktop_entry() { # file
   cat > "$1" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=Free GST Billing
+Name=Divtech Hisaab
 Comment=GST invoices and billing, on this computer
 Exec=/bin/sh "$SYS/open-app.sh"
 Icon=$SYS/dist/icons/icon-512.png
@@ -225,7 +225,7 @@ add_autostart() {
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>Label</key><string>com.dicecodes.freegstbilling</string>
+<key>Label</key><string>in.divtech.hisaab</string>
 <key>ProgramArguments</key><array><string>/bin/sh</string><string>$SYS/open-app.sh</string></array>
 <key>RunAtLoad</key><true/>
 </dict></plist>
@@ -241,11 +241,11 @@ add_to_dock() {
 }
 
 install_app() {
-  printf '\n  Free GST Billing - install or update\n\n'
+  printf '\n  Divtech Hisaab - install or update\n\n'
 
   # --- [1/4] ---------------------------------------------------------------
   step '[1/4] Checking this computer'
-  case "$OS" in Darwin | Linux) ;; *) fail "This computer ($OS) is not supported by this installer." 'Use the ZIP download instead: https://dicecodes.com/free-gst-software-documentation/install.html' ;; esac
+  case "$OS" in Darwin | Linux) ;; *) fail "This computer ($OS) is not supported by this installer." 'Use the ZIP download instead: https://divtech.in' ;; esac
   if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
     fail 'Neither curl nor wget is installed.' 'Install curl (Debian / Ubuntu: sudo apt install curl), then run the install line again.'
   fi
@@ -267,7 +267,7 @@ install_app() {
   [ -f "$SYS/server.js" ] && IS_UPDATE=1
   rm -rf "$DIR"/.install-tmp.* 2>/dev/null || true   # left by an interrupted run
   ok
-  [ -z "$IS_UPDATE" ] || printf '        Found Free GST Billing in %s - updating it. Your data stays as it is.\n' "$DIR"
+  [ -z "$IS_UPDATE" ] || printf '        Found Divtech Hisaab in %s - updating it. Your data stays as it is.\n' "$DIR"
 
   # --- [2/4] ---------------------------------------------------------------
   # Inside the app folder, so the files are moved into place, not copied.
@@ -284,10 +284,10 @@ install_app() {
   fi
   PATH="$(dirname "$NODE"):$PATH"; export PATH
   if [ -n "${FREEGSTBILL_ZIP:-}" ]; then
-    printf '        Free GST Billing: using %s\n' "$FREEGSTBILL_ZIP"
+    printf '        Divtech Hisaab: using %s\n' "$FREEGSTBILL_ZIP"
     cp "$FREEGSTBILL_ZIP" "$WORK/app.zip" || fail "Could not read $FREEGSTBILL_ZIP" 'Check the path.'
   else
-    printf '        Free GST Billing (about 25 MB):\n'
+    printf '        Divtech Hisaab (about 25 MB):\n'
     download "$ZIP_URL" "$WORK/app.zip" || fail 'The app could not be downloaded from GitHub.' 'Check the internet connection, then run the install line again.'
   fi
 
@@ -297,7 +297,7 @@ install_app() {
     || fail "The download could not be unpacked ($(tail -n 1 "$WORK/unpack.err")). It may be damaged, or the disk is full." 'Run the install line again.'
   NEW_SYS=$(find "$WORK/unpacked" -maxdepth 2 -type d -name _system | head -n 1)
   if [ -z "$NEW_SYS" ] || [ ! -f "$NEW_SYS/server.js" ] || [ ! -f "$NEW_SYS/node_modules/express/package.json" ]; then
-    fail 'The download is not a complete Free GST Billing package.' 'Run the install line again. If it happens again: https://github.com/IamRamgarhia/Free-GST-Billing-Software/issues'
+    fail 'The download is not a complete Divtech Hisaab package.' 'Run the install line again. If it happens again: https://github.com/GanatraDeep/free-gst-billing-software/issues'
   fi
   BACKUP=''
   [ -z "$IS_UPDATE" ] || backup_data
@@ -314,7 +314,7 @@ install_app() {
     case "$name" in data | 'Saved Invoices' | Trash | node | node-dir.txt) continue ;; esac
     [ -e "$NEW_SYS/$name" ] || rm -rf "${SYS:?}/$name"
   done
-  for f in "$DIR"/'Free GST Billing - '* "$DIR/READ ME FIRST.txt"; do
+  for f in "$DIR"/'Divtech Hisaab - '* "$DIR/READ ME FIRST.txt"; do
     [ -f "$f" ] || continue
     [ -e "$(dirname "$NEW_SYS")/$(basename "$f")" ] || rm -f "$f"
   done
@@ -354,31 +354,31 @@ install_app() {
   fi
   ok
   if [ -z "$IS_UPDATE" ]; then
-    if [ "$OS" = Darwin ] && ask 'Add Free GST Billing to the Dock?'; then add_to_dock; fi
-    if ask 'Open Free GST Billing by itself when this computer starts?'; then
+    if [ "$OS" = Darwin ] && ask 'Add Divtech Hisaab to the Dock?'; then add_to_dock; fi
+    if ask 'Open Divtech Hisaab by itself when this computer starts?'; then
       add_autostart
       printf '        It will open by itself when this computer starts.\n'
     fi
   fi
 
-  printf '\n  Done! Opening Free GST Billing...\n'
+  printf '\n  Done! Opening Divtech Hisaab...\n'
   sh "$SYS/open-app.sh" || true
   if [ "$OS" = Darwin ]; then
-    printf '\n  Next time, click the Free GST Billing icon (in Launchpad, or in Applications in your home folder).\n\n'
+    printf '\n  Next time, click the Divtech Hisaab icon (in Launchpad, or in Applications in your home folder).\n\n'
   else
-    printf '\n  Next time, open Free GST Billing from your applications menu.\n\n'
+    printf '\n  Next time, open Divtech Hisaab from your applications menu.\n\n'
   fi
 }
 
 uninstall_app() {
-  [ -f "$DIR/_system/server.js" ] || fail "Free GST Billing is not installed in $DIR." 'Nothing was changed.'
+  [ -f "$DIR/_system/server.js" ] || fail "Divtech Hisaab is not installed in $DIR." 'Nothing was changed.'
   SYS=$(CDPATH='' cd -- "$DIR" && pwd -P)/_system
-  printf '\n  Removing Free GST Billing from %s\n' "$DIR"
+  printf '\n  Removing Divtech Hisaab from %s\n' "$DIR"
   stop_app
   if [ -z "$TEST" ]; then
-    rm -rf "$HOME/Applications/Free GST Billing.app" "$(menu_file)" "$(autostart_file)"
+    rm -rf "$HOME/Applications/Divtech Hisaab.app" "$(menu_file)" "$(autostart_file)"
   else
-    rm -rf "$TEST/Free GST Billing.app" "$TEST/applications" "$TEST/autostart"
+    rm -rf "$TEST/Divtech Hisaab.app" "$TEST/applications" "$TEST/autostart"
   fi
   # The program goes; the books stay unless the user says otherwise.
   for entry in "$SYS"/* "$SYS"/.[!.]*; do
@@ -389,7 +389,7 @@ uninstall_app() {
   # Only the app's own files beside _system: the folder may be one the user
   # chose (FREEGSTBILL_DIR, a NAS share) with their own files in it. The same
   # rule as uninstall-unix.sh.
-  for entry in "$DIR"/'Free GST Billing - '* "$DIR/READ ME FIRST.txt"; do
+  for entry in "$DIR"/'Divtech Hisaab - '* "$DIR/READ ME FIRST.txt"; do
     [ -e "$entry" ] && rm -rf "$entry"
   done
   printf '  The app and its icons are removed.\n'
@@ -415,13 +415,13 @@ uninstall_app() {
 }
 
 main() {
-  if [ "$OS" = Darwin ]; then default_dir="$HOME/Applications/Free GST Billing"
+  if [ "$OS" = Darwin ]; then default_dir="$HOME/Applications/Divtech Hisaab"
   else default_dir="${XDG_DATA_HOME:-$HOME/.local/share}/free-gst-billing"; fi
   DIR=${FREEGSTBILL_DIR:-$default_dir}
   # A copy unzipped by hand, with invoices in it, is updated rather than
   # starting a second, empty one next to it (ERR-038).
   if [ -z "${FREEGSTBILL_DIR:-}" ] && [ ! -f "$DIR/_system/server.js" ]; then
-    for c in "$HOME/Free-GST-Billing" "$HOME/Documents/Free-GST-Billing" "$HOME/Desktop/Free-GST-Billing" "$HOME/Downloads/Free-GST-Billing"; do
+    for c in "$HOME/Divtech-Hisaab" "$HOME/Documents/Divtech-Hisaab" "$HOME/Desktop/Divtech-Hisaab" "$HOME/Downloads/Divtech-Hisaab"; do
       if [ -f "$c/_system/server.js" ] && [ -n "$(ls -A "$c/_system/data" 2>/dev/null)" ]; then DIR=$c; break; fi
     done
   fi

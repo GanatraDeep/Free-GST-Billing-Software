@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Free GST Billing — Unix backup.
+# Divtech Hisaab — Unix backup.
 set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DATA_DIR="$SCRIPT_DIR/data"
-BACKUPS_HOME="$HOME/Documents/FreeGSTBill Backups"
+BACKUPS_HOME="$HOME/Documents/Divtech Hisaab Backups"
 
 if [ ! -d "$DATA_DIR" ]; then
   echo "  No data folder found — nothing to back up."

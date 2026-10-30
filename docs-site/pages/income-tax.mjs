@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 const key = (...k) => k.map((x) => `<kbd>${x}</kbd>`).join(' + ');
 
 export default [
@@ -50,7 +49,6 @@ export default [
 </table></div>
 <p>In short: if you have big deductions (a home loan, full 80C, health insurance for parents), the old regime may cost less; otherwise the new one usually wins. The calculator works out both and tells you.</p>
 <p>The left column, <b>Your income</b>, is what you type. The right column shows the result, live as you type: the <b>Recommended</b> card, then the <b>Old Regime</b> and <b>New Regime</b> cards side by side.</p>
-<figure><img src="${img('app-income-tax.png')}" alt="The Regime Calculator." loading="lazy"><figcaption>The Regime Calculator.</figcaption></figure>
 </section>
 
 <section id="your-income">

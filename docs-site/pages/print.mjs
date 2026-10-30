@@ -44,7 +44,6 @@ export default [
 </table></div>
 <p>While a business type is chosen, options it does not need are hidden, and a note says <i>Some options are hidden because they don't apply to your … workflow</i>. ${ui('Show all options')} in that note clears the business type so you can see everything; your settings stay as they are. Some options are marked <b>★ Recommended for your business</b>.</p>
 <p>This is separate from the <a href="settings.html#business-type">Business type tab</a> of Settings, which decides which screens and features you see.</p>
-<figure><img src="assets/img/app-print-settings.png" alt="Business types, designs and the live preview." loading="lazy"><figcaption>Business types, designs and the live preview.</figcaption></figure>
 </section>
 
 <section id="visual-style">

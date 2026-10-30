@@ -1,5 +1,5 @@
 #!/bin/sh
-# Free GST Billing - Linux / macOS / NAS updater.
+# Divtech Hisaab - Linux / macOS / NAS updater.
 #
 # The Unix counterpart of update-windows.ps1, run by the Control Panel's
 # "Update Now" button. Before v1.10.66 there was no Unix updater at all, so on
@@ -30,7 +30,7 @@ set -eu
 # installing dependencies is worse than one that finishes or rolls back.
 trap '' HUP PIPE
 
-REPO_API='https://api.github.com/repos/IamRamgarhia/Free-GST-Billing-Software/releases/latest'
+REPO_API='https://api.github.com/repos/GanatraDeep/free-gst-billing-software/releases/latest'
 
 say()  { printf '  %s\n' "$*" 2>/dev/null || true; }
 fail() { printf '\n  ERROR: %s\n\n' "$*" >&2 2>/dev/null || true; exit 1; }
@@ -50,7 +50,7 @@ FROM=unknown
 
 say ''
 say '============================================================'
-say ' Free GST Billing Software - Update'
+say ' Divtech Hisaab - Update'
 say '============================================================'
 say ''
 
@@ -118,7 +118,7 @@ else
     Alpine:           apk add unzip
   Nothing was changed.
   (Or update with the one-line install, which needs neither:
-    curl -fsSL https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/install.sh | FREEGSTBILL_DIR="'"$(dirname "$SYSTEM_DIR")"'" sh )'
+    curl -fsSL https://raw.githubusercontent.com/GanatraDeep/free-gst-billing-software/main/install.sh | FREEGSTBILL_DIR="'"$(dirname "$SYSTEM_DIR")"'" sh )'
 fi
 
 FROM=$(version_of "$SYSTEM_DIR")
@@ -131,19 +131,32 @@ if [ -n "${FGSB_UPDATE_ZIP:-}" ]; then
   cp "$FGSB_UPDATE_ZIP" "$ZIP" || fail "Could not read $FGSB_UPDATE_ZIP"
 else
   say 'Checking the latest release on GitHub...'
-  node - "$REPO_API" "$ZIP" <<'NODE' || fail 'Could not download the update. Check the internet connection and try again. Nothing was changed.'
-const [api, out] = process.argv.slice(2);
+  # Divtech Hisaab: exit code 3 = the subscription does not cover this release.
+  set +e
+  node - "$REPO_API" "$ZIP" "$SYSTEM_DIR/license.js" <<'NODE'
+const [api, out, licenseJs] = process.argv.slice(2);
 const fs = require('fs');
-const agent = { 'User-Agent': 'FreeGSTBill-Updater' };
+const agent = { 'User-Agent': 'DivtechHisaab-Updater' };
 (async () => {
   if (typeof fetch !== 'function') throw new Error('Node.js 18 or newer is needed to download updates.');
   const rel = await fetch(api, { headers: { ...agent, Accept: 'application/vnd.github+json' } });
   if (!rel.ok) throw new Error(`GitHub answered ${rel.status}.`);
   const info = await rel.json();
   const assets = info.assets || [];
-  const asset = assets.find((a) => /^Free-GST-Billing-v.+\.zip$/i.test(a.name)) || assets.find((a) => /\.zip$/i.test(a.name));
+  const asset = assets.find((a) => /^Divtech-Hisaab-v.+\.zip$/i.test(a.name)) || assets.find((a) => /\.zip$/i.test(a.name));
   if (!asset) throw new Error(`Release ${info.tag_name} has no ZIP attached yet. Try again later.`);
   console.log(`  Latest release: ${info.tag_name}`);
+  // Divtech Hisaab: the app always works; only updates need a subscription.
+  let lic;
+  try { lic = await import(require('url').pathToFileURL(licenseJs).href); } catch {
+    console.error('  Could not check the subscription (license.js missing). Contact Divtech: hello@divtech.in / +91 94299 11067');
+    process.exit(3);
+  }
+  const status = lic.licenseStatus(require('path').join(require('path').dirname(licenseJs), 'data'));
+  if (!lic.licenseAllowsRelease(status, info.published_at || '')) {
+    console.error(`  ${lic.subscriptionMessage(status)}`);
+    process.exit(3);
+  }
   const res = await fetch(asset.browser_download_url, { headers: agent });
   if (!res.ok) throw new Error(`The download failed with ${res.status}.`);
   const buf = Buffer.from(await res.arrayBuffer());
@@ -152,6 +165,10 @@ const agent = { 'User-Agent': 'FreeGSTBill-Updater' };
   console.log(`  Downloaded ${(buf.length / 1048576).toFixed(1)} MB`);
 })().catch((e) => { console.error(`  ${e.message}`); process.exit(1); });
 NODE
+  DL_STATUS=$?
+  set -e
+  if [ "$DL_STATUS" -eq 3 ]; then fail 'This update needs an active Divtech Hisaab subscription (see above). Nothing was changed.'; fi
+  if [ "$DL_STATUS" -ne 0 ]; then fail 'Could not download the update. Check the internet connection and try again. Nothing was changed.'; fi
 fi
 
 # --- Step 2: open it, and prove every file arrived --------------------------
@@ -231,7 +248,7 @@ fi
 
 # --- Step 4: back up data/ before touching anything -------------------------
 if [ -d "$SYSTEM_DIR/data" ]; then
-  BACKUPS_HOME="${HOME:-$SYSTEM_DIR/..}/Documents/FreeGSTBill Backups"
+  BACKUPS_HOME="${HOME:-$SYSTEM_DIR/..}/Documents/Divtech Hisaab Backups"
   mkdir -p "$BACKUPS_HOME" || fail "Could not create $BACKUPS_HOME for the backup. Nothing was changed."
   BACKUP="$BACKUPS_HOME/pre-update-$(date +%Y-%m-%d_%H-%M-%S).tar.gz"
   say "Backing up your data to $BACKUP ..."
@@ -295,7 +312,7 @@ for launcher in "$NEW_ROOT"/*.sh "$NEW_ROOT"/*.command "$NEW_ROOT"/*.hta; do
 done
 # ...and launchers an older version had that this one no longer ships.
 if [ -n "$SHIPPED" ]; then
-  for f in "$ROOT_DIR"/'Free GST Billing - '* "$ROOT_DIR/READ ME FIRST.txt"; do
+  for f in "$ROOT_DIR"/'Divtech Hisaab - '* "$ROOT_DIR/READ ME FIRST.txt"; do
     [ -f "$f" ] || continue
     [ -e "$NEW_ROOT/$(basename "$f")" ] || rm -f "$f"
   done

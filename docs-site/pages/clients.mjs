@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 const key = (...k) => k.map((x) => `<kbd>${x}</kbd>`).join(' + ');
 
 export default [
@@ -131,7 +130,6 @@ export default [
 <section id="ledger">
 <h2>A client's account</h2>
 <p>Click a client's card to open their account. It shows everything about this one client in one place.</p>
-<figure><img src="${img('app-clients.png')}" alt="A client opened, with their invoices, ageing strip and PDFs." loading="lazy"><figcaption>A client opened, with their invoices, ageing strip and PDFs.</figcaption></figure>
 <p>From top to bottom:</p>
 <ol>
   <li>${ui('Statement PDF')} and ${ui('Aging PDF')}: see <a href="#statement">Statement and ageing PDFs</a>.</li>

@@ -819,7 +819,7 @@ export const markUnpaidPatch = (bill) => {
 // The online documentation. Help buttons link straight to the section for
 // their screen, and the sidebar User Guide opens the start (v1.10.75). The
 // build of docs-site checks that every doc="page#section" used in src exists.
-export const DOCS_URL = 'https://dicecodes.com/free-gst-software-documentation/';
+export const DOCS_URL = '/help/';
 export const docsLink = (doc = '') => {
   const [page, section] = String(doc).split('#');
   if (!page || page === 'index') return DOCS_URL + (section ? `#${section}` : '');
@@ -1907,7 +1907,7 @@ export const isValidUpiId = (s) => /^[\w.-]+@[\w.-]+$/.test(String(s || '').trim
 // switch, one plain line each), and the other modules are grouped by the
 // screen they live on, so the Features tab reads like the app itself.
 // `module: null` = always shown (Settings, Support & About with the
-// DiceCodes branding, and Lock app, which only appears once a PIN is set).
+// Divtech branding, and Lock app, which only appears once a PIN is set).
 // `section` is the part of the sidebar: 'main' (top) or 'bottom'.
 export const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', module: 'dashboard', core: true, section: 'main', help: 'Your sales, dues and shortcuts at a glance.' },
@@ -1927,7 +1927,7 @@ export const MENU_ITEMS = [
   { id: 'lock', label: 'Lock app', module: null, section: 'top', help: 'Padlock at the top right, shown only when a PIN is set.' },
   { id: 'offline', label: 'Offline mode', module: 'offlineButton', section: 'top', help: 'Wi-Fi button at the top right: turn Offline mode on or off, and see what changes.' },
   { id: 'darkMode', label: 'Dark mode', module: 'darkMode', section: 'top', help: 'Moon / sun button at the top right: light or dark screens.' },
-  { id: 'support', label: 'Support & About', module: null, section: 'bottom', help: 'Who makes this app, version and how to get help.' },
+  { id: 'support', label: 'Support & Subscription', module: null, section: 'bottom', help: 'Your subscription, version, and how to reach Divtech.' },
   { id: 'controlpanel', label: 'Control Panel', module: 'controlPanel', section: 'bottom', help: 'Update, backup, restore and move to another PC.' },
   { id: 'settings', label: 'Settings', module: null, section: 'bottom', help: 'Always here, so you can turn things back on.' },
 ];

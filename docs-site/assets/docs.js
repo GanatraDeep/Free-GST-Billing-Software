@@ -1,4 +1,4 @@
-/* Free GST Billing docs - search, menu, theme, copy buttons, contents highlight.
+/* Divtech Hisaab docs - search, menu, theme, copy buttons, contents highlight.
    No libraries; works from any folder. */
 (function () {
   'use strict';
@@ -126,53 +126,6 @@
   });
   document.addEventListener('click', function (e) { if (!e.target.closest('.search')) box.hidden = true; });
 
-  /* ---- supporters tracker (Support page): supporters.json in the repo.
-     Text only (textContent), and every value checked: it comes from the web. */
-  var sup = $('#supporters');
-  if (sup && window.fetch) {
-    fetch('https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/supporters.json', { cache: 'no-store' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
-        var n = function (v, max) { v = Number(v); return isFinite(v) && v >= 0 && v <= max ? v : null; };
-        var t = function (v, max) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : ''; };
-        var inr = function (v) { return '₹' + Math.round(v).toLocaleString('en-IN'); };
-        if (!d || typeof d !== 'object') return;
-        var total = n(d.totalReceived, 1e10);
-        if (total === null) return;
-        var people = n(d.supporters, 1e7);
-        $('.supporters-total', sup).textContent = total > 0
-          ? inr(total) + ' received so far' + (people ? ' from ' + Math.floor(people) + ' supporter' + (people === 1 ? '' : 's') : '') + '.'
-          : 'Be the first to support Free GST Billing.';
-        var updated = /^\d{4}-\d{2}-\d{2}$/.test(String(d.updated || '')) ? new Date(d.updated + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-        $('.supporters-meta', sup).textContent = 'Every rupee goes into fixes and new features.' + (updated ? ' Updated ' + updated + '.' : '');
-        var goal = d.goal && n(d.goal.amount, 1e10);
-        if (goal) {
-          var label = t(d.goal.label, 80);
-          $('.supporters-goal-text', sup).textContent = 'Goal' + (label ? ': ' + label : '') + ' - ' + inr(total) + ' of ' + inr(goal);
-          var bar = $('.supporters-bar', sup);
-          bar.setAttribute('aria-valuemax', String(goal));
-          bar.setAttribute('aria-valuenow', String(Math.min(total, goal)));
-          $('span', bar).style.width = Math.min(100, (total / goal) * 100) + '%';
-          $('.supporters-goal', sup).hidden = false;
-        }
-        // Newest are last in the file: the latest 10, newest first (the app's
-        // Support page has the full list with a search).
-        // With the amount when the file has it (people), else the names alone.
-        var givers = (Array.isArray(d.people) ? d.people : []).map(function (p) {
-          var nm = p && t(p.name, 60); var amt = p && n(p.amount, 1e9);
-          return nm ? nm + (amt !== null ? ' (' + inr(amt) + ')' : '') : '';
-        }).filter(Boolean);
-        var names = (givers.length ? givers : (Array.isArray(d.thanks) ? d.thanks : []).map(function (x) { return t(x, 60); }).filter(Boolean)).reverse();
-        if (names.length) {
-          var more = names.length - 10;
-          var th = $('.supporters-thanks', sup);
-          th.textContent = 'Thank you ' + names.slice(0, 10).join(', ') + (more > 0 ? ', and ' + more + ' more.' : '.');
-          th.hidden = false;
-        }
-        sup.hidden = false;
-      })
-      .catch(function () { /* offline: the section stays hidden */ });
-  }
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && document.activeElement !== input && !/input|textarea/i.test(document.activeElement.tagName)) {
       e.preventDefault(); input.focus();

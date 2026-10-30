@@ -16,6 +16,8 @@ import { fileURLToPath } from 'url';
 import { redact } from './src/utils/errorReport.js';
 import { validateCashEntry, cleanCashEntry } from './src/utils/cashBook.js';
 import { validatePurchasePayments } from './src/utils/purchasePayments.js';
+// Divtech Hisaab - subscription license (updates only; the app always works).
+import { licenseStatus, licenseAllowsRelease, subscriptionMessage, verifyLicenseKey, writeLicenseKey, normaliseKey } from './license.js';
 import { templateTotals, clientYearToDate, nextCounterValue, startFor, numberSeriesFor, counterKeyFor, formatDocNumber, businessKeyOf, getFinancialYearLabel, INVOICE_TYPES } from './src/utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -108,7 +110,7 @@ try {
   const why = err.code === 'ENOSPC' ? 'The disk is full. Free some space and open the app again.'
     : (err.code === 'EACCES' || err.code === 'EPERM') ? 'The app is not allowed to write to its data folder. Move the app folder to Documents (not Program Files), or allow it in your antivirus.'
       : `The data folder could not be created (${err.code || err.message}).`;
-  console.error(`\n  Free GST Billing cannot start: ${why}\n  Data folder: ${DATA_DIR}\n  Help: https://dicecodes.com/free-gst-software-documentation/troubleshooting.html#${err.code === 'ENOSPC' ? 'disk-full' : 'no-permission'}\n`);
+  console.error(`\n  Divtech Hisaab cannot start: ${why}\n  Data folder: ${DATA_DIR}\n  Help: https://divtech.in${err.code === 'ENOSPC' ? 'disk-full' : 'no-permission'}\n`);
   try { fs.appendFileSync(path.join(DATA_DIR, 'errors.log'), `[${new Date().toISOString()}] [startup] ${why} ${err.code || ''}\n`, 'utf-8'); } catch { /* the folder is the problem */ }
   process.exit(1);
 }
@@ -1324,6 +1326,33 @@ app.get('/api/changelog', (req, res) => {
   });
 });
 
+// ============================================================
+// Divtech Hisaab - subscription license
+// The key lives in data/license.json. Without an active subscription the app
+// works exactly the same; only installing new updates is refused.
+// ============================================================
+app.get('/api/license', (req, res) => {
+  res.json(licenseStatus(DATA_DIR));
+});
+
+app.post('/api/license', (req, res) => {
+  const key = normaliseKey(req.body?.key);
+  if (!key) {
+    writeLicenseKey(DATA_DIR, '');
+    res.json({ ok: true, status: licenseStatus(DATA_DIR) });
+    return;
+  }
+  const v = verifyLicenseKey(key);
+  if (!v.ok) { res.status(400).json({ ok: false, error: v.reason }); return; }
+  try {
+    writeLicenseKey(DATA_DIR, key);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: `Could not save the key: ${e.message}` });
+    return;
+  }
+  res.json({ ok: true, status: licenseStatus(DATA_DIR) });
+});
+
 app.get('/api/check-update', async (req, res) => {
   // v1.10.83 - Offline mode (Settings → Privacy & internet): no automatic
   // check. ?now=1 is the Check for Updates button, which the user clicked.
@@ -1338,10 +1367,10 @@ app.get('/api/check-update', async (req, res) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 4000);
     const [pkgRes, relRes] = await Promise.all([
-      fetch('https://raw.githubusercontent.com/IamRamgarhia/Free-GST-Billing-Software/main/package.json', { signal: ctrl.signal }).catch(() => null),
-      fetch('https://api.github.com/repos/IamRamgarhia/Free-GST-Billing-Software/releases/latest', {
+      fetch('https://raw.githubusercontent.com/GanatraDeep/free-gst-billing-software/main/package.json', { signal: ctrl.signal }).catch(() => null),
+      fetch('https://api.github.com/repos/GanatraDeep/free-gst-billing-software/releases/latest', {
         signal: ctrl.signal,
-        headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'FreeGSTBill-update-check' },
+        headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'DivtechHisaab-update-check' },
       }).catch(() => null),
     ]);
     clearTimeout(t);
@@ -1368,11 +1397,19 @@ app.get('/api/check-update', async (req, res) => {
       latest = (await pkgRes.json()).version;
     }
     const updateAvailable = compareSemver(latest, pkg.version) > 0;
+    // Divtech Hisaab: an update is still SHOWN without a subscription, but
+    // marked so the app offers a renewal instead of the Install button.
+    const license = licenseStatus(DATA_DIR);
+    const updateAllowed = updateAvailable && licenseAllowsRelease(license, releasePublishedAt);
 
     res.json({
       current: pkg.version,
       latest,
       updateAvailable,
+      updateAllowed,
+      subscriptionRequired: updateAvailable && !updateAllowed,
+      subscriptionMessage: updateAvailable && !updateAllowed ? subscriptionMessage(license) : null,
+      license: { state: license.state, expires: license.expires || null, daysLeft: license.daysLeft ?? null },
       releaseNotes,
       releaseUrl,
       releasePublishedAt,
@@ -1513,7 +1550,7 @@ app.post('/api/control-panel/open-data-folder', (req, res) => {
 });
 
 app.post('/api/control-panel/open-backups-folder', (req, res) => {
-  const backupsHome = path.join(process.env.USERPROFILE || process.env.HOME || '', 'Documents', 'FreeGSTBill Backups');
+  const backupsHome = path.join(process.env.USERPROFILE || process.env.HOME || '', 'Documents', 'Divtech Hisaab Backups');
   try {
     if (!fs.existsSync(backupsHome)) fs.mkdirSync(backupsHome, { recursive: true });
     if (isWindows) spawn('explorer.exe', [backupsHome], { detached: true }).unref();
@@ -1533,6 +1570,15 @@ app.post('/api/control-panel/launch-script', async (req, res) => {
     res.json({ ok: true, stdout: 'Stopped. Open the app again from its icon or launcher.' });
     setTimeout(() => process.exit(0), 400);
     return;
+  }
+  // Divtech Hisaab: updates need a subscription. The updater script checks
+  // the release date against the key again before downloading.
+  if (action === 'update') {
+    const license = licenseStatus(DATA_DIR);
+    if (license.state !== 'active' && license.state !== 'expired') {
+      res.json({ ok: false, subscriptionRequired: true, error: subscriptionMessage(license) });
+      return;
+    }
   }
   const script = pickScript(action);
   const result = await runControlScript(script);
@@ -1650,10 +1696,10 @@ function todayLocalIso() {
 // v1.10.80 (#99) - a second copy of every daily backup in a folder the user
 // picks (another drive, a USB disk, a synced folder), so a failed C: drive does
 // not take the backups with it. Stored in meta.json as `backupFolder`; the
-// copies go in "<folder>/FreeGSTBill Backups/<date>", 30 days kept, and are
+// copies go in "<folder>/Divtech Hisaab Backups/<date>", 30 days kept, and are
 // listed and restorable like the ones in data/backups.
 const BACKUP_FOLDER_KEY = 'backupFolder';
-const EXTRA_BACKUP_SUBDIR = 'FreeGSTBill Backups';
+const EXTRA_BACKUP_SUBDIR = 'Divtech Hisaab Backups';
 const DATE_DIR = /^\d{4}-\d{2}-\d{2}$/;
 const extraBackupsDir = () => {
   const folder = readJSON(META_PATH, {})[BACKUP_FOLDER_KEY];
@@ -2072,7 +2118,7 @@ app.get('{*path}', (req, res) => {
 function servePlaceholder(req, res) {
     if (req.path.startsWith('/api')) return res.status(404).json({ error: 'No such endpoint' });
     res.status(503).send(`<!doctype html>
-<html><head><meta charset="utf-8"><title>Free GST Billing Software — building…</title>
+<html><head><meta charset="utf-8"><title>Divtech Hisaab — building…</title>
 <meta http-equiv="refresh" content="3">
 <style>
   body { font-family: -apple-system, Segoe UI, Inter, sans-serif; max-width: 560px;
@@ -2087,7 +2133,7 @@ function servePlaceholder(req, res) {
   .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.85rem 1rem; border-radius: 8px; margin-top: 1rem; }
 </style></head>
 <body>
-  <h1>Free GST Billing Software</h1>
+  <h1>Divtech Hisaab</h1>
   <p><span class="spinner"></span> The app is still building. This page refreshes every 3 seconds.</p>
   <div class="box">
     <p style="margin:0 0 0.5rem"><strong>Local install?</strong></p>
@@ -2183,7 +2229,7 @@ function startServer(port) {
     // we landed on 47372 instead, next launch tries 47372 first (cuts collision
     // scans in half on repeated reboots of whatever was holding 47371).
     try { fs.writeFileSync(PORT_FILE, String(port), 'utf-8'); } catch { /* ignore */ }
-    console.log(`\n  Free GST Billing Software running at http://localhost:${port}`);
+    console.log(`\n  Divtech Hisaab running at http://localhost:${port}`);
     console.log(`  Data stored in: ${DATA_DIR}\n`);
   });
   server.on('error', (err) => {

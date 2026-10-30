@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 const key = (...k) => k.map((x) => `<kbd>${x}</kbd>`).join(' + ');
 
 export default [
@@ -84,7 +83,6 @@ export default [
   <tr><td><b>Margin</b></td><td>Profit as a percentage of revenue. ₹20,000 profit on ₹1,00,000 revenue is a 20% margin.</td></tr>
 </table></div>
 <p>Purchase bills (stock you bought to sell) are <b>not</b> subtracted here; this is sales less expenses. For profit after purchases, use <a href="#cost-centres">By cost centre</a> (its Total row is the whole business) or <a href="income-tax.html#itr-summary">Income Tax, ITR Summary</a>.</p>
-<figure><img src="${img('app-reports.png')}" alt="The Profit and Loss tab." loading="lazy"><figcaption>The Profit &amp; Loss tab.</figcaption></figure>
 <p>The same period choice appears on the Client Analytics and Product Performance tabs.</p>
 </section>
 
@@ -253,7 +251,6 @@ export default [
   <tr><td><b>Total stock value</b></td><td>The bottom row: all the values added up. Negative stock is not added in.</td></tr>
 </table></div>
 <p>Stock you typed in by hand on the Products screen has no date, so it counts as if it changed today. Products are shared by all your businesses, so this report covers every business. ${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} export it, "valued at purchase price".</p>
-<figure><img src="${img('app-stock-report.png')}" alt="Reports, Stock: closing quantity, rate and value of each product, with the total stock value." loading="lazy"><figcaption>Closing stock and its value at the end of a month.</figcaption></figure>
 <div class="note tip"><strong>Something wrong?</strong><p>A red (negative) quantity means more was sold than was bought: a purchase bill is missing, or opening stock was never entered. Add the purchase, or correct the stock on the <a href="products.html#stock">Products</a> screen. Values marked * use the selling price: add a purchase price to the product for a true value. "No products yet." means the product list is empty; stock is tracked only for items in it. See also <a href="limitations.html#stock-limits">what stock does not do</a>.</p></div>
 </section>
 
@@ -268,7 +265,6 @@ export default [
 </ul>
 <p><b>Choose the period</b> at the top: a <b>Financial year</b>, then <b>Whole year</b>, one quarter (<b>Q1</b> April to June, <b>Q2</b> July to September, <b>Q3</b> October to December, <b>Q4</b> January to March) or <b>Custom dates</b> with From and To. TDS returns and certificates go quarter by quarter, so a quarter is usually what you want. Like the other reports, it covers the business selected at the top of the sidebar; cancelled invoices, quotations, proformas and challans are left out.</p>
 <p>Four cards at the top give the totals: <b>TDS by your clients</b>, <b>Certificates received</b> (ticked out of all), <b>TCS you collected</b> and <b>TDS you deducted</b>. Each list has ${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} buttons for your CA.</p>
-<figure><img src="assets/img/reports-tds-tcs.png" alt="Reports, TDS and TCS tab for FY 2026-27: four total cards, empty lists for TDS by clients and TCS, and one purchase bill with 2% TDS under section 194C in TDS you deducted from suppliers, with totals by section and by quarter." loading="lazy"><figcaption>The TDS &amp; TCS tab: here only one purchase bill has TDS, so the first two lists are empty.</figcaption></figure>
 <div class="note tip"><strong>Something wrong?</strong><p>An invoice is missing from the TDS list: TDS was not ticked on it. Open it and tick TDS under ${ui('Customize')} (see <a href="invoices.html#tds-tcs">TDS and TCS</a>), or record the TDS with the client's payment (see <a href="dashboard.html#payment-tds">TDS when recording a payment</a>). A purchase bill is missing: tick <b>TDS deducted</b> on it (see <a href="purchases.html#purchase-tds">TDS on a purchase bill</a>). The GST Returns screen has a similar <a href="gst-returns.html#tds-tcs">TDS / TCS tab</a> with Form 26Q / 27EQ figures.</p></div>
 </section>
 
@@ -320,7 +316,7 @@ export default [
 </table>
 <p>Documents with no cost centre are added up in an <b>Untagged</b> row, so the <b>Total</b> row is the whole business. ${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} download the table. Purchase bills have no currency, so they count only when the currency is INR.</p>
 <h3>Worked example</h3>
-<p>DiceCodes adds two cost centres, <b>Branch: Ludhiana</b> (code LDH) and <b>Project Mehta House</b>. In April it enters:</p>
+<p>Divtech adds two cost centres, <b>Branch: Ludhiana</b> (code LDH) and <b>Project Mehta House</b>. In April it enters:</p>
 <ul>
   <li>An invoice tagged Branch: Ludhiana: ₹10,000 + 18% GST = ₹11,800.</li>
   <li>An invoice tagged Project Mehta House: ₹20,000 + 18% GST = ₹23,600, and a credit note on it for ₹2,000 + ₹360 GST.</li>

@@ -27,9 +27,9 @@ const LINUX_EDGE = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l
 
 console.log('\n[Redaction] private details are removed');
 const secret = 'Client 27AAPFU0939F1ZV (PAN AAPFU0939F) phone +91 98765 43210 / 9876543210, mail ramesh.k@gmail.com, '
-  + 'UPI ramesh@okaxis, IFSC HDFC0001234, a/c 50100234567890, path C:\\Users\\Ramesh\\FreeGST\\data and /home/dicecodes/app';
+  + 'UPI ramesh@okaxis, IFSC HDFC0001234, a/c 50100234567890, path C:\\Users\\Ramesh\\FreeGST\\data and /home/mehta/app';
 const r = redact(secret);
-for (const leak of ['27AAPFU0939F1ZV', 'AAPFU0939F', '98765', '43210', '9876543210', 'ramesh.k@gmail.com', 'ramesh@okaxis', 'HDFC0001234', '50100234567890', 'Ramesh', 'dicecodes']) {
+for (const leak of ['27AAPFU0939F1ZV', 'AAPFU0939F', '98765', '43210', '9876543210', 'ramesh.k@gmail.com', 'ramesh@okaxis', 'HDFC0001234', '50100234567890', 'Ramesh', 'mehta']) {
   ok(!r.includes(leak), `"${leak}" is gone`, r);
 }
 for (const tag of ['[gstin]', '[pan]', '[phone]', '[email]', '[upi-id]', '[ifsc]', '[number]', '[user]']) ok(r.includes(tag), `marked ${tag}`, r);
@@ -44,10 +44,10 @@ eq(redact('a/c 1234567 and 9:158939'), 'a/c [number] and 9:[number]', 'other lon
 console.log('\n[Entry] built redacted, without request bodies');
 const e = makeEntry({
   kind: 'api', message: 'Save failed for 27AAPFU0939F1ZV', stack: Array.from({ length: 20 }, (_, i) => `at f${i} (app.js:${i}:1)`).join('\n'),
-  view: 'new', version: '1.10.83', ua: WIN_FF, api: { method: 'post', path: '/api/clients?name=DiceCodes%20Stationers&phone=9876543210', status: 500 },
+  view: 'new', version: '1.10.83', ua: WIN_FF, api: { method: 'post', path: '/api/clients?name=Mehta%20Stationers&phone=9876543210', status: 500 },
 });
 ok(!JSON.stringify(e).includes('27AAPFU0939F1ZV'), 'GSTIN in the message is redacted');
-ok(!JSON.stringify(e).includes('DiceCodes') && !JSON.stringify(e).includes('9876543210'), 'query string dropped from the path');
+ok(!JSON.stringify(e).includes('Mehta') && !JSON.stringify(e).includes('9876543210'), 'query string dropped from the path');
 eq(e.api.path, '/api/clients', 'path only');
 eq(e.api.method, 'POST', 'method upper-cased');
 eq(e.stack.split('\n').length, 8, 'stack cut to 8 lines');
@@ -89,23 +89,22 @@ ok(matchKnownProblem('Failed to fetch').url.endsWith('troubleshooting.html#canno
 ok(KNOWN_PROBLEMS.every((k) => /^[a-z0-9-]+$/.test(k.id) && k.fix.length > 10), 'every known problem has an anchor id and a one-line fix');
 ok(isChunkLoadError('Loading chunk 7 failed') && !isChunkLoadError('Failed to fetch'), 'chunk-load errors are told apart from a stopped server');
 
-console.log('\n[Report URL] pre-filled GitHub form');
+console.log('\n[Report URL] pre-filled WhatsApp message to Divtech');
 const url = buildIssueUrl(e);
-const q = new URL(url).searchParams;
-ok(url.startsWith('https://github.com/IamRamgarhia/Free-GST-Billing-Software/issues/new?'), 'opens a new issue');
-eq(q.get('template'), 'bug_report.yml', 'uses the bug form');
-eq(q.get('version'), '1.10.83', 'version field filled');
-ok(q.get('title').startsWith('[Problem] Save failed for [gstin]'), 'title from the redacted message', q.get('title'));
-ok(q.get('what').startsWith('```\n') && q.get('what').includes('Request: POST /api/clients -> 500'), 'what: details in a code block, with the request');
-ok(q.get('what').includes('Steps: (please add what you did before this)'), 'what: asks for the steps');
-ok(!q.has('system'), 'Computer left empty on Windows');
-eq(new URL(buildIssueUrl(makeEntry({ message: 'x', ua: MAC_CHROME }))).searchParams.get('system'), 'Mac', 'Computer filled on a Mac');
-ok(!/27AAPFU0939F1ZV|9876543210|DiceCodes/.test(decodeURIComponent(url)), 'nothing private in the URL');
+const text = new URL(url).searchParams.get('text');
+ok(url.startsWith('https://wa.me/919429911067?text='), 'opens WhatsApp to Divtech');
+ok(text.includes('Version: 1.10.83'), 'version filled');
+ok(text.includes('[Problem] Save failed for [gstin]'), 'title from the redacted message', text);
+ok(text.includes('```\n') && text.includes('Request: POST /api/clients -> 500'), 'details in a code block, with the request');
+ok(text.includes('Steps: (please add what you did before this)'), 'asks for the steps');
+ok(!text.includes('Computer:'), 'Computer left out on Windows');
+ok(new URL(buildIssueUrl(makeEntry({ message: 'x', ua: MAC_CHROME }))).searchParams.get('text').includes('Computer: Mac'), 'Computer named on a Mac');
+ok(!/27AAPFU0939F1ZV|9876543210|Mehta/.test(decodeURIComponent(url)), 'nothing private in the URL');
 ok(url.length <= MAX_ISSUE_URL, `normal report fits (${url.length} chars)`);
 const huge = { ...e, message: 'é&?#'.repeat(3000), stack: Array.from({ length: 8 }, () => 'x'.repeat(1500)).join('\n') };
 const hugeUrl = buildIssueUrl(huge);
 ok(hugeUrl.length <= MAX_ISSUE_URL, `a huge message and stack are trimmed to fit (${hugeUrl.length} chars)`);
-ok(new URL(hugeUrl).searchParams.get('what').includes('Steps:'), 'trimmed report still asks for the steps');
+ok(new URL(hugeUrl).searchParams.get('text').includes('Steps:'), 'trimmed report still asks for the steps');
 const longStack = { ...e, stack: Array.from({ length: 8 }, (_, i) => `at line${i} ${'y'.repeat(600)}`).join('\n') };
 const lsUrl = buildIssueUrl(longStack);
 ok(lsUrl.length <= MAX_ISSUE_URL && decodeURIComponent(lsUrl).includes('at line0'), 'a long stack is shortened from the bottom, keeping where it broke');

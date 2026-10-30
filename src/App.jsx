@@ -37,7 +37,8 @@ const IncomeTax = lazy(() => import('./components/IncomeTax'));
 const PurchaseBills = lazy(() => import('./components/PurchaseBills'));
 const ControlPanel = lazy(() => import('./components/ControlPanel'));
 const SupportView = lazy(() => import('./components/SupportView'));
-import StarBanner from './components/StarBanner';
+import SubscriptionReminder from './components/SubscriptionReminder';
+import { BRAND } from './brand';
 import AppFooter from './components/AppFooter';
 import LockButton from './components/LockButton';
 import OfflineModeButton from './components/OfflineModeButton';
@@ -298,6 +299,14 @@ function App() {
   // throw "Cannot access 'X' before initialization" at render time because
   // useMemo's dependency array is evaluated synchronously every render.
 
+  // Divtech Hisaab: other screens (Settings → App Updates) can open a view,
+  // e.g. Support & Subscription for a renewal.
+  useEffect(() => {
+    const open = (e) => { if (typeof e.detail === 'string') setCurrentView(e.detail); };
+    window.addEventListener('divtech-open-view', open);
+    return () => window.removeEventListener('divtech-open-view', open);
+  }, []);
+
   // v1.10.69 - see runUpdateNow() in store.js for why this is no longer a link.
   const [updating, setUpdating] = useState(false);
   const handleUpdateNow = async () => {
@@ -305,6 +314,12 @@ function App() {
     toast('Updating… your data is backed up first. This takes about a minute.', 'info', 8000);
     const result = await runUpdateNow();
     setUpdating(false);
+    if (result.subscriptionRequired) {
+      setShowUpdateModal(false);
+      toast(result.error, 'warning', 12000);
+      setCurrentView('support');
+      return;
+    }
     if (result.ok) {
       setShowUpdateModal(false);
       toast('Update finished. Reload the page to use the new version.', 'success', 10000);
@@ -376,7 +391,7 @@ function App() {
   // v1.10.83 - the "Install as Desktop App" banner is gone. The browser icon
   // it made opens only a browser window: it cannot start the app's server, so
   // after a restart it showed "Needs a Quick Start". The installers' own
-  // Free GST Billing icon starts the server and opens the app.
+  // Divtech Hisaab icon starts the server and opens the app.
 
   useEffect(() => {
     sessionStorage.setItem('gst_currentView', currentView);
@@ -596,7 +611,7 @@ function App() {
     // v1.10.74 - Control Panel has its own sidebar button but was missing here.
     // v1.10.83 - and, like every menu item, not when it is switched off.
     if (bottomIds.includes('controlpanel')) acts.push({ label: 'Go to Control Panel', hint: '', category: 'nav', run: () => setCurrentView('controlpanel') });
-    acts.push({ label: 'Go to Support & About', hint: '', category: 'nav', run: () => setCurrentView('support') });
+    acts.push({ label: 'Go to Support & Subscription', hint: '', category: 'nav', run: () => setCurrentView('support') });
     if (topIds.includes('guide')) acts.push({ label: 'Open the User Guide', hint: '', category: 'help', run: openDocs });
     acts.push({ label: 'Toggle dark mode', hint: '', category: 'action', run: () => setDarkMode(d => !d) });
     acts.push({ label: 'Show keyboard shortcuts', hint: 'Ctrl+/', category: 'help', run: () => setShowShortcutsHelp(true) });
@@ -771,7 +786,7 @@ function App() {
       <div className="server-down-overlay">
         <div className="server-down-modal">
           <FileText size={48} color="#3b82f6" />
-          <h2>Free GST Billing Software Needs a Quick Start <HelpButton title="Needs a Quick Start" doc="shortcuts#app-not-running" size={16} /></h2>
+          <h2>Divtech Hisaab Needs a Quick Start <HelpButton title="Needs a Quick Start" doc="shortcuts#app-not-running" size={16} /></h2>
           <p>
             Your data is <strong>100% safe</strong> on your computer — nothing is lost.
             The app just needs to be started once.
@@ -787,13 +802,13 @@ function App() {
           <div className="server-down-steps">
             <p className="server-down-hint">How to start it:</p>
             <ol>
-              <li>Double-click the <strong>Free GST Billing</strong> icon on your Desktop (the blue <strong>B</strong>)</li>
-              <li>Or search <strong>"Free GST Billing"</strong> in the Start Menu</li>
+              <li>Double-click the <strong>Divtech Hisaab</strong> icon on your Desktop (the blue <strong>B</strong>)</li>
+              <li>Or search <strong>"Divtech Hisaab"</strong> in the Start Menu</li>
             </ol>
             {/* v1.10.83 - an icon made by the browser ("Install as Desktop App",
                 removed in this version) opens this window but cannot start the
                 app. Say so, or people keep clicking it. */}
-            <p className="server-down-hint">Opened this from a Chrome or Edge app icon? That icon cannot start the app. Use the Free GST Billing icon instead; you can remove the other one (right-click it, then Uninstall).</p>
+            <p className="server-down-hint">Opened this from a Chrome or Edge app icon? That icon cannot start the app. Use the Divtech Hisaab icon instead; you can remove the other one (right-click it, then Uninstall).</p>
           </div>
           <p className="server-down-safe">All your invoices, clients, and data are safely stored on your computer. They are never deleted or shared.</p>
           <div className="server-down-waiting">
@@ -868,11 +883,10 @@ function App() {
               : ownBrand ? <span className="sidebar-logo-letter">{brand.businessName.trim().charAt(0).toUpperCase()}</span>
                 : <FileText size={22} />}
           </div>
-          {/* "by DiceCodes" always stays, under their name too. "Free forever" is
-              in the top bar; on a phone (no top bar) it stays here. */}
+          {/* "by Divtech" always stays, under the business name too. */}
           <div className="sidebar-brand-text">
-            <h2 className={`sidebar-title${ownBrand ? ' sidebar-title-own' : ''}`} title={ownBrand ? `${brand.businessName} - Free GST Billing` : undefined}>{ownBrand ? brand.businessName : 'GST Billing'}</h2>
-            <p className="sidebar-subtitle" title="Free forever. Works on this computer, even offline. No tracking, no ads."><span className="sidebar-free sidebar-free-phone">Free forever<br /></span>by DiceCodes</p>
+            <h2 className={`sidebar-title${ownBrand ? ' sidebar-title-own' : ''}`} title={ownBrand ? `${brand.businessName} - Divtech Hisaab` : undefined}>{ownBrand ? brand.businessName : BRAND.app}</h2>
+            <p className="sidebar-subtitle" title="Works on this computer, even offline.">by {BRAND.company}</p>
           </div>
           {/* Auto-hide as a ☰ button (was a text checkbox): pressed = the menu
               shrinks to icons and opens when pointed at. */}
@@ -970,9 +984,9 @@ function App() {
                 <button key={id}
                   className={`nav-btn nav-btn-support${currentView === 'support' ? ' nav-btn-support-active' : ''}`}
                   onClick={() => setCurrentView('support')}
-                  title="Who makes this app, and how to help"
+                  title="Your subscription, and how to reach Divtech"
                 >
-                  <Heart size={18} /> Support &amp; About
+                  <Heart size={18} /> Support &amp; Subscription
                 </button>
               ),
               controlpanel: (
@@ -1009,15 +1023,12 @@ function App() {
 
       <div className="main-content">
         <div className="app-topbar">
-          {/* v1.10.83 - the promise, on every screen (it was under the app name in the menu). */}
-          <span className="topbar-free" title="Free forever: no paid version, no locked features, no ads, no tracking. Works on this computer, even offline.">Free forever</span>
           {topActions}
         </div>
         {/* v1.10.83 - a screen that throws shows "ran into a problem" here
             instead of blanking the app; keyed by screen so the sidebar works
             and opening another screen starts clean. */}
         <ErrorBoundary key={currentView} onHome={() => setCurrentView('dashboard')}>
-        {currentView !== 'new' && <StarBanner />}
         {currentView === 'dashboard' && (
           <Dashboard onNew={handleNewInvoice} onEdit={handleEditInvoice} onPrint={handlePrintInvoice} onDuplicate={handleDuplicateInvoice} onConvert={handleConvertToInvoice} onOpenProducts={() => setCurrentView('inventory')} onOpenSettings={() => setCurrentView('settings')} onOpenGuide={openDocs} onOpenSupport={() => setCurrentView('support')} activeProfile={profile} />
         )}
@@ -1077,7 +1088,7 @@ function App() {
           <SupportView />
         )}
         </Suspense>
-        {/* Version + DiceCodes line: Dashboard only, so it never takes space on working screens. */}
+        {/* Version + Divtech line: Dashboard only, so it never takes space on working screens. */}
         {currentView === 'dashboard' && <AppFooter onOpenSupport={() => setCurrentView('support')} />}
         </ErrorBoundary>
       </div>
@@ -1261,12 +1272,21 @@ function App() {
               <button className="icon-btn" onClick={() => setShowUpdateModal(false)} title="Close"><X size={18} /></button>
             </div>
 
+            {updateInfo.subscriptionRequired && (
+              <div className="notice notice-warn" style={{ marginBottom: '0.85rem' }}>
+                <span className="notice-icon">🔑</span>
+                <div>
+                  <strong>This update needs an active subscription.</strong> {updateInfo.subscriptionMessage}
+                </div>
+              </div>
+            )}
+
             {/* Data-safety reassurance — explicit, prominent. Same .notice-info style
                 as the Data Management privacy card so users learn one visual pattern. */}
             <div className="notice notice-info" style={{ marginBottom: '0.85rem' }}>
               <span className="notice-icon">🔒</span>
               <div>
-                <strong>Your data is safe.</strong> Updates only refresh the app code and dependencies — your <code>data/</code> folder (invoices, clients, products, settings) and <code>Saved Invoices/</code> PDF archive are <strong>never touched</strong>. The updater pulls the latest source from GitHub and rebuilds, then restarts.
+                <strong>Your data is safe.</strong> Updates only refresh the app code and dependencies — your <code>data/</code> folder (invoices, clients, products, settings) and <code>Saved Invoices/</code> PDF archive are <strong>never touched</strong>. The updater downloads the new version from Divtech, then restarts.
               </div>
             </div>
 
@@ -1274,8 +1294,7 @@ function App() {
             <div className="surface-card" style={{ maxHeight: '320px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.82rem', lineHeight: 1.55, marginBottom: '0.85rem' }}>
               {updateInfo.releaseNotes || (
                 <span style={{ color: 'var(--text-muted)' }}>
-                  No release notes available — see the full changelog at{' '}
-                  <a href={updateInfo.releaseUrl || 'https://github.com/IamRamgarhia/Free-GST-Billing-Software/releases'} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>GitHub Releases</a>.
+                  No release notes for this version.
                 </span>
               )}
             </div>
@@ -1295,14 +1314,15 @@ function App() {
               <button type="button" className="btn btn-secondary" onClick={() => setShowUpdateModal(false)}>
                 Remind me later
               </button>
-              {updateInfo.releaseUrl && (
-                <a href={updateInfo.releaseUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
-                  View on GitHub
-                </a>
+              {updateInfo.subscriptionRequired ? (
+                <button type="button" className="btn btn-primary" onClick={() => { setShowUpdateModal(false); setCurrentView('support'); }}>
+                  Renew subscription
+                </button>
+              ) : (
+                <button type="button" className="btn btn-primary" disabled={updating} onClick={handleUpdateNow}>
+                  <Download size={16} /> {updating ? 'Updating…' : 'Update Now'}
+                </button>
               )}
-              <button type="button" className="btn btn-primary" disabled={updating} onClick={handleUpdateNow}>
-                <Download size={16} /> {updating ? 'Updating…' : 'Update Now'}
-              </button>
             </div>
             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.6rem', marginBottom: 0 }}>
               <em>Update Now</em> backs up your data, then fetches the newest release. It takes about a minute — leave this window open, then reload the page when it finishes.
@@ -1311,6 +1331,7 @@ function App() {
         </div>
       )}
 
+      <SubscriptionReminder suppressed={currentView === 'support' || showUpdateModal} shopName={profile?.businessName || ''} />
       <ToastContainer />
       <ConfirmModalContainer />
     </div>

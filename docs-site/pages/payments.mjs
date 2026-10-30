@@ -1,5 +1,4 @@
 const ui = (s) => `<span class="ui">${s}</span>`;
-const img = (f) => `assets/img/${f}`;
 const key = (...k) => k.map((x) => `<kbd>${x}</kbd>`).join(' + ');
 
 export default [
@@ -133,7 +132,6 @@ export default [
 <p>Open it from ${ui('Cash book')} in the sidebar. If you do not see it, tick <b>Cash book</b> under <b>Menu</b> in <a href="settings.html#features">Settings, Features</a> and save. It is on to start, whatever your business type.</p>
 <p>Each business has its own cash book, like its expenses and receipts. Switching the business at the top of the sidebar shows that business's cash.</p>
 <p>The screen has, from top to bottom: the <a href="#cash-in-hand">cash in hand cards</a>, the <a href="#add-entry">entry form</a>, the <a href="#filters">dates and search</a> bar, and the <a href="#list">list</a> with its <a href="#export">Print / PDF, Excel and CSV</a> buttons.</p>
-<figure><img src="assets/img/cash-book.png" alt="The Cash book: cash in hand, today and this month cards, the New entry form with Money in and Money out, the search bar, and the month's list with an opening balance, tea, auto fare, a cash sale, an invoice payment and a bank deposit, each with its running balance." loading="lazy"><figcaption>The cash book for a month. The invoice payment received in cash comes in by itself, and the balance runs down the right.</figcaption></figure>
 </section>
 
 <section id="opening-balance">
@@ -315,7 +313,6 @@ export default [
   <tr><td><b>Status</b></td><td><b>Active</b> (green) or <b>Paused</b> (grey).</td></tr>
   <tr><td><b>Actions</b></td><td>${ui('▶')} Generate Now (green), Pause or Activate, the pencil to <a href="#edit-template">edit</a>, the bin to <a href="#pause-delete">delete</a>.</td></tr>
 </table></div>
-<figure><img src="${img('app-recurring.png')}" alt="The recurring template list." loading="lazy"><figcaption>The recurring template list.</figcaption></figure>
 </section>
 
 <section id="due-banner">

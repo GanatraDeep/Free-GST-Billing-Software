@@ -1,15 +1,13 @@
-// v1.10.81 - on Support & About: the weekly update (a new version every
-// Saturday, decided with the maintainer), where to report problems and ask
-// for features (GitHub issue forms), and "What's new" from the CHANGELOG.md
+// Divtech Hisaab - on Support & Subscription: updates from Divtech, where to report problems and
+// for features (WhatsApp / email), and "What's new" from the CHANGELOG.md
 // that ships with the app. The changelog is shown as text (changelog.js
 // parses it), never as HTML.
 import { useEffect, useState } from 'react';
-import { Bug, Lightbulb, CalendarClock, ListChecks, Sparkles } from 'lucide-react';
+import { Bug, Lightbulb, CalendarClock, Sparkles } from 'lucide-react';
 import { parseChangelog, inlineParts } from '../utils/changelog';
 import HelpButton from './HelpButton';
+import { BRAND } from '../brand';
 
-const REPO = 'https://github.com/IamRamgarhia/Free-GST-Billing-Software';
-const CHANGELOG_URL = `${REPO}/blob/main/CHANGELOG.md`;
 const card = { padding: '1.25rem 1.5rem' };
 
 function Inline({ text }) {
@@ -68,36 +66,26 @@ export default function WhatsNew() {
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <CalendarClock size={26} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
           <div style={{ flex: '1 1 300px', minWidth: 0 }}>
-            <h3 id="weekly-title" style={{ margin: '0 0 0.35rem', fontSize: '1rem' }}>A new update every Saturday <HelpButton title="A new update every Saturday" doc="support#weekly" size={16} /></h3>
+            <h3 id="weekly-title" style={{ margin: '0 0 0.35rem', fontSize: '1rem' }}>Updates from Divtech</h3>
             <p style={{ margin: '0 0 0.5rem', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: '72ch' }}>
-              Every Saturday we release one update with that week&apos;s fixes and new features. The app tells you when it is
-              ready: click <b>Update</b> in the sidebar, and your invoices and settings are kept. Anything urgent, such as the
-              app not opening, is fixed straight away.
+              Divtech releases updates with fixes, GST changes and new features. With an active subscription the app tells
+              you when one is ready: click <b>Update</b> in the sidebar, and your invoices and settings are kept.
             </p>
             <p style={{ margin: '0 0 0.9rem', fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.55, maxWidth: '72ch' }}>
-              Tell us on GitHub what is wrong or what you need. We read every request each week, the ones most people ask
-              for come first, and you get a reply there when it is done.
+              Something wrong, or something you need for your business? Tell Divtech on WhatsApp or email.
             </p>
             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <a className="btn btn-primary" href={`${REPO}/issues/new?template=bug_report.yml`} target="_blank" rel="noopener noreferrer">
+              <a className="btn btn-primary" href={`https://wa.me/${BRAND.whatsapp}?text=${encodeURIComponent(`${BRAND.app}: problem report\n`)}`} target="_blank" rel="noopener noreferrer">
                 <Bug size={16} /> Report a problem
               </a>
-              <a className="btn btn-secondary" href={`${REPO}/issues/new?template=feature_request.yml`} target="_blank" rel="noopener noreferrer">
+              <a className="btn btn-secondary" href={`mailto:${BRAND.email}?subject=${encodeURIComponent(`${BRAND.app}: feature request`)}`}>
                 <Lightbulb size={16} /> Ask for a feature
               </a>
-              <a className="btn btn-secondary" href={`${REPO}/issues`} target="_blank" rel="noopener noreferrer">
-                <ListChecks size={16} /> See all requests
-              </a>
-              {/* The changelog: the list below, or every version on GitHub. */}
-              {entries && entries.length > 0 ? (
+              {entries && entries.length > 0 && (
                 <button type="button" className="btn btn-secondary"
                   onClick={() => document.getElementById('whats-new')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
                   <Sparkles size={16} /> What&apos;s new
                 </button>
-              ) : (
-                <a className="btn btn-secondary" href={CHANGELOG_URL} target="_blank" rel="noopener noreferrer">
-                  <Sparkles size={16} /> Changelog
-                </a>
               )}
             </div>
           </div>
@@ -110,7 +98,7 @@ export default function WhatsNew() {
             <Sparkles size={18} style={{ color: 'var(--primary)' }} /> What&apos;s new <HelpButton title="What's new" doc="support#whats-new" size={16} />
           </h3>
           <p style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            The latest updates. Every version since the first is in the <a href={CHANGELOG_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>full changelog</a>, and the downloads are on <a href={`${REPO}/releases`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>GitHub Releases</a>.
+            The latest updates in this copy of the app.
           </p>
           {entries.map((e, i) => (
             <details key={e.version} open={i === 0} style={{ borderTop: '1px solid var(--border-color)', padding: '0.65rem 0' }}>
