@@ -28,7 +28,7 @@ import { fileURLToPath } from 'url';
 
 // Set by `npm run license:init` (scripts/license-admin.mjs). Empty means no
 // key can be valid yet, so updates stay off until Divtech sets this up.
-export const LICENSE_PUBLIC_KEY = '';
+export const LICENSE_PUBLIC_KEY = 'MCowBQYDK2VwAyEApM11QnBvImx0pHsXhcJY+5mPvuz3CQVdRoM+05TBmbs=';
 
 export const LICENSE_PREFIX = 'DH1';
 export const LICENSE_FILE = 'license.json';
