@@ -20,7 +20,7 @@
  *   npm test              # starts a server on a free port, runs, cleans up
  *   APP_URL=... npm test  # run against an already-running instance
  */
-import { firefox } from 'playwright';
+import { firefox, chromium } from 'playwright';
 import { spawn } from 'child_process';
 import { readFileSync } from 'fs';
 import { PDFDocument } from 'pdf-lib';
@@ -142,7 +142,8 @@ const profileAtStart = await fetch(`${APP}/api/profile`)
   .then((r) => (r.ok ? r.json() : null))
   .catch(() => null);
 
-const browser = await firefox.launch({ headless: true });
+// SMOKE_BROWSER=chromium for a quick local run where Firefox is not installed.
+const browser = await (process.env.SMOKE_BROWSER === 'chromium' ? chromium : firefox).launch({ headless: true });
 // 1366x768 is the resolution the preview-clipping bug needed (ERR-005).
 // It is also the most common laptop size among this app's users.
 const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, acceptDownloads: true });
@@ -153,6 +154,11 @@ const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, a
 // is right, so it gets room; every assertion stays exactly as strict.
 ctx.setDefaultNavigationTimeout(120000);
 ctx.setDefaultTimeout(60000);
+// Divtech Hisaab: the daily subscription reminder would pop up mid-test and
+// cover the screen; mark it as already seen today. It is checked on its own below.
+await ctx.addInitScript(() => {
+  try { localStorage.setItem('divtech_subscriptionReminderDay', new Date().toISOString().slice(0, 10)); } catch { /* private mode */ }
+});
 const page = await ctx.newPage();
 
 const cspViolations = [];
@@ -1848,16 +1854,26 @@ try {
     for (const id of made79) await page.evaluate(async (id) => fetch('/api/bills/' + encodeURIComponent(id), { method: 'DELETE' }), id);
   }
 
-  // ---- v1.10.80: Support page payment note names the business ------------
+  // ---- Divtech Hisaab: Support & Subscription and the license endpoints ----
   {
-    const prof80 = await page.evaluate(async () => (await fetch('/api/profile')).json());
+    const lic = await page.evaluate(async () => (await fetch('/api/license')).json());
+    check('subscription: /api/license answers with a state', ['none', 'invalid', 'active', 'expired'].includes(lic.state), JSON.stringify(lic));
+    const bad = await page.evaluate(async () => {
+      const r = await fetch('/api/license', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'DH1-not-a-key.xx' }) });
+      return { status: r.status, body: await r.json() };
+    });
+    check('subscription: a made-up key is refused', bad.status === 400 && bad.body.ok === false, JSON.stringify(bad));
+    if (lic.state === 'none') {
+      const upd = await page.evaluate(async () => (await fetch('/api/control-panel/launch-script', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update' }) })).json());
+      check('subscription: Update is refused without a key, and says why', upd.ok === false && upd.subscriptionRequired === true, JSON.stringify(upd).slice(0, 200));
+    }
     await page.evaluate(() => { sessionStorage.removeItem('gst_editingBill'); sessionStorage.removeItem('gst_invoiceDraft'); sessionStorage.setItem('gst_currentView', 'support'); });
     await page.reload({ waitUntil: 'networkidle' });
     await sleep(2500);
     await dismissFirstRun(page);
-    const noteText = await page.getByText(/^Payment note:/).first().innerText().catch(() => '');
-    const expected = ('Divtech Hisaab support - ' + String(prof80.businessName || '').replace(/[^A-Za-z0-9 .-]+/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 50).trim();
-    check('v80 the UPI payment note names the business', !!prof80.businessName && noteText.includes(expected), noteText);
+    const pageText = await page.evaluate(() => document.querySelector('.main-content')?.innerText || '');
+    check('subscription: Support & Subscription shows the plan and how to reach Divtech',
+      /Support & Subscription/.test(pageText) && /Subscription/.test(pageText) && /hello@divtech\.in/.test(pageText), pageText.slice(0, 200));
   }
 
   // Put the real business details back.

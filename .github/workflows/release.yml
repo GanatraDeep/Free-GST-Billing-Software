@@ -29,6 +29,10 @@ jobs:
 
       - run: npm ci
 
+      # The release check runs the browser smoke tests against the packaged app.
+      - name: Browser for the smoke tests
+        run: npx playwright install --with-deps firefox
+
       - name: Lint, test, build and package
         run: npm run release:zip
 
