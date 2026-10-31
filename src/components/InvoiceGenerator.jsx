@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { Maximize2, ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer, Eye, EyeOff, QrCode } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getInvoiceSeries } from '../store';
+import { seriesForBusiness, defaultSeries, seriesOfBill } from '../utils/invoiceSeries';
 import { saveBill, deleteBill, applyStockChanges, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllRecurring, getAllBills, getEnabledModules, getBusinessType } from '../store';
 import { INVOICE_TYPES, isModuleEnabled, businessKeyOf, GST_DOC_NUMBER, COUNTRIES, printedSubtotal, deliveryChargeLine, stockEffect, appliedStock, stockDelta, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, REMOVED_TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, clientYearToDate, htmlHasText, ORDER_DETAIL_FIELDS, invoiceOptionOn, DEFAULT_DECLARATION, decodeGstin, safePageBoundaries, localToday, toLocalIsoDate, parseLocalDate, paymentStatusFor, getStateCode } from '../utils';
 import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
@@ -817,6 +819,18 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   // an answer that arrives late (asked before the business was known) cannot
   // overwrite the right one.
   const peekSeq = useRef(0);
+  // Divtech Hisaab - the invoice series (A, AB, BB...) a tax invoice is in.
+  // Kept in details.seriesId (saved with the bill); the ref is what number
+  // look-ups read, so async code never sees a stale series.
+  const seriesRef = useRef(draft?.details?.seriesId || editingBill?.data?.details?.seriesId || '');
+  useEffect(() => { seriesRef.current = details.seriesId || ''; }, [details.seriesId]);
+  // The number on screen, for async code (state updaters run later).
+  const invoiceNumberRef = useRef(details.invoiceNumber || '');
+  useEffect(() => { invoiceNumberRef.current = details.invoiceNumber || ''; }, [details.invoiceNumber]);
+  const [seriesList, setSeriesList] = useState([]);
+  // True once the user clicks a series on this invoice: a client's usual
+  // series then no longer overrides it.
+  const seriesPicked = useRef(false);
   const warnedLongNumber = useRef(false);
 
   const typeConfig = INVOICE_TYPES[invoiceType];
@@ -1216,7 +1230,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         const overridePrefix = rawOverride && rawOverride.trim();
         const prefix = overridePrefix || INVOICE_TYPES[type]?.prefix || 'INV';
         const seq = ++peekSeq.current;
-        getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType: type, businessKey: businessKeyOf(profile) }).then(num => {
+        getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType: type, businessKey: businessKeyOf(profile), seriesId: d.details?.seriesId || seriesRef.current }).then(num => {
           if (seq !== peekSeq.current) return;
           peekedNumber.current = num;
           setDetails({ ...d.details, invoiceNumber: num, invoiceDate: localToday() });
@@ -1232,7 +1246,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       const overridePrefix = rawOverride && rawOverride.trim();
       const prefix = overridePrefix || INVOICE_TYPES[invoiceType]?.prefix || 'INV';
       const seq = ++peekSeq.current;
-      getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType, businessKey: businessKeyOf(profile) }).then(num => {
+      getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType, businessKey: businessKeyOf(profile), seriesId: seriesRef.current }).then(num => {
         if (seq !== peekSeq.current) return;
         peekedNumber.current = num;
         setDetails(prev => ({ ...prev, invoiceNumber: num }));
@@ -1258,13 +1272,50 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     const overridePrefix = rawOverride && rawOverride.trim();
     const prefix = overridePrefix || INVOICE_TYPES[invoiceType]?.prefix || 'INV';
     const seq = ++peekSeq.current;
-    getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType, businessKey: bizKey })
+    getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType, businessKey: bizKey, seriesId: seriesRef.current })
       .then((num) => {
         if (seq !== peekSeq.current || numberReserved.current) return;
         setDetails((prev) => (prev.invoiceNumber && prev.invoiceNumber !== peekedNumber.current ? prev : { ...prev, invoiceNumber: num }));
         peekedNumber.current = num;
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bizKey]);
+
+  // Divtech Hisaab - the business's invoice series. A new tax invoice starts in
+  // the default series; picking a series (or a client who usually buys in
+  // one) shows that series' next number until the invoice is saved.
+  const isNewDocument = !editingBill || !!editingBill._isDuplicate;
+  const applySeries = async (id) => {
+    seriesRef.current = id;
+    setDetails((prev) => (prev.seriesId === id ? prev : { ...prev, seriesId: id }));
+    if (!isNewDocument || numberReserved.current || hasBeenSaved.current || invoiceType !== 'tax-invoice') return;
+    const seq = ++peekSeq.current;
+    try {
+      const num = await getNextInvoiceNumber('INV', { peek: true, invoiceType: 'tax-invoice', businessKey: bizKey, seriesId: id, invoiceDate: details.invoiceDate });
+      if (seq !== peekSeq.current || numberReserved.current) return;
+      // A number typed by hand stays; only one the editor filled in changes.
+      const shown = invoiceNumberRef.current;
+      if (shown && shown !== peekedNumber.current) return;
+      peekedNumber.current = num;
+      invoiceNumberRef.current = num;
+      setDetails((prev) => ({ ...prev, invoiceNumber: num }));
+    } catch { /* keep the number shown; Save reserves the right one */ }
+  };
+  useEffect(() => {
+    if (!bizKey) return undefined;
+    let live = true;
+    getInvoiceSeries().then((list) => {
+      if (!live) return;
+      const mine = seriesForBusiness(list, bizKey);
+      setSeriesList(mine);
+      const current = seriesRef.current;
+      if (!isNewDocument || !mine.length || (current && mine.some((x) => x.id === current))) return;
+      const cli = selectedClientId && savedClients.find((c) => c.id === selectedClientId);
+      const pick = (cli?.preferredSeries && mine.find((x) => x.id === cli.preferredSeries)) || defaultSeries(mine);
+      if (pick) applySeries(pick.id);
+    }).catch(() => {});
+    return () => { live = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bizKey]);
 
@@ -1358,7 +1409,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     const prefix = overridePrefix || config?.prefix || 'INV';
     // Peek — actual reservation happens on save.
     const seq = ++peekSeq.current;
-    const num = await getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType: type, businessKey: businessKeyOf(profile) });
+    const num = await getNextInvoiceNumber(prefix, { peek: true, explicitPrefix: !!overridePrefix, invoiceType: type, businessKey: businessKeyOf(profile), seriesId: seriesRef.current });
     if (seq !== peekSeq.current) return;
     peekedNumber.current = num;
     numberReserved.current = false;
@@ -1658,6 +1709,10 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         clientAutoPrint: !!cli.autoPrint,
       }));
     }
+    // Divtech Hisaab - the series this client usually buys in.
+    if (isNewDocument && !seriesPicked.current && cli.preferredSeries && cli.preferredSeries !== seriesRef.current && seriesList.some((x) => x.id === cli.preferredSeries)) {
+      applySeries(cli.preferredSeries);
+    }
     toast(`Loaded client: ${cli.name}`, 'info');
   };
 
@@ -1762,7 +1817,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
         const rawOverride = _psForPrefix.customPrefixes?.[invoiceType];
         const overridePrefix = rawOverride && rawOverride.trim();
         const prefix = overridePrefix || INVOICE_TYPES[invoiceType]?.prefix || 'INV';
-        const numOpts = { explicitPrefix: !!overridePrefix, invoiceType, businessKey: businessKeyOf(profile), invoiceDate: details.invoiceDate };
+        const numOpts = { explicitPrefix: !!overridePrefix, invoiceType, businessKey: businessKeyOf(profile), invoiceDate: details.invoiceDate, seriesId: seriesRef.current };
         // A number typed by hand (a paper bill book's next number) is kept. It
         // used to be replaced by the next counter number on the first save,
         // whatever was in the field. Only the number the editor filled in
@@ -1989,7 +2044,10 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           // thermal. See the restore side in handleSelectClient.
           const nextCustomW = invoiceOptions.customPaperWidth || 80;
           const nextCustomH = invoiceOptions.customPaperHeight || 297;
+          // Divtech Hisaab - remember the series of a tax invoice for next time.
+          const nextSeries = invoiceType === 'tax-invoice' && details.seriesId ? details.seriesId : (cli.preferredSeries || '');
           const changed = cli.preferredPaperSize !== nextPaperSize
+            || (cli.preferredSeries || '') !== nextSeries
             || cli.preferredCurrency !== nextCurrency
             || cli.preferredCustomPaperWidth !== nextCustomW
             || cli.preferredCustomPaperHeight !== nextCustomH;
@@ -2000,6 +2058,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               preferredCurrency: nextCurrency,
               preferredCustomPaperWidth: nextCustomW,
               preferredCustomPaperHeight: nextCustomH,
+              preferredSeries: nextSeries,
             };
             saveClient(updatedClient).then(() => {
               // Refresh the in-memory clients list so subsequent
@@ -2040,7 +2099,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           // ponytail: one local request pair per taken number; fine up to ~1000.
           for (let i = 0; i < 1000; i++) {
             try {
-              nextNum = await getNextInvoiceNumber(prefix, { explicitPrefix: !!overridePrefix, invoiceType, businessKey: businessKeyOf(profile), invoiceDate: details.invoiceDate });
+              nextNum = await getNextInvoiceNumber(prefix, { explicitPrefix: !!overridePrefix, invoiceType, businessKey: businessKeyOf(profile), invoiceDate: details.invoiceDate, seriesId: seriesRef.current });
               const retryBill = { ...bill, id: nextNum, invoiceNumber: nextNum };
               retryBill.data = { ...retryBill.data, details: { ...retryBill.data.details, invoiceNumber: nextNum } };
               await saveBill(retryBill, { overwrite: false });
@@ -3650,6 +3709,31 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               </p>
             )}
             <p className="type-desc">{typeConfig?.description}</p>
+
+            {/* Divtech Hisaab - which of the business's invoice series this tax
+                invoice is in (A, AB, BB...). Fixed once the invoice is saved. */}
+            {invoiceType === 'tax-invoice' && seriesList.length > 0 && (() => {
+              const locked = !isNewDocument || numberReserved.current;
+              const savedIn = locked ? seriesOfBill({ invoiceNumber: details.invoiceNumber, data: { details } }, seriesList) : null;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }} role="group" aria-label="Invoice series">
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '0.25rem' }}>Series: <HelpButton title="Invoice series" doc="settings#invoice-series" size={16} /></span>
+                  {locked ? (
+                    <span className="type-chip type-chip-active" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', cursor: 'default' }}
+                      title="An invoice keeps the series it was saved in. Use Duplicate to make one in another series.">
+                      {savedIn ? `${savedIn.prefix} · ${savedIn.name}` : 'Standard numbering'}
+                    </span>
+                  ) : seriesList.map((sr) => (
+                    <button key={sr.id} type="button" aria-pressed={details.seriesId === sr.id}
+                      className={`type-chip ${details.seriesId === sr.id ? 'type-chip-active' : ''}`}
+                      onClick={() => { seriesPicked.current = true; applySeries(sr.id); }} title={sr.name}
+                      style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}>
+                      <strong>{sr.prefix}</strong>&nbsp;{sr.name}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Goods / Services / Mixed selector — drives default line-item unit
                 (Hrs vs Nos) and filters the unit dropdown. Stays out of the way

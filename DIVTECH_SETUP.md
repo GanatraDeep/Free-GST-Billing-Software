@@ -97,6 +97,11 @@ There is no direct Miracle import. Export from Miracle to Excel, save as CSV:
    amount, decides who owes whom. Download the sample file in that window to
    see the layout. Check the total at the bottom against Miracle.
 
+4. **Invoice series** (A retail cash, AB retail credit, BB dealer credit…):
+   **Settings → Company → Invoice series → Add a series**. Set each one's
+   *Next number* to the number after its last Miracle bill to continue the
+   numbering, or leave it at 1 to start fresh.
+
 Start fresh invoices in Divtech Hisaab from that day and keep Miracle for
 older records. Payments against old balances: **Receipts → Quick Select —
 Opening Balances** (prints a receipt), or **Received** / **Paid** in the

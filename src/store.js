@@ -3,6 +3,7 @@
 
 import { getFinancialYearLabel, parseLocalDate, nextCounterValue, startFor, numberSeriesFor, counterKeyFor, formatDocNumber, INVOICE_TYPES, savedPdfNameFor, stockUpdates } from './utils';
 import { poCounterKey, formatPoNumber } from './utils/purchaseOrders';
+import { SERIES_META_KEY, seriesCounterKey, formatSeriesNumber } from './utils/invoiceSeries';
 
 import { logProblem } from './utils/problemLog';
 
@@ -242,7 +243,13 @@ export const setMenuOrder = (order) => {
 // `invoiceDate` (YYYY-MM-DD) picks the financial year printed in the number;
 // without it, today's. A back-dated invoice (31 March, made on 2 April) took
 // the new year's label, so its number disagreed with its own date.
-export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, explicitPrefix = false, invoiceType = null, businessKey = '', invoiceDate = '' } = {}) => {
+export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, explicitPrefix = false, invoiceType = null, businessKey = '', invoiceDate = '', seriesId = '' } = {}) => {
+  // Divtech Hisaab - a tax invoice in one of the business's own series
+  // (A, AB, BB...) counts and prints in that series.
+  if (seriesId && (invoiceType || 'tax-invoice') === 'tax-invoice') {
+    const series = (await getInvoiceSeries()).find((x) => x.id === seriesId);
+    if (series) return nextSeriesNumber(series, { peek, invoiceDate });
+  }
   const settings = await getNumberSeries(businessKey);
   const typePrefix = settings.own ? (INVOICE_TYPES[invoiceType]?.prefix || prefix) : prefix;
   const key = counterKeyFor(typePrefix, settings, businessKey);
@@ -269,6 +276,40 @@ export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, expli
     explicitPrefix: settings.own ? false : explicitPrefix,
     fyLabel: getFinancialYearLabel(invoiceDate ? parseLocalDate(invoiceDate) : new Date()),
   });
+};
+
+// ---- Invoice series (Divtech Hisaab) ----
+// The business's own tax-invoice series, in meta.json so backups carry them.
+export const getInvoiceSeries = async () => {
+  const { value } = await apiFetch(`${API}/meta/${SERIES_META_KEY}`);
+  return Array.isArray(value) ? value : [];
+};
+export const saveInvoiceSeries = (list) => apiFetch(`${API}/meta/${SERIES_META_KEY}`, {
+  method: 'POST', body: JSON.stringify({ value: list || [] }),
+});
+// The next number of a series (peek), or reserve it.
+export const nextSeriesNumber = async (series, { peek = false, invoiceDate = '' } = {}) => {
+  const fyLabel = getFinancialYearLabel(invoiceDate ? parseLocalDate(invoiceDate) : new Date());
+  const key = seriesCounterKey(series, fyLabel);
+  let next;
+  if (peek) {
+    const { value: current } = await apiFetch(`${API}/meta/${encodeURIComponent(key)}`);
+    next = nextCounterValue(current, 1);
+  } else {
+    next = (await apiFetch(`${API}/meta/${encodeURIComponent(key)}/increment`, { method: 'POST', body: JSON.stringify({ start: 1 }) })).value;
+  }
+  return formatSeriesNumber(series, next, fyLabel);
+};
+// Settings → "Next number": the counter is set to one less, for this year.
+export const setSeriesNextNumber = async (series, nextNumber) => {
+  const key = seriesCounterKey(series, getFinancialYearLabel(new Date()));
+  await apiFetch(`${API}/meta/${encodeURIComponent(key)}`, { method: 'POST', body: JSON.stringify({ value: Math.max(0, Math.floor(Number(nextNumber)) - 1) }) });
+};
+// The number the next invoice in this series gets this year (1 if unused).
+export const peekSeriesNext = async (series) => {
+  const key = seriesCounterKey(series, getFinancialYearLabel(new Date()));
+  const { value } = await apiFetch(`${API}/meta/${encodeURIComponent(key)}`);
+  return nextCounterValue(value, 1);
 };
 
 // ---- Bills ----

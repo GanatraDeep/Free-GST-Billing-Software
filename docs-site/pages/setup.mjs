@@ -210,6 +210,23 @@ export default [
 </ul>
 </section>
 
+<section id="invoice-series">
+<h2>Invoice series (A, AB, BB…)</h2>
+<p>Many traders keep separate numbering for different kinds of tax invoice, for example <b>A</b> for retail cash sales, <b>AB</b> for retail sales on credit (udhar) and <b>BB</b> for sales to GST-registered dealers. Each series has its own running number. All of them are normal tax invoices, so GST, reports and returns treat them the same; GSTR-1's documents-issued table (Table 13) lists each series on its own row.</p>
+<ol class="steps">
+  <li><strong>Open Settings → Company</strong>Scroll to <b>Invoice series</b>, below the company details.</li>
+  <li><strong>Add a series</strong>Click ${ui('Add a series')}. Give it a name (Retail cash) and a prefix (A, letters and digits only). Choose the separator (/ or - or none), whether the financial year is in the number, and how many digits.</li>
+  <li><strong>Set where it continues</strong><b>Next number</b> is the number the next invoice in this series gets. To carry on from your old software, enter the number after its last bill (for example 1546). To start fresh, leave it at 1.</li>
+  <li><strong>Restart each year?</strong>With <b>Start again at 1 every 1 April</b> ticked, each financial year counts from 1. Untick it to keep counting.</li>
+  <li><strong>Save</strong>The line under the form shows the next number exactly as it will print, such as <code>A/26-27/0001</code> or <code>AB-1546</code>.</li>
+</ol>
+<p>Repeat for each series. The star (☆) makes a series the default: new invoices start in it. The pencil changes a series; a change of format applies to new invoices only. A series that has been used can be archived (it stops showing on invoices; old invoices keep their numbers); one never used can be deleted.</p>
+<h3>Picking the series on an invoice</h3>
+<p>When the business has series, a tax invoice shows <b>Series:</b> buttons under the invoice type. Click one and the number changes to that series' next number. The number is taken for good only when you save. Each client remembers the series of their last invoice, so picking the client usually picks the right series too. A saved invoice keeps its series; use Duplicate to make the same bill in another series.</p>
+<p>Quotations, credit notes, challans and the other documents keep their own numbering. With no series at all, tax invoices use the standard format above.</p>
+<p>To see one series on the Dashboard, choose it under <b>Tax invoice series</b> in the <b>All Types</b> filter.</p>
+</section>
+
 <section id="own-numbering">
 <h3>Shared numbering or own numbering for this business</h3>
 <p>Shown under <b>Numbering for <i>your business</i></b> when you have more than one business in <a href="#business-profiles">Business Profiles</a>. Every business uses <b>Shared numbering</b> to start: one series for all of them. The line below names who shares it, such as <i>Shared by Firm 1, Firm 2</i>; saving a change then asks <b>Change numbering for all 2 businesses?</b></p>

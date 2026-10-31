@@ -2,9 +2,11 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Download, Printer, Ban, Undo2, Eye, QrCode, Upload } from 'lucide-react';
 import HelpButton from './HelpButton';
 import { useOpeningBalances } from './OpeningBalances';
+import { getInvoiceSeries } from '../store';
+import { seriesForBusiness, seriesOfBill } from '../utils/invoiceSeries';
 import { openingDue } from '../utils/openingBalances';
 import { getAllBills, saveBill, getAllProducts, applyStockChanges, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts, markSavedPdfCancelled, getEnabledModules } from '../store';
-import { formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile, salesSign, isCancelledBill, markPaidPatch, markUnpaidPatch, stockEffect, appliedStock, stockDelta, SALES_INVOICE_TYPES, localToday, amountDue, paymentStatusFor, isModuleEnabled, TDS_SECTIONS, findLowStock, trackedStock } from '../utils';
+import { businessKeyOf, formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile, salesSign, isCancelledBill, markPaidPatch, markUnpaidPatch, stockEffect, appliedStock, stockDelta, SALES_INVOICE_TYPES, localToday, amountDue, paymentStatusFor, isModuleEnabled, TDS_SECTIONS, findLowStock, trackedStock } from '../utils';
 import { billInInr, billCurrency as fxBillCurrency, baseCurrencyOf } from '../utils/fx';
 import { withClientTds } from '../utils/tdsTcs';
 import { prepareEInvoices, parseIrpResponse, matchIrnEntries, downloadJson, einvoiceFileName } from '../utils/einvoice';
@@ -306,6 +308,14 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
   // v1.10.83 (#112) - '' = all; see utils/costCentres.js.
   const [centreFilter, setCentreFilter] = useState('');
   const { on: ccOn, centres } = useCostCentres(profile);
+  // Divtech Hisaab - the business's invoice series, offered in the Types filter.
+  const [seriesList, setSeriesList] = useState([]);
+  const seriesBiz = businessKeyOf(profile);
+  useEffect(() => {
+    let live = true;
+    getInvoiceSeries().then((l) => { if (live) setSeriesList(seriesForBusiness(l, seriesBiz, { includeArchived: true })); }).catch(() => {});
+    return () => { live = false; };
+  }, [seriesBiz]);
   // Bulk-selection state. Stores a Set of bill IDs (not the bills themselves)
   // so we don't hold stale references when the underlying bill is edited
   // elsewhere. Cleared whenever filters change so the user doesn't accidentally
@@ -501,7 +511,10 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
         (b.invoiceNumber || '').toLowerCase().includes(q)
       );
     }
-    if (typeFilter !== 'all') result = result.filter(b => (b.invoiceType || 'tax-invoice') === typeFilter);
+    if (typeFilter.startsWith('series:')) {
+      const sid = typeFilter.slice(7);
+      result = result.filter(b => (b.invoiceType || 'tax-invoice') === 'tax-invoice' && seriesOfBill(b, seriesList)?.id === sid);
+    } else if (typeFilter !== 'all') result = result.filter(b => (b.invoiceType || 'tax-invoice') === typeFilter);
     if (statusFilter !== 'all') result = result.filter(b => (b.status || 'unpaid') === statusFilter);
     if (fyFilter !== 'all') {
       const fy = fyOptions.find(f => f.value === fyFilter);
@@ -511,7 +524,7 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
     if (dateTo) result = result.filter(b => b.invoiceDate <= dateTo);
     if (centreFilter) result = result.filter(b => matchesCentre(b, centreFilter));
     setFiltered(result);
-  }, [bills, search, typeFilter, statusFilter, fyFilter, dateFrom, dateTo, centreFilter]);
+  }, [bills, search, typeFilter, statusFilter, fyFilter, dateFrom, dateTo, centreFilter, seriesList]);
 
   // v1.10.67 (#66 item 12, @sangwanmail-eng) — an issued invoice is not
   // deleted: its number has to stay in the books, gapless, for GST. Cancelling
@@ -1620,6 +1633,11 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
           <select className="filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
             <option value="all">All Types</option>
             {Object.entries(INVOICE_TYPES).map(([key, val]) => <option key={key} value={key}>{val.label}</option>)}
+            {seriesList.length > 0 && (
+              <optgroup label="Tax invoice series">
+                {seriesList.map((sr) => <option key={sr.id} value={`series:${sr.id}`}>{sr.prefix} · {sr.name}</option>)}
+              </optgroup>
+            )}
           </select>
           <select className="filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="all">All Status</option>
