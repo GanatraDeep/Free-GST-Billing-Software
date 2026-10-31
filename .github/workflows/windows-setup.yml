@@ -18,6 +18,7 @@ on:
 jobs:
   setup:
     runs-on: windows-latest
+    timeout-minutes: 40
     env:
       NODE_WIN: v20.19.0
     steps:
@@ -65,10 +66,14 @@ jobs:
 
       - name: Install it and check the app starts
         shell: pwsh
+        timeout-minutes: 15
         run: |
           $ErrorActionPreference = 'Stop'
           $dir = 'C:\DH Test'
-          $p = Start-Process release-build\Divtech-Hisaab-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$dir" -PassThru -Wait
+          # Not Start-Process -Wait: that also waits for the app the installer
+          # opens at the end (its server keeps running), so it never returns.
+          $p = Start-Process release-build\Divtech-Hisaab-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$dir" -PassThru
+          if (-not $p.WaitForExit(600000)) { throw 'Setup did not finish in 10 minutes' }
           if ($p.ExitCode -ne 0) { throw "Setup exited with $($p.ExitCode)" }
           foreach ($f in @("$dir\Divtech Hisaab.exe", "$dir\_system\server.js", "$dir\_system\node\node.exe", "$dir\_system\installed-by-setup.txt")) {
             if (-not (Test-Path -LiteralPath $f)) { throw "Missing after install: $f" }
