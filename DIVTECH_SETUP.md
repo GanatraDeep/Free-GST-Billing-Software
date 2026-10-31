@@ -85,13 +85,19 @@ it the same way.
 
 ## Moving from Miracle Accounting
 
-There is no direct Miracle import. Export from Miracle to Excel / CSV:
+There is no direct Miracle import. Export from Miracle to Excel, save as CSV:
 
-- **Parties (ledgers)** → import in **Clients** (CSV import).
-- **Items (oils: name, HSN 1507–1515, GST 5%, unit such as KG / LTR / TIN)**
-  → import in **Products** (CSV import), with opening stock.
-- Pending amounts per party → enter each unpaid bill so the party shows as
-  outstanding (there is no separate opening-balance field yet).
+1. **Parties (ledgers)** → **Clients → Import CSV** (Name, GSTIN, Phone,
+   Email, Address, State).
+2. **Items** (oils: name, HSN 1507–1515, GST 5%, unit such as KG / LTR / TIN)
+   → **Products → Import CSV**, with opening stock.
+3. **Party closing balances** (Sundry Debtors and Sundry Creditors, as on the
+   day before you start) → **Clients → Opening balances → Import CSV**.
+   Only Name and Amount are needed; a Dr/Cr column, or "12,500.00 Dr" in the
+   amount, decides who owes whom. Download the sample file in that window to
+   see the layout. Check the total at the bottom against Miracle.
 
-Start fresh invoices in Divtech Hisaab from a clean date (for example the
-1st of next month) and keep Miracle for older records.
+Start fresh invoices in Divtech Hisaab from that day and keep Miracle for
+older records. Payments against old balances: **Receipts → Quick Select —
+Opening Balances** (prints a receipt), or **Received** / **Paid** in the
+Opening balances window.

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { ShoppingCart, Plus, Edit3, Trash2, Search, X, Save, Download, Wand2, Eye, ClipboardList, IndianRupee } from 'lucide-react';
+import { ShoppingCart, Plus, Edit3, Trash2, Search, X, Save, Download, Wand2, Eye, ClipboardList, IndianRupee, Wallet } from 'lucide-react';
 import HelpButton from './HelpButton';
 import { getAllPurchases, savePurchase, deletePurchase, getAllProducts, saveProduct, getProfile, getEnabledModules, getAllPurchaseOrders, savePurchaseOrder, getNextPoNumber } from '../store';
 import { formatCurrency, getFYOptions, belongsToProfile, isUnassignedToBusiness, isInterstateSupply, localToday, roundQty, splitPurchaseTax, isModuleEnabled, businessKeyOf, getAllUnits, TDS_SECTIONS } from '../utils';
@@ -17,6 +17,8 @@ import { CostCentreSelect, CostCentreFilter } from './CostCentrePicker';
 import { matchesCentre, centreFields } from '../utils/costCentres';
 import { PURCHASE_STATUS_LABEL, OVERPAY_SLACK, purchaseStatus, purchaseBalance, purchasePaid, purchaseOwed, hasPurchasePayments, withPurchasePayments, markPurchasePaid, markPurchaseUnpaid, purchasePaymentModeName } from '../utils/purchasePayments';
 import PurchasePaymentModal from './PurchasePaymentModal';
+import OpeningBalances, { useOpeningBalances } from './OpeningBalances';
+import { openingDue } from '../utils/openingBalances';
 
 // v1.10.31 — UI-C3: Same accent-color helper as ClientsView so the
 // Purchase Bill PDF header rule + totals line pick up the user's brand.
@@ -260,6 +262,11 @@ export default function PurchaseBills() {
     if (statusFilter === 'Paid' && purchaseStatus(p) !== 'Paid') return false;
     return matchesCentre(p, centreFilter);
   });
+
+  // Divtech Hisaab - supplier balances carried over from the old software.
+  const openings = useOpeningBalances();
+  const [showOpenings, setShowOpenings] = useState(false);
+  const supplierOpeningOwed = openings.filter((o) => o.party === 'supplier').reduce((s, o) => s + Math.max(0, openingDue(o)), 0);
 
   const totalStats = filtered.reduce((acc, p) => {
     const t = calcPurchaseTotal(p.items, !!p.applyRoundOff);
@@ -1093,6 +1100,7 @@ export default function PurchaseBills() {
 
   return (
     <div className="dashboard-container">
+      {showOpenings && <OpeningBalances initialParty="supplier" onClose={() => setShowOpenings(false)} />}
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div>
@@ -1110,6 +1118,9 @@ export default function PurchaseBills() {
             <Wand2 size={16} /> Import from image (OCR)
           </button>
           <BulkCsvImport kind="purchase" onDone={() => { loadPurchases(); loadProducts(); }} />
+          <button className="btn btn-secondary" onClick={() => setShowOpenings(true)} title="What you owed each supplier when you started using this app">
+            <Wallet size={16} /> Opening balances
+          </button>
           <button className="btn btn-primary" onClick={openAdd}><Plus size={18} /> Add Purchase</button>
         </div>
         )}
@@ -1283,6 +1294,12 @@ export default function PurchaseBills() {
           <div>
             <p className="stat-label">Owed to suppliers <HelpButton title="Owed to suppliers" doc="purchases#owed-to-suppliers" size={13} /></p>
             <h2 className="stat-value" style={{ color: totalStats.owed > 0.005 ? 'var(--danger)' : undefined }}>{formatCurrency(totalStats.owed)}</h2>
+            {supplierOpeningOwed > 0.005 && (
+              <button type="button" onClick={() => setShowOpenings(true)} title="Opening balances still owed (not in the figure above)"
+                style={{ background: 'none', border: 0, padding: 0, font: 'inherit', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}>
+                + {formatCurrency(supplierOpeningOwed)} opening balances
+              </button>
+            )}
           </div>
         </div>
         <div className="stat-card">

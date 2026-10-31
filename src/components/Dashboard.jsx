@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Download, Printer, Ban, Undo2, Eye, QrCode, Upload } from 'lucide-react';
 import HelpButton from './HelpButton';
+import { useOpeningBalances } from './OpeningBalances';
+import { openingDue } from '../utils/openingBalances';
 import { getAllBills, saveBill, getAllProducts, applyStockChanges, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts, markSavedPdfCancelled, getEnabledModules } from '../store';
 import { formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile, salesSign, isCancelledBill, markPaidPatch, markUnpaidPatch, stockEffect, appliedStock, stockDelta, SALES_INVOICE_TYPES, localToday, amountDue, paymentStatusFor, isModuleEnabled, TDS_SECTIONS, findLowStock, trackedStock } from '../utils';
 import { billInInr, billCurrency as fxBillCurrency, baseCurrencyOf } from '../utils/fx';
@@ -258,6 +260,8 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
   // Outstanding and the invoice count added up EVERY company's invoices while
   // the table underneath showed only one.
   const baseCur = baseCurrencyOf(profile);
+  // Divtech Hisaab - client opening balances count in Outstanding (rupees).
+  const openings = useOpeningBalances();
   const stats = useMemo(() => {
     // v1.10.67 (#66 item 7, @sangwanmail-eng) — these cards are turnover, so
     // only real sales count. A proforma is a quote, a delivery challan moves
@@ -275,6 +279,11 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
       byCurrency[cur].tax += sign * (b.totalTaxAmount || 0);
       if (sign > 0 && b.status !== 'paid') byCurrency[cur].unpaid += Math.max(0, amountDue(b) - (b.paidAmount || 0));
     }
+    const openingOwed = openings.filter((o) => o.party === 'client').reduce((s, o) => s + Math.max(0, openingDue(o)), 0);
+    if (openingOwed > 0.005) {
+      if (!byCurrency.INR) byCurrency.INR = { total: 0, tax: 0, unpaid: 0 };
+      byCurrency.INR.unpaid += openingOwed;
+    }
     // v1.10.83 - more than one currency: the total in rupees too, each
     // invoice at its own exchange rate (one without a rate is counted apart).
     let inBase = 0, noRate = 0;
@@ -287,7 +296,7 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
       }
     }
     return { byCurrency, count, inBase, noRate };
-  }, [bills, baseCur]);
+  }, [bills, baseCur, openings]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');

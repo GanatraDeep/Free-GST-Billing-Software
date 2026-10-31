@@ -12,6 +12,8 @@ import { billsInInr } from '../utils/fx';
 import CostCentreReport from './CostCentreReport';
 import { costCentresOn } from './useCostCentres';
 import TdsTcsReport from './TdsTcsReport';
+import { useOpeningBalances } from './OpeningBalances';
+import { openingDue, openingPaid } from '../utils/openingBalances';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -40,6 +42,7 @@ const TAB_HELP = {
 
 export default function ReportsView() {
   const [bills, setBills] = useState([]);
+  const openings = useOpeningBalances();
   const [expenses, setExpenses] = useState([]);
   const [activeTab, setActiveTab] = useState('pl');
   const [filterMode, setFilterMode] = useState('fy');
@@ -180,7 +183,18 @@ export default function ReportsView() {
   // Money owed to you: only on sales (a quote, a challan or a credit note is
   // never a receivable).
   const unpaidBills = bills.filter(b => countsAsSales(b) && b.status !== 'paid');
-  const agingData = unpaidBills.map(b => {
+  // Divtech Hisaab - client opening balances still owed, aged from their as-on date.
+  const openingAging = openings.filter(o => o.party === 'client' && openingDue(o) > 0.005).map(o => {
+    const d = parseLocalDate(o.asOn);
+    const daysOverdue = Math.max(0, Math.floor((today - d) / 86400000));
+    return {
+      clientName: o.name, invoiceNumber: 'Opening balance', invoiceDate: o.asOn, dueDate: o.asOn,
+      totalAmount: o.amount, paidAmount: openingPaid(o), outstanding: openingDue(o), daysOverdue,
+      bucket: daysOverdue > 90 ? '90plus' : daysOverdue > 60 ? '61to90' : daysOverdue > 30 ? '31to60' : 'current',
+      currency: 'INR',
+    };
+  });
+  const agingData = [...openingAging, ...unpaidBills.map(b => {
     // Guard against missing or invalid dates — `new Date(undefined)` returns Invalid Date
     // which propagates as NaN through the aging math and breaks the chart.
     const dueDate = b.data?.details?.dueDate || b.invoiceDate;
@@ -206,7 +220,7 @@ export default function ReportsView() {
       bucket,
       currency: getBillCurrency(b),
     };
-  }).filter(r => r.outstanding > 0);
+  }).filter(r => r.outstanding > 0)];
 
   const agingFiltered = agingSearch.trim()
     ? agingData.filter(r => r.clientName.toLowerCase().includes(agingSearch.toLowerCase()))
@@ -453,7 +467,7 @@ export default function ReportsView() {
         </>
       )}
 
-      {activeTab === 'party' && <PartyOutstandingReport bills={bills} businessName={businessName} />}
+      {activeTab === 'party' && <PartyOutstandingReport bills={bills} businessName={businessName} openings={openings} />}
 
       {activeTab === 'costcentres' && ccOn && (
         <CostCentreReport bills={bills} expenses={expenses} profile={ownerProfile}

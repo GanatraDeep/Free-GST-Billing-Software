@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Search, FileText, ChevronDown, ChevronUp, Trash2, X, MessageCircle, Mail, Plus, Edit3, Copy, Upload, Download } from 'lucide-react';
+import { Users, Search, FileText, ChevronDown, ChevronUp, Trash2, X, MessageCircle, Mail, Plus, Edit3, Copy, Upload, Download, Wallet } from 'lucide-react';
 import HelpButton from './HelpButton';
 import { getAllClients, getAllBills, deleteClient, saveClient, deleteBill, saveBill, getProfile, deleteReceipt, applyStockChanges, trashSavedPdf } from '../store';
 import { formatCurrency, INVOICE_TYPES, markPaidPatch, markUnpaidPatch, salesSign, countsAsSales, isCancelledBill, amountDue, localToday, parseLocalDate, appliedStock, stockDelta } from '../utils';
@@ -7,6 +7,8 @@ import { getPrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
 import { confirmAction } from './ConfirmModal';
 import { toast } from './Toast';
+import OpeningBalances, { useOpeningBalances } from './OpeningBalances';
+import { openingFor, openingDue, openingPaid } from '../utils/openingBalances';
 
 // v1.10.31 — UI-C3: Shared helper to resolve the user's accent color as an
 // RGB tuple usable with jsPDF setFillColor / setDrawColor. Falls back to the
@@ -46,6 +48,10 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
   const [modalClient, setModalClient] = useState(null);
   const [editingClientId, setEditingClientId] = useState(null);
   const [profileCountry, setProfileCountry] = useState('');
+  // Divtech Hisaab - opening balances carried over from the old software.
+  const openings = useOpeningBalances();
+  const [showOpenings, setShowOpenings] = useState(false);
+  const clientOpening = (name) => openingFor(openings, 'client', name);
 
   useEffect(() => {
     getProfile().then(p => { if (p?.country) setProfileCountry(p.country); }).catch(() => {});
@@ -77,7 +83,8 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
 
   const generateClientStatement = async (clientName) => {
     const clientBills = getClientBills(clientName);
-    if (clientBills.length === 0) {
+    const ob = clientOpening(clientName);
+    if (clientBills.length === 0 && !ob) {
       toast('No invoices for this client', 'warning');
       return;
     }
@@ -223,9 +230,15 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
       y += 11;
 
       // Opening balance row — italic + muted, above the first real row.
+      // Divtech Hisaab: the balance carried over from the old software (Dr when
+      // the client owed, Cr for an advance), then any payments against it.
+      const obSigned = ob ? (ob.direction === 'advance' ? -ob.amount : ob.amount) : 0;
       doc.setFontSize(8.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(80);
+      if (ob) doc.text(parseLocalDate(ob.asOn).toLocaleDateString('en-IN'), marginL + 2, y);
       doc.text('Opening Balance', col.dateEnd + 2, y);
-      doc.text(fmt(0), col.balanceEnd, y, { align: 'right' });
+      if (obSigned > 0) doc.text(fmt(obSigned), col.debitEnd, y, { align: 'right' });
+      if (obSigned < 0) doc.text(fmt(-obSigned), col.creditEnd, y, { align: 'right' });
+      doc.text(fmt(Math.abs(obSigned)) + (obSigned > 0.01 ? ' Dr' : obSigned < -0.01 ? ' Cr' : ''), col.balanceEnd, y, { align: 'right' });
       // v1.10.35 — thin separator so the opening line reads as a
       // distinct baseline, not as a squished header extension.
       doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.15);
@@ -234,7 +247,16 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
       y += 7;
 
       // Rows
-      let runningBalance = 0;
+      let runningBalance = obSigned;
+      if (ob && ob.direction === 'owed' && openingPaid(ob) > 0.005) {
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(80);
+        doc.text('   Payment recd against opening balance', col.dateEnd + 2, y);
+        doc.text(fmt(openingPaid(ob)), col.creditEnd, y, { align: 'right' });
+        runningBalance -= openingPaid(ob);
+        doc.text(fmt(Math.abs(runningBalance)) + (runningBalance > 0.01 ? ' Dr' : runningBalance < -0.01 ? ' Cr' : ''), col.balanceEnd, y, { align: 'right' });
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(15, 23, 42);
+        y += 7;
+      }
       // Sales and credit notes only, as in the summary above: quotations,
       // proformas, challans and cancelled invoices are not owed, and listing
       // them as debits gave a closing balance that disagreed with the summary.
@@ -449,9 +471,18 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
   const getClientBills = (clientName) =>
     billsByClient.get((clientName || '').toLowerCase()) || EMPTY_BILLS;
 
-  const getClientStats = (clientName) =>
-    statsByClient.get((clientName || '').toLowerCase())
-    || { total: 0, paid: 0, unpaid: 0, count: 0 };
+  // Divtech Hisaab: an opening balance counts in Total and Outstanding (and
+  // what was received against it in Paid); an advance lowers Outstanding.
+  const getClientStats = (clientName) => {
+    const base = statsByClient.get((clientName || '').toLowerCase()) || { total: 0, paid: 0, unpaid: 0, count: 0 };
+    const ob = clientOpening(clientName);
+    if (!ob) return base;
+    // Total is what was billed (an advance is not billing); the advance only
+    // lowers Outstanding.
+    const owed = ob.direction === 'owed' ? ob.amount : 0;
+    const paid = ob.direction === 'owed' ? openingPaid(ob) : 0;
+    return { ...base, total: base.total + owed, paid: base.paid + paid, unpaid: base.unpaid + openingDue(ob), opening: ob };
+  };
 
 
   // v1.10.22 — Aging analysis: bucket unpaid amounts by how long they've
@@ -483,6 +514,16 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
       buckets[bucket] += outstanding;
       buckets.total += outstanding;
       unpaidBills.push({ bill: b, ageDays, outstanding });
+    }
+    // Divtech Hisaab: an opening balance still owed, aged from its as-on date.
+    const ob = clientOpening(clientName);
+    const obDue = ob ? openingDue(ob) : 0;
+    if (obDue > 0.01) {
+      const ageDays = Math.max(0, Math.floor((today - parseLocalDate(ob.asOn)) / 86400000));
+      const bucket = bucketAge(ageDays);
+      buckets[bucket] += obDue;
+      buckets.total += obDue;
+      unpaidBills.unshift({ bill: { invoiceNumber: 'Opening balance', invoiceDate: ob.asOn, totalAmount: ob.amount, data: { details: { dueDate: ob.asOn } } }, ageDays, outstanding: obDue });
     }
     return { buckets, unpaidBills };
   };
@@ -590,10 +631,12 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
   };
 
   // Get all unique client names from bills (includes unsaved clients)
-  const allClientNames = [...new Set([
+  const allClientNames = [...new Map([
     ...clients.map(c => c.name),
-    ...bills.map(b => b.clientName).filter(Boolean)
-  ])];
+    ...bills.map(b => b.clientName).filter(Boolean),
+    // Divtech Hisaab: a party known only from its opening balance still shows.
+    ...openings.filter(o => o.party === 'client').map(o => o.name),
+  ].map(n => [n.trim().toLowerCase(), n])).values()];
 
   const filteredClients = search.trim()
     ? allClientNames.filter(name => name.toLowerCase().includes(search.toLowerCase()))
@@ -710,6 +753,10 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
           </div>
         </div>
         <div className="flex gap-2">
+          <button className="btn btn-secondary" onClick={() => setShowOpenings(true)}
+            title="Balances carried over from your old software (Miracle, Tally…)">
+            <Wallet size={16} /> Opening balances
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
             <Upload size={16} /> Import CSV
           </button>
@@ -728,6 +775,8 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
           parse={(text) => { const r = clientsCsvToList(text, clients); return { list: r.clients, skipped: r.skipped, errors: r.errors }; }}
           save={saveClient} onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); loadData(); }} />
       )}
+
+      {showOpenings && <OpeningBalances initialParty="client" onClose={() => setShowOpenings(false)} />}
 
       {/* Add/Edit Client Modal */}
       <ClientModal show={showForm} onClose={closeForm} onSave={handleModalSave} client={modalClient} isEditing={!!editingClientId} defaultCountry={profileCountry} />
@@ -791,7 +840,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                       {/* v1.10.23 — surface overpayment explicitly (was
                           hidden as "Outstanding: ₹0" when paid > total). */}
                       <span className="client-stat-label">
-                        {stats.unpaid < -0.005 ? 'Overpaid' : 'Outstanding'}
+                        {stats.unpaid < -0.005 ? (stats.opening?.direction === 'advance' ? 'Advance' : 'Overpaid') : 'Outstanding'}
                       </span>
                       <span className="client-stat-value" style={{ color: stats.unpaid > 0.005 ? '#dc2626' : (stats.unpaid < -0.005 ? '#0369a1' : '#059669') }}>
                         {formatCurrency(Math.abs(stats.unpaid))}
@@ -856,6 +905,19 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                         )}
                         {savedClient.email && <span>{savedClient.email}</span>}
                         {savedClient.phone && <span>{savedClient.phone}</span>}
+                      </div>
+                    )}
+                    {/* Divtech Hisaab: the opening balance carried over for this client. */}
+                    {stats.opening && (
+                      <div style={{ padding: '0.65rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.8rem' }}>
+                        <span style={{ fontWeight: 600 }}>Opening balance</span>
+                        <span className="text-muted">as on {parseLocalDate(stats.opening.asOn).toLocaleDateString('en-IN')}</span>
+                        <span>{formatCurrency(stats.opening.amount)} {stats.opening.direction === 'advance' ? 'advance (Cr)' : 'owed (Dr)'}</span>
+                        {stats.opening.direction === 'owed' && (
+                          <span>still open <strong style={{ color: openingDue(stats.opening) > 0.005 ? '#dc2626' : '#059669' }}>{formatCurrency(openingDue(stats.opening))}</strong></span>
+                        )}
+                        <button type="button" className="btn-link" onClick={() => setShowOpenings(true)}
+                          style={{ background: 'none', border: 0, color: 'var(--primary)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', padding: 0 }}>Change</button>
                       </div>
                     )}
                     {clientBills.length === 0 ? (

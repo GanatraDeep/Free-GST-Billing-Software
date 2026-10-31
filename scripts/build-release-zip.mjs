@@ -156,6 +156,8 @@ copyFileSync(join(REPO_ROOT, 'src', 'utils', 'errorReport.js'), join(SYSTEM, 'sr
 copyFileSync(join(REPO_ROOT, 'src', 'utils', 'cashBook.js'), join(SYSTEM, 'src', 'utils', 'cashBook.js'));
 // Supplier payments are checked on save (#123): purchasePayments.js imports
 // purchaseOrders.js, which imports ../utils.js only.
+// Divtech Hisaab - opening balances are checked on save (imports nothing).
+copyFileSync(join(REPO_ROOT, 'src', 'utils', 'openingBalances.js'), join(SYSTEM, 'src', 'utils', 'openingBalances.js'));
 for (const f of ['purchasePayments.js', 'purchaseOrders.js']) {
   copyFileSync(join(REPO_ROOT, 'src', 'utils', f), join(SYSTEM, 'src', 'utils', f));
 }

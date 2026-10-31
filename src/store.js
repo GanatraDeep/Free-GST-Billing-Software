@@ -467,6 +467,15 @@ export const deleteReceipt = async (id) => {
   return apiFetch(`${API}/receipts/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
 
+// ---- Opening balances (Divtech Hisaab) ----
+// Carried over from the previous software. See utils/openingBalances.js.
+export const getAllOpeningBalances = async () => apiFetch(`${API}/opening-balances`);
+export const saveOpeningBalance = async (entry) => {
+  const res = await apiFetch(`${API}/opening-balances`, { method: 'POST', body: JSON.stringify(entry) });
+  return res.entry || { ...entry, id: res.id };
+};
+export const deleteOpeningBalance = async (id) => apiFetch(`${API}/opening-balances/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
 // ---- Business Profiles (multi-business) ----
 export const getAllProfiles = async () => {
   return apiFetch(`${API}/profiles`);
@@ -599,6 +608,7 @@ export const exportAllData = async (selection) => {
   if (sel.products && all.productions) data.productions = all.productions;
   if (sel.expenses)       data.expenses = all.expenses;
   if (sel.expenses)       data.cashBook = all.cashBook; // v1.10.83 - the cash book travels with expenses
+  if (sel.clients)        data.openingBalances = all.openingBalances; // Divtech Hisaab - travel with clients
   if (sel.recurring)      data.recurring = all.recurring;
   if (sel.receipts)       data.receipts = all.receipts;
   if (sel.purchases)      data.purchases = all.purchases;
@@ -649,6 +659,7 @@ export const importData = async (jsonString, selection) => {
   if (sel.profiles && data.profiles)             payload.profiles = data.profiles;
   if (sel.bills && data.bills)                   payload.bills = data.bills;
   if (sel.clients && data.clients)               payload.clients = data.clients;
+  if (sel.clients && data.openingBalances)       payload.openingBalances = data.openingBalances;
   if (sel.termsTemplates && data.termsTemplates) payload.termsTemplates = data.termsTemplates;
   if (sel.products && data.products)             payload.products = data.products;
   if (sel.products && data.productions)          payload.productions = data.productions;

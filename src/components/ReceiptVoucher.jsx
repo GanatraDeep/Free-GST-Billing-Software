@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Receipt, Plus, Trash2, Search, Printer, Pencil } from 'lucide-react';
-import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill } from '../store';
+import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill, getAllOpeningBalances, saveOpeningBalance } from '../store';
+import { OPENING_REF, openingDue, openingFor } from '../utils/openingBalances';
+import { OPENING_EVENT } from './OpeningBalances';
 import { formatCurrency, numberToWords, belongsToProfile, isUnassignedToBusiness, countsAsSales, businessKeyOf, localToday, amountDue, paymentStatusFor, isCancelledBill } from '../utils';
 import UnassignedBanner from './UnassignedBanner';
 import { toast } from './Toast';
@@ -26,6 +28,8 @@ const emptyForm = {
 export default function ReceiptVoucher() {
   const [receipts, setReceipts] = useState([]);
   const [bills, setBills] = useState([]);
+  // Divtech Hisaab - client opening balances, which a receipt can pay off.
+  const [openings, setOpenings] = useState([]);
   const [profile, setProfile] = useState({});
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -39,7 +43,8 @@ export default function ReceiptVoucher() {
 
   const loadData = async () => {
     try {
-      const [recs, bls, prof] = await Promise.all([getAllReceipts(), getAllBills(), getProfile()]);
+      const [recs, bls, prof, obs] = await Promise.all([getAllReceipts(), getAllBills(), getProfile(), getAllOpeningBalances().catch(() => [])]);
+      setOpenings((obs || []).filter(o => o.party === 'client' && belongsToProfile(o, prof)));
       // v1.10.66 (#64 item 2) — receipts belong to one business, like its
       // invoices. Both lists are narrowed: the receipts shown, and the
       // invoices offered in Quick Select and matched by "Against Invoice".
@@ -125,6 +130,27 @@ export default function ReceiptVoucher() {
     }));
   };
 
+  // Divtech Hisaab - "Against Invoice" says Opening balance.
+  const isOpeningRef = (ref) => String(ref || '').trim().toLowerCase() === OPENING_REF.toLowerCase();
+  const selectOpening = (ob) => {
+    setForm(prev => ({ ...prev, clientName: ob.name, amount: String(openingDue(ob)), againstInvoice: OPENING_REF }));
+  };
+  // Put this receipt's payment on (entry) or take it off (null) the client's
+  // opening balance. Fresh copy from the server, so two edits never collide.
+  const syncOpeningPayment = async (clientName, receiptNo, entry) => {
+    const latest = await getAllOpeningBalances();
+    const ob = openingFor((latest || []).filter(o => o.party === 'client' && belongsToProfile(o, profile)), 'client', clientName);
+    if (!ob) return entry ? 'missing' : 'ok';
+    const kept = (ob.payments || []).filter(p => p.receiptNo !== receiptNo);
+    const payments = entry ? [...kept, entry] : kept;
+    if (!entry && kept.length === (ob.payments || []).length) return 'ok';
+    const paid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    if (entry && paid > Number(ob.amount) + 0.005) return 'too-much';
+    await saveOpeningBalance({ ...ob, payments });
+    window.dispatchEvent(new Event(OPENING_EVENT));
+    return 'ok';
+  };
+
   const handleSave = async () => {
     if (!form.clientName.trim()) { toast('Client name required', 'warning'); return; }
     if (!form.amount || parseFloat(form.amount) <= 0) { toast('Enter valid amount', 'warning'); return; }
@@ -189,13 +215,26 @@ export default function ReceiptVoucher() {
           const oldRef = original?.againstInvoice?.trim();
           const newRef = form.againstInvoice?.trim();
           if (oldRef && oldRef !== newRef) {
-            const oldBill = bills.find(b => b.invoiceNumber === oldRef || b.id === oldRef);
-            await stripReceiptFromBill(oldBill);
+            if (isOpeningRef(oldRef)) await syncOpeningPayment(original.clientName, receiptNo, null);
+            else {
+              const oldBill = bills.find(b => b.invoiceNumber === oldRef || b.id === oldRef);
+              await stripReceiptFromBill(oldBill);
+            }
+          } else if (oldRef && isOpeningRef(oldRef) && original.clientName.trim().toLowerCase() !== form.clientName.trim().toLowerCase()) {
+            await syncOpeningPayment(original.clientName, receiptNo, null);
           }
         } catch { /* non-fatal */ }
       }
       let unmatchedRef = '';
-      if (form.againstInvoice && form.againstInvoice.trim()) {
+      if (isOpeningRef(form.againstInvoice)) {
+        const res = await syncOpeningPayment(form.clientName, receiptNo, {
+          id: receipt.id, amount: paidAmount, date: form.date, mode: modeMap[form.paymentMode] || 'other',
+          note: `Receipt ${receiptNo}${form.referenceNo ? ' · ref ' + form.referenceNo : ''}`, receiptNo, receiptId: receipt.id,
+        }).catch(() => 'failed');
+        if (res === 'missing') toast(`${form.clientName} has no opening balance, so this receipt is saved on its own.`, 'info', 7000);
+        else if (res === 'too-much') toast('This is more than the opening balance still open, so it was not counted against it. Check the amount.', 'warning', 8000);
+        else if (res === 'failed') toast('The receipt is saved, but the opening balance could not be updated.', 'warning', 8000);
+      } else if (form.againstInvoice && form.againstInvoice.trim()) {
         try {
           const bill = bills.find(b => b.invoiceNumber === form.againstInvoice.trim() || b.id === form.againstInvoice.trim());
           if (!bill) unmatchedRef = form.againstInvoice.trim(); // v1.10.74 - tell the user below
@@ -233,13 +272,20 @@ export default function ReceiptVoucher() {
   };
 
   const handleDelete = async (id) => {
+    const rcp = receipts.find(r => r.id === id);
+    const onOpening = rcp && isOpeningRef(rcp.againstInvoice);
     if (await confirmAction({
       title: 'Delete this receipt?',
-      message: 'The receipt voucher is removed from your records. The underlying invoice payment (if this was linked to one) stays intact.',
+      message: onOpening
+        ? 'The receipt voucher is removed, and its payment is taken off the client\'s opening balance (which goes back up).'
+        : 'The receipt voucher is removed from your records. The underlying invoice payment (if this was linked to one) stays intact.',
       confirmLabel: 'Delete',
       tone: 'danger',
     })) {
-      try { await deleteReceipt(id); toast('Deleted', 'success'); loadData(); }
+      try {
+        if (onOpening) await syncOpeningPayment(rcp.clientName, rcp.receiptNo, null).catch(() => {});
+        await deleteReceipt(id); toast('Deleted', 'success'); loadData();
+      }
       catch { toast('Failed to delete', 'error'); }
     }
   };
@@ -331,6 +377,26 @@ export default function ReceiptVoucher() {
               <HelpButton title={editingId ? 'Edit Payment Receipt' : 'New Payment Receipt'} doc={editingId ? 'receipts#edit-receipt' : 'receipts#new-receipt'} size={16} />
             </h3>
 
+            {/* Divtech Hisaab - client opening balances still open. */}
+            {!form.againstInvoice && openings.some(o => openingDue(o) > 0.005) && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label className="form-label">Quick Select — Opening Balances<HelpButton title="Receipts against an opening balance" doc="clients#opening-receipts" size={14} /></label>
+                <div className="client-picker" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                  {openings.filter(o => openingDue(o) > 0.005)
+                    .filter(o => !form.clientName.trim() || o.name.toLowerCase().includes(form.clientName.trim().toLowerCase()))
+                    .slice(0, 50).map(o => (
+                      <button key={o.id} className="client-picker-item" onClick={() => selectOpening(o)}>
+                        <div>
+                          <strong>{o.name}</strong>
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Opening balance</span>
+                        </div>
+                        <span style={{ fontWeight: 600 }}>{formatCurrency(openingDue(o))}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+
             {/* Quick select from unpaid invoices */}
             {unpaidBills.length > 0 && !form.againstInvoice && (
               <div style={{ marginBottom: '1rem' }}>
@@ -391,7 +457,8 @@ export default function ReceiptVoucher() {
               </div>
               <div className="form-group">
                 <label className="form-label">Against Invoice</label>
-                <input type="text" className="form-input" value={form.againstInvoice} onChange={e => updateField('againstInvoice', e.target.value)} placeholder="e.g. INV/2025-26/0001" />
+                <input type="text" className="form-input" list="rcp-against" value={form.againstInvoice} onChange={e => updateField('againstInvoice', e.target.value)} placeholder="e.g. INV/2025-26/0001 or Opening balance" />
+                <datalist id="rcp-against"><option value={OPENING_REF} /></datalist>
               </div>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label className="form-label">Note (optional)</label>

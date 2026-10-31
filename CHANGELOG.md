@@ -27,6 +27,13 @@ asked) and double-click **Divtech Hisaab - WINDOWS**. Your data is kept.
 - A short subscription reminder, at most once a day, when there is no key or
   the plan ends within 15 days.
 - The help pages now come with the app and open without the internet.
+- **Opening balances** for clients and suppliers, for moving from Miracle or
+  other software: what each party owed (or had paid in advance) on the day you
+  start. They count in every outstanding figure (client cards, Statement and
+  Aging PDFs, Outstanding & Aging, Party Outstanding, the Dashboard), can be
+  paid off from the Opening balances window or with a receipt, and import from
+  a CSV of closing balances (Dr / Cr understood). Open it from **Clients** or
+  **Purchases → Opening balances**.
 
 ### Changed
 - New name and look: **Divtech Hisaab** by Divtech.

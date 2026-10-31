@@ -6,12 +6,13 @@ import { Wallet } from 'lucide-react';
 import { getFinancialYearStart, belongsToProfile } from '../utils';
 import { getAllPurchases, getProfile } from '../store';
 import { periodMonths, partyOutstanding, supplierOutstanding, billCurrency } from '../utils/partyOutstanding';
+import { openingOutstandingEntries } from '../utils/openingBalances';
 import TableExport from './TableExport';
 import HelpButton from './HelpButton';
 
 const amt = (n) => (n ? n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
 
-export default function PartyOutstandingReport({ bills, businessName }) {
+export default function PartyOutstandingReport({ bills, businessName, openings = [] }) {
   const thisYear = new Date().getFullYear();
   const [mode, setMode] = useState('fy');
   const [year, setYear] = useState(getFinancialYearStart());
@@ -31,7 +32,10 @@ export default function PartyOutstandingReport({ bills, businessName }) {
   const cur = suppliers ? 'INR' : (currencies.includes(currency) ? currency : (currencies[0] || 'INR'));
 
   const months = periodMonths(mode, year);
-  const rows = suppliers ? supplierOutstanding(purchases || [], months) : partyOutstanding(bills, months, cur);
+  // Divtech Hisaab - opening balances count too (in the month they are as on).
+  const rows = suppliers
+    ? supplierOutstanding(purchases || [], months, openingOutstandingEntries(openings, 'supplier'))
+    : partyOutstanding(bills, months, cur, openingOutstandingEntries(openings, 'client'));
   const hasEarlier = rows.some((r) => r.earlier > 0);
   const colTotal = (key) => rows.reduce((s, r) => s + (r.months[key] || 0), 0);
   const earlierTotal = rows.reduce((s, r) => s + r.earlier, 0);
@@ -107,10 +111,10 @@ export default function PartyOutstandingReport({ bills, businessName }) {
       <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0 1.25rem 1rem', margin: 0 }}>
         {suppliers ? (
           <>What you still owe each supplier today, in the month of their bill: the bill total, less TDS you keep back, less the payments recorded on it. A bill marked Paid owes nothing.
-            {hasEarlier && ' "Earlier" is bills from before this period that are still unpaid.'}</>
+            {hasEarlier && ' "Earlier" is bills from before this period that are still unpaid.'} Opening balances count in the month they are as on; an advance paid to a supplier shows as a minus.</>
         ) : (
           <>What each party still owes today, in the month of the invoice. Only sales count; estimates, challans and cancelled invoices are left out, and credit notes are not subtracted (as on Outstanding &amp; Aging).
-            {hasEarlier && ' "Earlier" is invoices from before this period that are still unpaid.'}</>
+            {hasEarlier && ' "Earlier" is invoices from before this period that are still unpaid.'} Opening balances count in the month they are as on; an advance from a client shows as a minus.</>
         )}
       </p>
     </div>

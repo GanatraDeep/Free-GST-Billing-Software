@@ -245,6 +245,46 @@ Sample Studio,,9800000002,hello@sample-studio.example,"12 Sample Street, Kolkata
 <div class="note info"><p><b>Old invoices</b> are imported on the Dashboard, with ${ui('CSV import / export')}: it can add their clients to this list at the same time. See <a href="dashboard.html#csv">Importing and exporting invoices as CSV</a>.</p></div>
 <div class="note tip"><strong>Something wrong?</strong><p>Nothing is read: the file is not a plain CSV, or the headings are not in the first row. An <code>.xlsx</code> file renamed to <code>.csv</code> does not work. See <a href="troubleshooting.html#csv-import">A CSV import did not work</a>.</p><p>An address with a comma in it must be inside double quotes, <code>"12, MG Road"</code>. Excel does this for you when it saves as CSV.</p></div>
 </section>
+
+<section id="opening-balances">
+<h2>Opening balances (moving from Miracle or other software)</h2>
+<p>When you start using Divtech Hisaab, your parties already have balances in your old software. Enter each one once as an <b>opening balance</b>: what the party owed (or had paid in advance) on the day you start here. From then on it is part of their outstanding everywhere: the client card, the Statement and Aging PDFs, <b>Reports → Outstanding &amp; Aging</b>, <b>Reports → Party Outstanding</b> and the Dashboard.</p>
+<ol class="steps">
+  <li><strong>Pick a start date</strong>Usually the last day before you make your first invoice here, for example 31 October. Take the closing balance of every party in your old software as on that date.</li>
+  <li><strong>Open the window</strong>Click ${ui('Opening balances')} on the Clients screen (or on Purchases, for suppliers).</li>
+  <li><strong>Add each balance</strong>${ui('Add')}, then the party name (as on your invoices), the amount, whether it is owed or an advance, and the date. Or import them all at once (below).</li>
+</ol>
+<div class="table-wrap"><table>
+  <tr><th>Tab</th><th>Balance is</th><th>Means</th></tr>
+  <tr><td>Clients</td><td><b>Owes you</b> (Dr)</td><td>The client still has to pay you this.</td></tr>
+  <tr><td>Clients</td><td><b>Advance from them</b> (Cr)</td><td>The client paid you before buying; it lowers what they owe.</td></tr>
+  <tr><td>Suppliers</td><td><b>You owe them</b> (Cr)</td><td>You still have to pay the supplier this.</td></tr>
+  <tr><td>Suppliers</td><td><b>Advance paid to them</b> (Dr)</td><td>You paid the supplier before the goods came.</td></tr>
+</table></div>
+<p>Each party has one opening balance. The list shows the amount, what has been paid against it and what is still open, with the total at the bottom. ${ui('Export')} downloads them all as a CSV.</p>
+
+<h3 id="opening-import">Importing them from a CSV</h3>
+<p>Export a list of party closing balances from your old software (in Miracle, a trial balance or ledger balance list for Sundry Debtors and Sundry Creditors), save it as CSV and click ${ui('Import CSV')} in the Opening balances window. ${ui('Download sample file')} shows the layout:</p>
+<pre><code>Name,Type,Amount,Dr/Cr,As on,Note
+Shree Ram Kirana Stores,Client,45000,Dr,2026-10-31,From Miracle
+Patel Traders,Client,5000,Cr,2026-10-31,Advance received
+Saurashtra Oil Mills,Supplier,320000,Cr,2026-10-31,</code></pre>
+<ul>
+  <li>Only <b>Name</b> and <b>Amount</b> are needed. Headings such as <i>Ledger Name</i>, <i>Closing Balance</i>, <i>Group</i> and <i>Date</i> are understood too.</li>
+  <li><b>Dr</b> is money owed to you, <b>Cr</b> money you owe. Without a Type column, Dr rows become clients and Cr rows suppliers. <code>12,500.00 Dr</code> in the amount column works, and a minus amount means Cr.</li>
+  <li><b>Type</b> can say Client / Customer / Sundry Debtors, or Supplier / Creditor / Sundry Creditors.</li>
+  <li>Rows without a date get the date shown in the import window. Dates like 31/10/2026 or 2026-10-31 both work.</li>
+  <li>Rows with a zero balance are skipped, and so are parties that already have an opening balance, so importing the same file twice is safe.</li>
+</ul>
+
+<h3 id="opening-payments">Payments against an opening balance</h3>
+<p>Click ${ui('Received')} (clients) or ${ui('Paid')} (suppliers) on a row, enter the amount, date and mode, and save. The balance goes down; once it reaches zero it shows <b>Settled</b>. To undo one, open the row with the pencil and click <b>remove</b> next to the payment.</p>
+</section>
+
+<section id="opening-receipts">
+<h3>A receipt against an opening balance</h3>
+<p>To give the client a printed receipt, record the payment in <b>Receipts</b> instead. Under <b>Quick Select — Opening Balances</b>, click the client, or type <code>Opening balance</code> in <b>Against Invoice</b>. The receipt reduces the client&apos;s opening balance. Editing the receipt updates it, and deleting the receipt puts the amount back on the balance.</p>
+</section>
 `,
 },
 ];

@@ -39,7 +39,9 @@ function byParty(entries, months) {
   const rows = new Map();
   for (const { name: rawName, date, due } of entries) {
     const ym = String(date || '').slice(0, 7);
-    if (!(due > 0) || !ym || ym > last) continue;
+    // Divtech Hisaab: an opening advance is a minus (credit), so any non-zero
+    // amount counts; bills only ever give more than 0.
+    if (!due || Math.abs(due) < 0.005 || !ym || ym > last) continue;
     const name = String(rawName || '').trim() || 'Unknown';
     const id = name.toLowerCase();
     const row = rows.get(id) || { name, earlier: 0, months: {}, total: 0 };
@@ -51,15 +53,18 @@ function byParty(entries, months) {
   return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// What clients owe you.
-export function partyOutstanding(bills, months, currency = 'INR') {
-  return byParty(bills
+// What clients owe you. `opening`: opening-balance rows ({ name, date, due },
+// see openingOutstandingEntries), rupees only.
+export function partyOutstanding(bills, months, currency = 'INR', opening = []) {
+  const fromBills = bills
     .filter((b) => countsAsSales(b) && b.status !== 'paid' && billCurrency(b) === currency)
     // Less TDS the client deducts (they pay Net Receivable), as everywhere else.
-    .map((b) => ({ name: b.clientName, date: b.invoiceDate, due: Math.round((amountDue(b) - (Number(b.paidAmount) || 0)) * 100) / 100 })), months);
+    .map((b) => ({ name: b.clientName, date: b.invoiceDate, due: Math.round((amountDue(b) - (Number(b.paidAmount) || 0)) * 100) / 100 }))
+    .filter((e) => e.due > 0);
+  return byParty(currency === 'INR' ? [...opening, ...fromBills] : fromBills, months);
 }
 
 // v1.10.83 (#123) - what you owe suppliers: the balance of each purchase bill
 // (total less TDS less payments), in the month of the bill. Rupees only.
-export const supplierOutstanding = (purchases, months) =>
-  byParty(purchases.map((p) => ({ name: p.supplierName, date: p.date, due: purchaseBalance(p) })), months);
+export const supplierOutstanding = (purchases, months, opening = []) =>
+  byParty([...opening, ...purchases.map((p) => ({ name: p.supplierName, date: p.date, due: purchaseBalance(p) })).filter((e) => e.due > 0)], months);

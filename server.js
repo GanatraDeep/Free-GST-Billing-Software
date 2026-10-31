@@ -16,6 +16,8 @@ import { fileURLToPath } from 'url';
 import { redact } from './src/utils/errorReport.js';
 import { validateCashEntry, cleanCashEntry } from './src/utils/cashBook.js';
 import { validatePurchasePayments } from './src/utils/purchasePayments.js';
+// Divtech Hisaab - opening balances carried over from the previous software.
+import { validateOpening, cleanOpening } from './src/utils/openingBalances.js';
 // Divtech Hisaab - subscription license (updates only; the app always works).
 import { licenseStatus, licenseAllowsRelease, subscriptionMessage, verifyLicenseKey, writeLicenseKey, normaliseKey } from './license.js';
 import { templateTotals, clientYearToDate, nextCounterValue, startFor, numberSeriesFor, counterKeyFor, formatDocNumber, businessKeyOf, getFinancialYearLabel, INVOICE_TYPES } from './src/utils.js';
@@ -96,7 +98,7 @@ app.use((req, res, next) => {
 });
 
 // Ensure data directory and sub-directories exist
-const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book'];
+const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book', 'opening-balances'];
 // v1.10.83 - a data folder the app may not write to (inside Program Files, a
 // read-only drive, antivirus "controlled folder access") or a full disk used
 // to crash here with a raw stack trace the launcher never showed. Say it in
@@ -623,6 +625,41 @@ app.delete('/api/receipts/:id', (req, res) => {
 });
 
 // ========================
+// OPENING BALANCES (Divtech Hisaab)
+// What each client / supplier owed, or had paid in advance, when the books
+// started in this app. Checked with the same rules as the screen.
+// ========================
+app.get('/api/opening-balances', (req, res) => {
+  const list = readAllFromDir('opening-balances');
+  list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  res.json(list);
+});
+
+app.post('/api/opening-balances', (req, res) => {
+  const problem = validateOpening(req.body);
+  if (problem) return res.status(400).json({ error: problem, code: 'bad-request' });
+  const entry = cleanOpening(req.body);
+  const now = new Date().toISOString();
+  if (!entry.id) { entry.id = 'ob_' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex'); entry.createdAt = now; }
+  entry.updatedAt = now;
+  const dir = path.join(DATA_DIR, 'opening-balances');
+  const filePath = path.join(dir, safeFileName(entry.id) + '.json');
+  if (!isPathInside(filePath, dir)) return errRes(res, 400, 'invalid-path');
+  try {
+    writeJSON(filePath, entry);
+    res.json({ success: true, id: entry.id, entry });
+  } catch (err) {
+    errRes(res, 500, 'server-error', err);
+  }
+});
+
+app.delete('/api/opening-balances/:id', (req, res) => {
+  const filePath = path.join(DATA_DIR, 'opening-balances', safeFileName(req.params.id) + '.json');
+  deleteFile(filePath);
+  res.json({ success: true });
+});
+
+// ========================
 // PURCHASES (Purchase Bills for ITC)
 // ========================
 app.get('/api/purchases', (req, res) => {
@@ -886,6 +923,7 @@ app.get('/api/export', (req, res) => {
     productions: readAllFromDir('productions'), // v1.10.83 (#115)
     purchaseOrders: readAllFromDir('purchase-orders'),
     cashBook: readAllFromDir('cash-book'),
+    openingBalances: readAllFromDir('opening-balances'),
     // v1.10.77 - never the PIN hash: a backup file can travel (email, Drive).
     meta: withoutLock(readJSON(META_PATH, {})),
     exportedAt: new Date().toISOString(),
@@ -920,6 +958,7 @@ app.post('/api/import', (req, res) => {
     productionCount: 0, productionSkipped: 0,
     purchaseOrderCount: 0, purchaseOrderSkipped: 0,
     cashBookCount: 0, cashBookSkipped: 0,
+    openingCount: 0, openingSkipped: 0,
   };
 
   // Helper: upsert one entity to a directory, honouring the overwrite flag.
@@ -952,6 +991,8 @@ app.post('/api/import', (req, res) => {
   (data.purchaseOrders || []).forEach(p => upsertOne('purchase-orders', p, 'purchaseOrderCount', 'purchaseOrderSkipped'));
   // v1.10.83 - a cash entry that fails the form's checks is skipped, not saved.
   (data.cashBook || []).forEach(c => { if (validateCashEntry(c)) counts.cashBookSkipped++; else upsertOne('cash-book', cleanCashEntry(c), 'cashBookCount', 'cashBookSkipped'); });
+  // Divtech Hisaab - opening balances that fail the screen's checks are skipped.
+  (data.openingBalances || []).forEach(o => { if (!o?.id || validateOpening(o)) counts.openingSkipped++; else upsertOne('opening-balances', cleanOpening(o), 'openingCount', 'openingSkipped'); });
 
   // meta.json — same gating. Previously always overwrote → counters could
   // regress below existing bill numbers → collision loop on next save.
