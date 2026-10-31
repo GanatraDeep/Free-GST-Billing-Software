@@ -37,6 +37,10 @@ Releases page and run it; it installs over your copy and keeps your data.
 - Depreciation worked out on the written-down value (half rate on additions
   used under 180 days) and saved as a journal voucher.
 - Ledgers list every account, including CC, loans, assets and expense heads.
+- **GST Returns → Whole period (Excel)**: GSTR-1 and GSTR-3B of the month (or
+  quarter / year) in one Excel file, one sheet per table, with a sales
+  register, purchase register and expenses with GST. **Excel (all tables)** on
+  each tab gives one return on its own.
 
 ### Changed
 - GST on purchases from an unregistered dealer (URD) is counted in the cost of
@@ -79,10 +83,6 @@ Releases page and run it; it installs over your copy and keeps your data.
   purchases and expenses. **Ledger** buttons on clients, suppliers and products.
 - Units **Tin**, **Drum**, **Carton** and **Quintal**, and **+ New unit** in
   the product form.
-- **GST Returns → Whole period (Excel)**: GSTR-1 and GSTR-3B of the month (or
-  quarter / year) in one Excel file, one sheet per table, with a sales
-  register, purchase register and expenses with GST. **Excel (all tables)** on
-  each tab gives one return on its own.
 
 ### Fixed
 - **Profit & Loss** now subtracts the **cost of goods sold** (items sold at
