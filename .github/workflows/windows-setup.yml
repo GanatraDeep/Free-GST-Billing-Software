@@ -1,0 +1,103 @@
+# Divtech Hisaab - builds Divtech-Hisaab-Setup.exe from the release ZIP (the
+# "release-zip" artifact of the calling run), installs it on this Windows
+# machine and checks the app starts. With publish: true it is added to the
+# GitHub release of the tag that started the run.
+#
+# A normal Windows installer with Node.js inside and a compiled launcher, so
+# installing and opening the app runs no PowerShell script (antivirus programs
+# such as Bitdefender block those).
+name: Windows setup
+
+on:
+  workflow_call:
+    inputs:
+      publish:
+        type: boolean
+        default: false
+
+jobs:
+  setup:
+    runs-on: windows-latest
+    env:
+      NODE_WIN: v20.19.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zip
+          path: dl
+
+      - name: Unpack the release and add Node.js
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Expand-Archive dl\Divtech-Hisaab.zip -DestinationPath stage
+          $sys = 'stage\Divtech-Hisaab\_system'
+          if (-not (Test-Path "$sys\server.js")) { throw 'server.js is not in the release ZIP' }
+          Invoke-WebRequest "https://nodejs.org/dist/$env:NODE_WIN/node-$env:NODE_WIN-win-x64.zip" -OutFile node.zip
+          Expand-Archive node.zip -DestinationPath nodetmp
+          New-Item -ItemType Directory -Force "$sys\node" | Out-Null
+          Copy-Item "nodetmp\node-$env:NODE_WIN-win-x64\node.exe" "$sys\node\node.exe"
+          & "$sys\node\node.exe" -v
+
+      - name: Build the launcher (Divtech Hisaab.exe)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $csc /nologo /target:winexe /optimize+ "/win32icon:stage\Divtech-Hisaab\_system\app-icon.ico" `
+            /r:System.Windows.Forms.dll "/out:stage\Divtech Hisaab.exe" installer\launcher\DivtechHisaab.cs
+          if ($LASTEXITCODE -ne 0) { throw 'csc failed' }
+
+      - name: Build Divtech-Hisaab-Setup.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $v = node -p "require('./package.json').version"
+          $src = (Resolve-Path 'stage\Divtech-Hisaab').Path
+          $exe = (Resolve-Path 'stage\Divtech Hisaab.exe').Path
+          & $iscc /Q "/DAppVersion=$v" "/DSourceDir=$src" "/DLauncherExe=$exe" installer\divtech-hisaab.iss
+          if ($LASTEXITCODE -ne 0) { throw 'ISCC failed' }
+          Copy-Item "release-build\Divtech-Hisaab-Setup-v$v.exe" release-build\Divtech-Hisaab-Setup.exe
+
+      - name: Install it and check the app starts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dir = 'C:\DH Test'
+          $p = Start-Process release-build\Divtech-Hisaab-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$dir" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Setup exited with $($p.ExitCode)" }
+          foreach ($f in @("$dir\Divtech Hisaab.exe", "$dir\_system\server.js", "$dir\_system\node\node.exe", "$dir\_system\installed-by-setup.txt")) {
+            if (-not (Test-Path -LiteralPath $f)) { throw "Missing after install: $f" }
+          }
+          Start-Process -FilePath "$dir\Divtech Hisaab.exe"
+          $ok = $false
+          for ($i = 0; $i -lt 60 -and -not $ok; $i++) {
+            Start-Sleep -Seconds 2
+            try {
+              $port = if (Test-Path "$dir\_system\data\port.txt") { (Get-Content "$dir\_system\data\port.txt").Trim() } else { 47371 }
+              $h = Invoke-RestMethod "http://127.0.0.1:$port/api/health" -TimeoutSec 3
+              $ok = $h.ok -eq $true
+            } catch { }
+          }
+          if (-not $ok) { throw 'The installed app did not start' }
+          Write-Host 'Installed app answered /api/health'
+          Get-Process node, msedge -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-setup
+          path: release-build/Divtech-Hisaab-Setup.exe
+          retention-days: 7
+
+      - name: Upload to the release
+        if: inputs.publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = node -p "require('./package.json').version"
+          gh release upload $env:GITHUB_REF_NAME "release-build\Divtech-Hisaab-Setup-v$v.exe" release-build\Divtech-Hisaab-Setup.exe --clobber

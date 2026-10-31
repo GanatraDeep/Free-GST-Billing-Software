@@ -1,0 +1,48 @@
+# Divtech Hisaab - on every push that touches the installer or the app's start
+# and update code: build the release ZIP and Divtech-Hisaab-Setup.exe, install
+# it on Windows and check the app starts. Nothing is published.
+name: Setup check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'installer/**'
+      - 'server.js'
+      - 'scripts/build-release-zip.mjs'
+      - '.github/workflows/windows-setup.yml'
+      - '.github/workflows/setup-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Tools for the ZIP
+        run: sudo apt-get update && sudo apt-get install -y zip unzip
+      - run: npm ci
+      - name: Build and package (no smoke tests here)
+        run: |
+          npm run build
+          node scripts/build-release-zip.mjs
+          V=$(node -p "require('./package.json').version")
+          cp "release-build/Divtech-Hisaab-v$V.zip" release-build/Divtech-Hisaab.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: release-build/Divtech-Hisaab.zip
+          retention-days: 3
+
+  windows-setup:
+    needs: zip
+    uses: ./.github/workflows/windows-setup.yml
+    with:
+      publish: false

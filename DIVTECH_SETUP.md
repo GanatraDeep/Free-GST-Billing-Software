@@ -34,8 +34,8 @@ git push origin v1.11.0
 ```
 
 GitHub Actions (the **Actions** tab on GitHub) builds the setup and publishes
-it under **Releases** in about 5 to 10 minutes. Download
-**`Divtech-Hisaab.zip`** from there.
+it under **Releases** in about 15 minutes. Download
+**`Divtech-Hisaab-Setup.exe`** from there (the ZIP is there too).
 
 For each later update: change `version` in `package.json` and
 `docs-site/site.mjs`, add an entry at the top of `CHANGELOG.md`, commit, push,
@@ -44,20 +44,21 @@ update in the app.
 
 ## 3. Install at the shop PC (Windows 10 / 11)
 
-1. Copy `Divtech-Hisaab.zip` to the shop PC (pen drive, WhatsApp Web, email).
-2. Right-click the ZIP → **Extract All…** and extract to a permanent place,
-   for example `C:\Divtech Hisaab` or `D:\Divtech Hisaab`. **Not** Downloads
-   or the Desktop: the app runs from wherever it is extracted.
-3. Open the extracted `Divtech-Hisaab` folder and double-click
-   **Divtech Hisaab - WINDOWS**.
-4. If Windows says **"Windows protected your PC"**: click **More info**, then
-   **Run anyway** (the app is not code-signed; this is expected).
-5. Click **Install**. A black window works for 1 to 3 minutes; leave it.
-   The PC needs internet the first time if Node.js is not installed yet.
-6. The app opens. A **Divtech Hisaab** icon is now on the Desktop and in the
-   Start menu; use that every day.
-7. Fill in the business details in the welcome screens (name, GSTIN, address,
-   state, bank / UPI).
+Use **Divtech-Hisaab-Setup.exe** from the release (the ZIP is for Mac / Linux,
+or as a fallback).
+
+1. Copy `Divtech-Hisaab-Setup.exe` to the shop PC and double-click it.
+2. If Windows says **"Windows protected your PC"**: **More info → Run anyway**
+   (the installer is not code-signed yet).
+3. Choose the folder (any drive, for example `D:\Divtech Hisaab`) and click
+   **Install**. No administrator rights and no internet are needed.
+4. Tick **Open Divtech Hisaab** and click **Finish**. The **Divtech Hisaab**
+   icon is now on the Desktop and in the Start menu.
+5. Fill in the business details in the welcome screens.
+
+If an antivirus still stops it, add the install folder to its exceptions and
+run the Setup again. To remove the app: Windows Settings → Apps → Installed
+apps → Divtech Hisaab (the data folder `_system\data` is kept).
 
 ## 4. Activate the subscription
 

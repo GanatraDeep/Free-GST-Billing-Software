@@ -1472,6 +1472,45 @@ import { spawn } from 'child_process';
 import os from 'os';
 
 const isWindows = process.platform === 'win32';
+// Divtech Hisaab - a copy installed with Divtech-Hisaab-Setup.exe (Windows).
+// It starts, stops, restarts and updates without PowerShell scripts, which
+// antivirus programs (Bitdefender) block. The installer writes this file.
+const SETUP_INSTALL = isWindows && fs.existsSync(path.join(__dirname, 'installed-by-setup.txt'));
+const RELEASES_API = 'https://api.github.com/repos/GanatraDeep/free-gst-billing-software/releases/latest';
+
+// Update a Setup install: download the newest Divtech-Hisaab-Setup.exe and run
+// it silently. It closes this app, installs over it (data is kept) and opens
+// the app again. The subscription must cover the release, as for the ZIP.
+async function updateViaSetup() {
+  const agent = { 'User-Agent': 'DivtechHisaab-Updater' };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120000);
+  try {
+    const r = await fetch(RELEASES_API, { signal: ctrl.signal, headers: { ...agent, Accept: 'application/vnd.github+json' } });
+    if (!r.ok) return { ok: false, error: `Could not check for the update (GitHub answered ${r.status}). Try again later.` };
+    const info = await r.json();
+    const latest = String(info.tag_name || '').replace(/^v/, '');
+    if (!/^\d+\.\d+\.\d+$/.test(latest) || compareSemver(latest, pkg.version) <= 0) {
+      return { ok: false, error: `You already have the newest version (${pkg.version}).` };
+    }
+    const license = licenseStatus(DATA_DIR);
+    if (!licenseAllowsRelease(license, info.published_at)) return { ok: false, subscriptionRequired: true, error: subscriptionMessage(license) };
+    const asset = (info.assets || []).find((a) => /^Divtech-Hisaab-Setup.*\.exe$/i.test(a.name));
+    if (!asset) return { ok: false, error: `Version ${latest} has no installer yet. Try again in a few minutes.` };
+    const dl = await fetch(asset.browser_download_url, { signal: ctrl.signal, headers: agent });
+    if (!dl.ok) return { ok: false, error: `The download failed (${dl.status}). Nothing was changed.` };
+    const buf = Buffer.from(await dl.arrayBuffer());
+    if (asset.size && buf.length !== asset.size) return { ok: false, error: 'The download was incomplete. Nothing was changed; try again.' };
+    const file = path.join(os.tmpdir(), `Divtech-Hisaab-Setup-v${latest}.exe`);
+    fs.writeFileSync(file, buf);
+    spawn(file, ['/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS'], { detached: true, stdio: 'ignore' }).unref();
+    return { ok: true, restarting: true, stdout: `Installing version ${latest}. The app closes and opens again by itself in about a minute.` };
+  } catch (e) {
+    return { ok: false, error: e.name === 'AbortError' ? 'The update took too long. Check the internet and try again; nothing was changed.' : `The update could not be downloaded: ${e.message}` };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 const isMac = process.platform === 'darwin';
 
 // Where the launcher scripts live. In a release-ZIP install the app
@@ -1510,7 +1549,7 @@ const CONTROL_ACTIONS = ['update', 'backup', 'restore', 'move', 'stop'];
 // v1.10.83 - Stop works everywhere: on macOS / Linux there is no stop script,
 // so the server stops itself (see launch-script below). The Mac and Linux
 // guides tell people to use it.
-const controlActions = () => Object.fromEntries(CONTROL_ACTIONS.map(a => [a, a === 'stop' && !isWindows ? true : !!pickScript(a)]));
+const controlActions = () => Object.fromEntries(CONTROL_ACTIONS.map(a => [a, (a === 'stop' && (!isWindows || SETUP_INSTALL)) || (a === 'update' && SETUP_INSTALL) ? true : !!pickScript(a)]));
 
 function runControlScript(scriptPath) {
   return new Promise((resolve) => {
@@ -1606,7 +1645,7 @@ app.post('/api/control-panel/launch-script', async (req, res) => {
   const allowed = new Set(['update', 'restore', 'move', 'stop']);
   const action = String(req.body?.action || '');
   if (!allowed.has(action)) { res.status(400).json({ ok: false, error: 'Unknown action' }); return; }
-  if (action === 'stop' && !isWindows) {
+  if (action === 'stop' && (!isWindows || SETUP_INSTALL)) {
     // Answer first, then exit, so the page can say it stopped.
     res.json({ ok: true, stdout: 'Stopped. Open the app again from its icon or launcher.' });
     setTimeout(() => process.exit(0), 400);
@@ -1618,6 +1657,12 @@ app.post('/api/control-panel/launch-script', async (req, res) => {
     const license = licenseStatus(DATA_DIR);
     if (license.state !== 'active' && license.state !== 'expired') {
       res.json({ ok: false, subscriptionRequired: true, error: subscriptionMessage(license) });
+      return;
+    }
+    if (SETUP_INSTALL) {
+      const result = await updateViaSetup();
+      res.json(result);
+      if (result.ok) setTimeout(() => process.exit(0), 2500);
       return;
     }
   }
@@ -1633,7 +1678,7 @@ app.post('/api/control-panel/launch-script', async (req, res) => {
 app.post('/api/control-panel/restart', (req, res) => {
   const serverJs = path.join(__dirname, 'server.js');
   try {
-    if (isWindows) {
+    if (isWindows && !SETUP_INSTALL) {
       const q = (v) => `'${String(v).replace(/'/g, "''")}'`;
       const cmd = `"${process.execPath}" "${serverJs}" --after-pid ${process.pid}`;
       const ps = `$si = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }; `
@@ -1648,7 +1693,7 @@ app.post('/api/control-panel/restart', (req, res) => {
         setTimeout(() => process.exit(0), 400);
       });
     } else {
-      spawn(process.execPath, [serverJs, '--after-pid', String(process.pid)], { cwd: __dirname, detached: true, stdio: 'ignore' }).unref();
+      spawn(process.execPath, [serverJs, '--after-pid', String(process.pid)], { cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true }).unref();
       res.json({ ok: true });
       setTimeout(() => process.exit(0), 400);
     }
@@ -1663,6 +1708,17 @@ app.post('/api/control-panel/restart', (req, res) => {
 app.post('/api/control-panel/uninstall', async (req, res) => {
   const { data, pdfs, backups, confirm } = req.body || {};
   if (confirm !== 'REMOVE') { res.status(400).json({ ok: false, error: 'Not confirmed' }); return; }
+  // Divtech Hisaab - a Setup install is removed by its own uninstaller (also in
+  // Windows Settings > Apps). It keeps the data folder; ticked items are
+  // left for the user to delete, as the message says.
+  if (SETUP_INSTALL) {
+    const unins = path.join(path.dirname(__dirname), 'unins000.exe');
+    if (!fs.existsSync(unins)) { res.json({ ok: false, error: 'Remove it from Windows Settings > Apps > Installed apps > Divtech Hisaab.' }); return; }
+    spawn(unins, [], { detached: true, stdio: 'ignore' }).unref();
+    res.json({ ok: true, note: `The Windows uninstaller is open. Your data stays in ${DATA_DIR}${data || pdfs || backups ? '; delete that folder yourself if you no longer need it' : ''}.` });
+    setTimeout(() => process.exit(0), 1500);
+    return;
+  }
   const script = pickScript('uninstall');
   if (path.basename(__dirname) !== '_system' || !script) {
     res.json({ ok: false, error: 'Remove works only in the installed app (the folder with _system in it).' });

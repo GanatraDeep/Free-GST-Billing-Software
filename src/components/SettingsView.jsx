@@ -175,7 +175,7 @@ export default function SettingsView({ onSaved }) {
     const result = await runUpdateNow();
     setUpdatingNow(false);
     if (result.subscriptionRequired) { toast(result.error, 'warning', 12000); return; }
-    toast(result.ok ? 'Update finished. Reload the page to use the new version.' : `Update failed — ${result.error}`,
+    toast(result.ok ? (result.restarting ? result.message : 'Update finished. Reload the page to use the new version.') : `Update failed — ${result.error}`,
       result.ok ? 'success' : 'error', 10000);
   };
   const [regionMode, setRegionModeState] = useState(getRegionMode());

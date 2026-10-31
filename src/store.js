@@ -628,7 +628,8 @@ export const runUpdateNow = async () => {
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, subscriptionRequired: !!data.subscriptionRequired, error: data.error || data.stderr || 'The update script did not finish.' };
-    return { ok: true };
+    // Divtech Hisaab - a Setup install closes, updates and reopens by itself.
+    return { ok: true, restarting: !!data.restarting, message: data.stdout || '' };
   } catch (e) {
     return { ok: false, error: e.message };
   }

@@ -49,3 +49,20 @@ jobs:
             release-build/Divtech-Hisaab.zip \
             --title "Divtech Hisaab v$V" \
             --notes-file release-notes.md
+
+      # The Windows job below turns this ZIP into Divtech-Hisaab-Setup.exe.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: release-build/Divtech-Hisaab.zip
+          retention-days: 3
+
+  # Divtech-Hisaab-Setup.exe (see windows-setup.yml): built, installed and
+  # checked on Windows, then added to the release.
+  windows-setup:
+    needs: release
+    uses: ./.github/workflows/windows-setup.yml
+    with:
+      publish: true
+    permissions:
+      contents: write

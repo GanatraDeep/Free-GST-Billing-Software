@@ -4,6 +4,33 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.11.2] - 2026-10-31
+
+### How to update
+
+**Current version:** 1.11.1  →  **New version:** 1.11.2
+
+1. Open the app and click **Update to v1.11.2** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. Wait about a minute, then reload the page.
+
+New installs on Windows: use **Divtech-Hisaab-Setup.exe** instead of
+`Divtech-Hisaab.zip`. If the button does not work, ask Divtech for
+`Divtech-Hisaab.zip`, close the app, extract the ZIP over your Divtech Hisaab
+folder (replace files when asked) and double-click **Divtech Hisaab - WINDOWS**.
+
+### Added
+- **Divtech-Hisaab-Setup.exe**: a normal Windows installer. Choose any folder
+  or drive, no administrator rights, Node.js included (nothing is downloaded).
+  The Desktop and Start-menu icons open **Divtech Hisaab.exe**, which starts
+  the app directly. Installing, opening and updating no longer run PowerShell
+  scripts, which antivirus programs such as Bitdefender blocked.
+- Updates of a Setup install download the new Setup and run it; the app
+  closes and opens again by itself. Remove it from Windows Settings → Apps;
+  your data folder is kept.
+
+---
+
 ## [1.11.1] - 2026-10-31
 
 ### How to update

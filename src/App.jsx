@@ -322,7 +322,7 @@ function App() {
     }
     if (result.ok) {
       setShowUpdateModal(false);
-      toast('Update finished. Reload the page to use the new version.', 'success', 10000);
+      toast(result.restarting ? result.message : 'Update finished. Reload the page to use the new version.', 'success', 15000);
     } else {
       toast(`Update failed — ${result.error}`, 'error', 10000);
     }
