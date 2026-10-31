@@ -2,8 +2,11 @@
 import {
   ledgerView, clientLedger, supplierLedger, gstLedger, salesLedger, purchasesLedger, moneyLedger,
   itemLedger, costOfGoodsSold, buildLedger, ledgerCatalog, side, isUrdPurchase,
+  postings, trialBalance, profitAndLoss, balanceSheet, stockValue,
 } from '../src/utils/ledgers.js';
 import { sheetNames, buildWorkbook } from '../src/utils/xlsx.js';
+import { caPackSheets } from '../src/utils/caPack.js';
+import { voucherProblem, nextVoucherNumber, depreciation, accountProblem } from '../src/utils/vouchers.js';
 import { unzipSync, strFromU8 } from 'fflate';
 import { typesList, typeProblem, defaultType, needsReceipt, typeRef, cleanType } from '../src/utils/docTypes.js';
 
@@ -78,7 +81,7 @@ eq(ledgerView(gstLedger('igst', data)).rows.length, 0, 'No IGST lines on intra-s
 
 console.log('\n[Ledgers] sales and purchases without GST');
 eq(ledgerView(salesLedger(data)).closing, -6050, 'Sales 4,800 + 2,500 - credit note 1,250 = 6,050 Cr; quotation left out');
-eq(ledgerView(purchasesLedger(data)).closing, 20500, 'Purchases 20,000 + URD 500 = 20,500 Dr');
+eq(ledgerView(purchasesLedger(data)).closing, 20525, 'Purchases 20,000 + URD 500 with its 25 GST (not claimed, so it is cost) = 20,525 Dr');
 
 console.log('\n[Ledgers] cash and bank');
 const cash = ledgerView(moneyLedger('cash', data));
@@ -113,6 +116,61 @@ eq(cat.find((g) => g.group === 'Customers').items.map((i) => i.name), ['Patel Ki
 eq(buildLedger('item:p1', data).kind, 'item', 'Item ledger by id');
 eq(buildLedger('client:Patel Kirana', data).entries.length, 2, 'Customer ledger by id');
 eq(buildLedger('nonsense', data), null, 'Unknown id: none');
+
+console.log('\n[Double entry and final accounts]');
+const books = {
+  ...data,
+  accounts: [
+    { id: 'cap', name: 'Ramesh Ganatra capital', group: 'capital', opening: 100000, openingSide: 'Cr', asOn: '2026-10-31' },
+    { id: 'cc', name: 'SBI CC account', group: 'cc', opening: 200000, openingSide: 'Cr', asOn: '2026-10-31', limit: 500000 },
+    { id: 'shop', name: 'Shop furniture', group: 'fixed-assets', opening: 50000, openingSide: 'Dr', asOn: '2026-10-31' },
+    { id: 'loan', name: 'Loan to Suresh', group: 'loans-advances', opening: 0, openingSide: 'Dr' },
+  ],
+  vouchers: [
+    { id: 'v1', type: 'journal', date: '2026-11-30', number: 'JV/1', narration: 'CC interest for November', lines: [{ account: 'expense:Interest', dr: 1500, cr: 0 }, { account: 'acc:cc', dr: 0, cr: 1500 }] },
+    { id: 'v2', type: 'payment', date: '2026-11-10', number: 'PV/1', narration: 'Loan given', lines: [{ account: 'acc:loan', dr: 5000, cr: 0 }, { account: 'bank', dr: 0, cr: 5000 }] },
+  ],
+  expenses: [{ id: 'x1', date: '2026-11-15', category: 'Rent', amount: 1180, gstAmount: 180, paymentMode: 'cash' }],
+  cashEntries: [...data.cashEntries, { id: 'e2', type: 'out', date: '2026-11-20', amount: 700, category: 'Owner drawing' }, { id: 'e3', type: 'in', date: '2026-10-31', amount: 20000, category: 'Opening balance' }],
+};
+{
+  const all = postings(books);
+  const byDoc = {};
+  for (const p of all) byDoc[p.doc] = Math.round(((byDoc[p.doc] || 0) + p.dr - p.cr) * 100) / 100;
+  eq(Object.entries(byDoc).filter(([, v]) => Math.abs(v) > 0.005), [], 'Every document posts as much debit as credit');
+  const tb = trialBalance(books, { from: '2026-04-01', to: '2027-03-31' });
+  eq([tb.difference, tb.dr > 0], [0, true], 'Trial balance agrees');
+  eq(tb.closingStock, 15000, 'Closing stock 7.5 tins at 2,000');
+  const pl = profitAndLoss(books, { from: '2026-04-01', to: '2027-03-31' });
+  eq(pl.grossProfit, 525, 'Gross profit: sales 6,050 + closing stock 15,000 - purchases 20,525');
+  eq(pl.netProfit, 525 - 1500 - 1000, 'Net profit: less CC interest 1,500 and rent 1,000 (its GST is credit)');
+  const bs = balanceSheet(books, { from: '2026-04-01', to: '2027-03-31' });
+  eq(bs.difference, 0, 'Balance sheet agrees');
+  const ccLine = bs.liabilities.find((g) => g.group === 'cc');
+  eq(ccLine?.total, 201500, 'CC account: 2,00,000 drawn + 1,500 interest');
+  eq(bs.assets.find((g) => g.group === 'loans-advances')?.items.find((i) => i.id === 'acc:loan')?.amount, 5000, 'Loan given shows as an asset');
+  const half = trialBalance(books, { from: '2026-11-16', to: '2027-03-31' });
+  eq(half.difference, 0, 'A trial balance from mid-year agrees too (earlier profit carried in one line)');
+  eq(balanceSheet(books, { from: '2026-11-16', to: '2027-03-31' }).totalAssets, bs.totalAssets, 'The balance sheet on a date does not depend on where the period starts');
+  eq(buildLedger('acc:cc', books).entries.length, 2, 'CC ledger: opening and interest');
+  eq(stockValue(books, '2026-11-02').total, 20000, 'Stock on 2 Nov: the 10 tins bought');
+}
+
+console.log('\n[CA pack and vouchers]');
+{
+  const pack = caPackSheets(books, { from: '2026-04-01', to: '2027-03-31', title: 'FY 2026-27' });
+  const names = pack.map((p) => p.name);
+  eq(names.slice(0, 4), ['Summary', 'Trial balance', 'Profit and loss', 'Balance sheet'], 'CA pack starts with the summary and the three statements');
+  eq(['Day book', 'Cash book', 'Bank book', 'Customer ledgers', 'Supplier ledgers', 'Other ledgers', 'Debtors', 'Creditors', 'Stock summary', 'Stock register', 'Sales register', 'Purchase register', 'Expense register', 'Receipts', 'Vouchers'].every((n) => names.includes(n)), true, 'and has every book, ledger and register');
+  eq(pack[0].rows.find((r) => r[0] === 'Trial balance agrees')[1], 'Yes', 'The summary says the trial balance agrees');
+  const file = buildWorkbook(pack);
+  eq(file.length > 1000, true, 'It builds into one Excel file');
+  eq(voucherProblem({ type: 'journal', date: '2026-11-01', lines: [{ account: 'cash', dr: 10 }, { account: 'bank', cr: 9 }] }).startsWith('Debits'), true, 'An unbalanced journal is refused');
+  eq(voucherProblem({ type: 'payment', date: '2026-11-01', lines: [{ account: 'acc:x', dr: 10 }, { account: 'cash', cr: 10 }] }), '', 'A balanced payment is fine');
+  eq(nextVoucherNumber([{ number: 'JV/26-27/0007' }, { number: 'PV/26-27/0009' }], 'journal', '2026-27'), 'JV/26-27/0008', 'Voucher numbers run per type and year');
+  eq(depreciation({ openingWdv: 50000, additions: [{ date: '2026-12-01', amount: 20000 }], rate: 10, fyEnd: '2027-03-31' }), 6000, 'Depreciation: 10% on 50,000 + half rate on an addition used under 180 days');
+  eq(accountProblem({ name: 'CC', group: 'cc', opening: 100, asOn: '' }), 'Enter the date of the opening balance.', 'An opening balance needs its date');
+}
 
 console.log('\n[Sale and purchase types]');
 const st = typesList(null, 'sale');

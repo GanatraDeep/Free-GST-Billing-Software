@@ -36,11 +36,12 @@ import print from './pages/print.mjs';
 import help from './pages/help.mjs';
 import about from './pages/about.mjs';
 import security from './pages/security.mjs';
+import accountsPages from './pages/accounts.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'out', SITE.folder);
 const IMG_SRC = join(HERE, 'assets', 'img');
-const PAGES = [...start, ...gstBasics, ...install, ...invoice, ...daily, ...clients, ...products, ...payments, ...buying, ...money, ...reports, ...incomeTax, ...setup, ...print, ...help, ...about, ...security];
+const PAGES = [...start, ...gstBasics, ...install, ...invoice, ...daily, ...clients, ...products, ...payments, ...buying, ...money, ...reports, ...accountsPages, ...incomeTax, ...setup, ...print, ...help, ...about, ...security];
 const TODAY = new Date().toISOString().slice(0, 10);
 const BRAND = 'Divtech Hisaab';
 

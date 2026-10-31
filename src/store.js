@@ -279,6 +279,19 @@ export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, expli
   });
 };
 
+// Any meta.json value (Divtech Hisaab: closed years and the like).
+export const getMeta = async (key) => (await apiFetch(`${API}/meta/${encodeURIComponent(key)}`)).value;
+export const setMeta = (key, value) => apiFetch(`${API}/meta/${encodeURIComponent(key)}`, { method: 'POST', body: JSON.stringify({ value }) });
+
+// ---- Accounts and vouchers (Divtech Hisaab) ----
+// A problem in the form comes back as the error's message (apiFetch).
+export const getAllAccounts = async () => apiFetch(`${API}/accounts`);
+export const saveAccount = async (a) => (await apiFetch(`${API}/accounts`, { method: 'POST', body: JSON.stringify(a) })).account;
+export const deleteAccount = (id) => apiFetch(`${API}/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const getAllVouchers = async () => apiFetch(`${API}/vouchers`);
+export const saveVoucher = async (v) => (await apiFetch(`${API}/vouchers`, { method: 'POST', body: JSON.stringify(v) })).voucher;
+export const deleteVoucher = (id) => apiFetch(`${API}/vouchers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
 // ---- Sale and purchase types (Divtech Hisaab) ----
 // Cash / Retail Debit / Debit and Cash / Debit / URD by default; the user's
 // own lists live in meta.json (utils/docTypes.js).
@@ -670,6 +683,7 @@ export const exportAllData = async (selection) => {
   if (sel.products && all.productions) data.productions = all.productions;
   if (sel.expenses)       data.expenses = all.expenses;
   if (sel.expenses)       data.cashBook = all.cashBook; // v1.10.83 - the cash book travels with expenses
+  if (sel.expenses)       { data.accounts = all.accounts; data.vouchers = all.vouchers; } // Divtech Hisaab - accounts and vouchers too
   if (sel.clients)        data.openingBalances = all.openingBalances; // Divtech Hisaab - travel with clients
   if (sel.recurring)      data.recurring = all.recurring;
   if (sel.receipts)       data.receipts = all.receipts;
@@ -728,6 +742,8 @@ export const importData = async (jsonString, selection) => {
   if (sel.products && data.productions)          payload.productions = data.productions;
   if (sel.expenses && data.expenses)             payload.expenses = data.expenses;
   if (sel.expenses && data.cashBook)             payload.cashBook = data.cashBook;
+  if (sel.expenses && data.accounts)             payload.accounts = data.accounts;
+  if (sel.expenses && data.vouchers)             payload.vouchers = data.vouchers;
   if (sel.recurring && data.recurring)           payload.recurring = data.recurring;
   if (sel.receipts && data.receipts)             payload.receipts = data.receipts;
   if (sel.purchases && data.purchases)           payload.purchases = data.purchases;

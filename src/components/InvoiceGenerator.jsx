@@ -5,9 +5,10 @@ import html2canvas from 'html2canvas';
 import { getInvoiceSeries, getDocTypes } from '../store';
 import { activeTypes, defaultType, typeRef } from '../utils/docTypes';
 import { DOC_TYPES_EVENT } from './DocTypesSettings';
+import { getClosedYears, closedYearsOf } from './useClosedYears';
 import { seriesForBusiness, defaultSeries, seriesOfBill } from '../utils/invoiceSeries';
 import { saveBill, deleteBill, applyStockChanges, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllRecurring, getAllBills, getEnabledModules, getBusinessType } from '../store';
-import { INVOICE_TYPES, isModuleEnabled, businessKeyOf, GST_DOC_NUMBER, COUNTRIES, printedSubtotal, deliveryChargeLine, stockEffect, appliedStock, stockDelta, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, REMOVED_TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, clientYearToDate, htmlHasText, ORDER_DETAIL_FIELDS, invoiceOptionOn, DEFAULT_DECLARATION, decodeGstin, safePageBoundaries, localToday, toLocalIsoDate, parseLocalDate, paymentStatusFor, getStateCode, countsAsSales, amountDue } from '../utils';
+import { INVOICE_TYPES, isModuleEnabled, businessKeyOf, GST_DOC_NUMBER, COUNTRIES, printedSubtotal, deliveryChargeLine, stockEffect, appliedStock, stockDelta, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, REMOVED_TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, clientYearToDate, htmlHasText, ORDER_DETAIL_FIELDS, invoiceOptionOn, DEFAULT_DECLARATION, decodeGstin, safePageBoundaries, localToday, toLocalIsoDate, parseLocalDate, paymentStatusFor, getStateCode, countsAsSales, amountDue, getFinancialYearLabel } from '../utils';
 import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
 import { confirmAction, promptAction } from './ConfirmModal';
@@ -840,6 +841,9 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const saleTypePicked = useRef(!!(draft?.details?.saleType || editingBill?.data?.details?.saleType));
   const isSaleDoc = countsAsSales({ invoiceType });
   const pickSaleType = (t) => setDetails((prev) => ({ ...prev, saleType: typeRef(t, 'sale') }));
+  // Divtech Hisaab - financial years closed on Final accounts → Year end.
+  const [closedYears, setClosedYears] = useState({});
+  useEffect(() => { getClosedYears().then(setClosedYears).catch(() => {}); }, []);
   const warnedLongNumber = useRef(false);
 
   const typeConfig = INVOICE_TYPES[invoiceType];
@@ -3798,6 +3802,16 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 ))}
               </div>
             )}
+
+            {(() => {
+              const fy = details.invoiceDate ? getFinancialYearLabel(parseLocalDate(details.invoiceDate)) : '';
+              const c = fy && closedYearsOf(closedYears, profile)[fy];
+              return c ? (
+                <p className="type-desc" style={{ color: 'var(--warn-text, #b45309)', fontWeight: 600 }}>
+                  FY {fy} is closed (Final accounts → Year end). Saving this changes that year's accounts.
+                </p>
+              ) : null;
+            })()}
 
             {/* Goods / Services / Mixed selector — drives default line-item unit
                 (Hrs vs Nos) and filters the unit dropdown. Stays out of the way

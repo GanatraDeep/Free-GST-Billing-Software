@@ -262,3 +262,15 @@ export function periodRange(kind, today = toLocalIsoDate(new Date())) {
   }
   return { from: '', to: '' };
 }
+
+// Divtech Hisaab - voucher lines on the cash or bank account (a loan received
+// in cash, a CC deposit made from the bank...), as read-only lines.
+export const voucherMoneyLines = (vouchers = [], book = 'cash') => vouchers.flatMap((v) => (v.lines || [])
+  .map((l, i) => [l, i])
+  .filter(([l]) => l.account === book && (Number(l.dr) > 0 || Number(l.cr) > 0))
+  .map(([l, i]) => ({
+    key: `voucher:${v.id}:${i}`, source: 'voucher', view: 'vouchers', label: `Voucher ${v.number || ''}`.trim(),
+    type: Number(l.dr) > 0 ? 'in' : 'out', date: v.date || '', amount: r2(Number(l.dr) || Number(l.cr)),
+    name: (v.lines || []).filter((x) => x !== l).map((x) => String(x.account).replace(/^(client|supplier|expense|acc|cashcat):/, '')).join(', '),
+    note: v.narration || '', category: '', at: v.createdAt || '',
+  })));

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 // v1.10.83 - same redaction as the browser's Problem log, for errors.log lines.
 import { redact } from './src/utils/errorReport.js';
 import { validateCashEntry, cleanCashEntry } from './src/utils/cashBook.js';
+import { accountProblem, cleanAccount, voucherProblem, cleanVoucher } from './src/utils/vouchers.js';
 import { validatePurchasePayments } from './src/utils/purchasePayments.js';
 // Divtech Hisaab - opening balances carried over from the previous software.
 import { validateOpening, cleanOpening } from './src/utils/openingBalances.js';
@@ -98,7 +99,7 @@ app.use((req, res, next) => {
 });
 
 // Ensure data directory and sub-directories exist
-const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book', 'opening-balances', 'suppliers'];
+const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book', 'opening-balances', 'suppliers', 'accounts', 'vouchers'];
 // v1.10.83 - a data folder the app may not write to (inside Program Files, a
 // read-only drive, antivirus "controlled folder access") or a full disk used
 // to crash here with a raw stack trace the launcher never showed. Say it in
@@ -447,6 +448,47 @@ app.post('/api/suppliers', (req, res) => {
 app.delete('/api/suppliers/:id', (req, res) => {
   const filePath = path.join(DATA_DIR, 'suppliers', safeFileName(req.params.id) + '.json');
   deleteFile(filePath);
+  res.json({ success: true });
+});
+
+// ========================
+// ACCOUNTS AND VOUCHERS (Divtech Hisaab)
+// ========================
+// Your own accounts (capital, loans, CC / OD, assets...) and vouchers
+// (payment, receipt, contra, journal). Rules: src/utils/vouchers.js.
+const saveRecord = (dirName, record, res, key) => {
+  const dir = path.join(DATA_DIR, dirName);
+  const filePath = path.join(dir, safeFileName(record.id) + '.json');
+  if (!isPathInside(filePath, dir)) return errRes(res, 400, 'invalid-path');
+  writeJSON(filePath, record);
+  res.json({ success: true, id: record.id, [key]: record });
+};
+app.get('/api/accounts', (req, res) => {
+  res.json(readAllFromDir('accounts').sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+});
+app.post('/api/accounts', (req, res) => {
+  const problem = accountProblem(req.body || {}, readAllFromDir('accounts'));
+  if (problem) return res.status(400).json({ error: problem, code: 'bad-request' });
+  saveRecord('accounts', cleanAccount(req.body), res, 'account');
+});
+app.delete('/api/accounts/:id', (req, res) => {
+  const id = String(req.params.id);
+  if (readAllFromDir('vouchers').some((v) => (v.lines || []).some((l) => l.account === `acc:${id}`))) {
+    return res.status(409).json({ error: 'This account is used in vouchers. Delete or change those vouchers first.', code: 'in-use' });
+  }
+  deleteFile(path.join(DATA_DIR, 'accounts', safeFileName(id) + '.json'));
+  res.json({ success: true });
+});
+app.get('/api/vouchers', (req, res) => {
+  res.json(readAllFromDir('vouchers').sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.number).localeCompare(String(a.number))));
+});
+app.post('/api/vouchers', (req, res) => {
+  const problem = voucherProblem(req.body || {});
+  if (problem) return res.status(400).json({ error: problem, code: 'bad-request' });
+  saveRecord('vouchers', cleanVoucher(req.body), res, 'voucher');
+});
+app.delete('/api/vouchers/:id', (req, res) => {
+  deleteFile(path.join(DATA_DIR, 'vouchers', safeFileName(req.params.id) + '.json'));
   res.json({ success: true });
 });
 
@@ -964,6 +1006,8 @@ app.get('/api/export', (req, res) => {
     cashBook: readAllFromDir('cash-book'),
     openingBalances: readAllFromDir('opening-balances'),
     suppliers: readAllFromDir('suppliers'),
+    accounts: readAllFromDir('accounts'),
+    vouchers: readAllFromDir('vouchers'),
     // v1.10.77 - never the PIN hash: a backup file can travel (email, Drive).
     meta: withoutLock(readJSON(META_PATH, {})),
     exportedAt: new Date().toISOString(),
@@ -1000,6 +1044,7 @@ app.post('/api/import', (req, res) => {
     cashBookCount: 0, cashBookSkipped: 0,
     openingCount: 0, openingSkipped: 0,
     supplierCount: 0, supplierSkipped: 0,
+    accountCount: 0, accountSkipped: 0, voucherCount: 0, voucherSkipped: 0,
   };
 
   // Helper: upsert one entity to a directory, honouring the overwrite flag.
@@ -1020,6 +1065,8 @@ app.post('/api/import', (req, res) => {
   (data.bills || []).forEach(b => upsertOne('bills', b, 'billCount', 'billSkipped'));
   (data.clients || []).forEach(c => upsertOne('clients', c, 'clientCount', 'clientSkipped'));
   (data.suppliers || []).forEach(s => { if (s?.name) upsertOne('suppliers', s, 'supplierCount', 'supplierSkipped'); });
+  (data.accounts || []).forEach(a => { if (a?.id && a?.name) upsertOne('accounts', a, 'accountCount', 'accountSkipped'); });
+  (data.vouchers || []).forEach(v => { if (v?.id && !voucherProblem(v)) upsertOne('vouchers', v, 'voucherCount', 'voucherSkipped'); else counts.voucherSkipped++; });
   (data.termsTemplates || []).forEach(t => upsertOne('templates', t, 'templateCount', 'templateSkipped'));
   (data.products || []).forEach(p => upsertOne('products', p, 'productCount', 'productSkipped'));
   (data.expenses || []).forEach(e => upsertOne('expenses', e, 'expenseCount', 'expenseSkipped'));

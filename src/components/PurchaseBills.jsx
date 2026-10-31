@@ -12,6 +12,7 @@ import BulkCsvImport from './BulkCsvImport';
 import UnassignedBanner from './UnassignedBanner';
 import { getPrintSettings } from '../utils/printSettings';
 import { toast } from './Toast';
+import { confirmClosedYear } from './useClosedYears';
 import { confirmAction, promptAction } from './ConfirmModal';
 import { useCostCentres } from './useCostCentres';
 import { CostCentreSelect, CostCentreFilter } from './CostCentrePicker';
@@ -612,6 +613,7 @@ export default function PurchaseBills() {
   const handleSave = async () => {
     if (form.kind === 'po') return handleSavePo();
     if (!form.supplierName.trim()) { toast('Supplier name is required', 'warning'); return; }
+    if (!(await confirmClosedYear(form.date, ownerProfile))) return;
     if (!form.invoiceNumber.trim()) { toast('Invoice number is required', 'warning'); return; }
     // v1.10.58 — reported (#47 item 2, @sangwanmail-eng): "Purchase also
     // save without adding any product." Supplier and invoice number were
@@ -891,6 +893,7 @@ export default function PurchaseBills() {
   const handleDelete = async (id) => {
     // A bill's payments are kept only on the bill, so they go with it.
     const target = purchases.find(p => p.id === id);
+    if (target && !(await confirmClosedYear(target.date, ownerProfile))) return;
     const paidNote = hasPurchasePayments(target)
       ? ` Its payments of ${formatCurrency(purchasePaid(target))} are deleted with it and leave the Cash book. To re-enter the bill, edit it instead.`
       : '';

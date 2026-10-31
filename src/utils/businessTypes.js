@@ -17,7 +17,7 @@ export const SWITCHABLE_MODULES = FEATURE_GROUPS.flatMap(g => g.modules).filter(
 const APP_HELPERS = ['guide', 'notifications', 'darkMode', 'controlPanel', 'offlineButton'];
 // Every type sells, and every business handles cash (the cash book), the
 // bank (Divtech Hisaab: bank book) and its ledgers.
-const SELLING = ['receipts', 'cashBook', 'bankBook', 'ledgers', 'reports', 'gstReturns', 'incomeTax', 'upiQr', 'googleDrive'];
+const SELLING = ['receipts', 'cashBook', 'bankBook', 'ledgers', 'accounts', 'vouchers', 'finalAccounts', 'reports', 'gstReturns', 'incomeTax', 'upiQr', 'googleDrive'];
 const GOODS = ['inventory', 'purchases', 'suppliers', 'expenses'];
 const TRADING = [...GOODS, 'purchaseOrders', 'gstr2b', 'ewayBill', 'tdsTcs'];
 
