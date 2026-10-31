@@ -215,7 +215,8 @@ export function itemLedger(product, { bills = [], purchases = [] } = {}) {
       if (!keys.has(itemKey(it))) continue;
       const qty = Number(it.quantity) || 0;
       if (!qty) continue;
-      moves.push({ key: `pur:${p.id}:${i}`, date: p.date, kind: 'purchase', particulars: `Purchase - ${p.supplierName || ''}`, ref: p.invoiceNumber, qtyIn: qty, qtyOut: 0, rate: r2(it.rate), view: 'purchases' });
+      // Saving a purchase bill adds its lines to Products' stock by name.
+      moves.push({ key: `pur:${p.id}:${i}`, date: p.date, kind: 'purchase', particulars: `Purchase - ${p.supplierName || ''}`, ref: p.invoiceNumber, qtyIn: qty, qtyOut: 0, rate: r2(it.rate), view: 'purchases', moved: true });
     }
   }
   for (const b of bills) {
@@ -229,11 +230,14 @@ export function itemLedger(product, { bills = [], purchases = [] } = {}) {
       const value = b.invoiceType === 'delivery-challan' ? 0 : r2(calculateLineItemTax(it, incl).afterDiscount);
       const label = b.invoiceType === 'credit-note' ? 'Returned (credit note)' : b.invoiceType === 'delivery-challan' ? 'Sent (delivery challan)' : 'Sale';
       const kind = sign > 0 ? 'return' : b.invoiceType === 'delivery-challan' ? 'challan' : 'sale';
-      moves.push({ key: `bill:${b.id}:${i}`, date: b.invoiceDate, kind, particulars: `${label} - ${b.clientName || ''}`, ref: b.invoiceNumber, qtyIn: sign > 0 ? qty : 0, qtyOut: sign < 0 ? qty : 0, rate: r2(qty ? value / qty : 0), saleValue: value, view: 'dashboard', billId: b.id, inr: inr(b) });
+      moves.push({ key: `bill:${b.id}:${i}`, date: b.invoiceDate, kind, particulars: `${label} - ${b.clientName || ''}`, ref: b.invoiceNumber, qtyIn: sign > 0 ? qty : 0, qtyOut: sign < 0 ? qty : 0, rate: r2(qty ? value / qty : 0), saleValue: value, view: 'dashboard', billId: b.id, inr: inr(b),
+        // An invoice moves Products' stock only for a line picked from the
+        // product list; one typed by name is in the ledger but not in stock.
+        moved: it.productId === product.id, ...(it.productId === product.id ? {} : { unlinked: true }) });
     }
   }
   moves.sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.qtyIn ? -1 : 1));
-  const net = moves.reduce((s, m) => s + m.qtyIn - m.qtyOut, 0);
+  const net = moves.filter((m) => m.moved).reduce((s, m) => s + m.qtyIn - m.qtyOut, 0);
   const current = Number(product.stock);
   const openingQty = Number.isFinite(current) && product.stock !== '' && product.stock !== null ? r3(current - net) : 0;
   const openingRate = r2(product.purchasePrice);

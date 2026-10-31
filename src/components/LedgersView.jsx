@@ -199,6 +199,7 @@ export default function LedgersView() {
                     <td style={{ whiteSpace: 'normal', maxWidth: 320 }}>
                       <div className="font-medium">{r.particulars}</div>
                       {r.ref && <div style={muted}>{r.ref}</div>}
+                      {r.unlinked && <div style={{ ...muted, color: 'var(--warn-text, #b45309)' }} title="Pick the item from the product list on the invoice so Products' stock follows it">Typed on the invoice, not picked from Products: stock there did not change</div>}
                     </td>
                     <td style={{ ...right, color: 'var(--success)' }}>{qtyText(r.qtyIn)}</td>
                     <td style={{ ...right, color: 'var(--danger)' }}>{qtyText(r.qtyOut)}</td>

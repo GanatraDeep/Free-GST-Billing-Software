@@ -1441,6 +1441,8 @@ export default function PurchaseBills() {
                     {PAYMENT_STATUSES.filter(s => s !== 'Partial' || form.paymentStatus === 'Partial').map(s => <option key={s} value={s}>{PURCHASE_STATUS_LABEL[s]}</option>)}
                   </select>
                 )}
+              </div>
+              )}
               {!isPo && activePurchaseTypes.length > 0 && (
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label" style={{ color: form.purchaseType ? undefined : 'var(--danger)' }}>Purchase type * <HelpButton title="Purchase types" doc="purchases#purchase-types" size={13} /></label>
@@ -1456,8 +1458,6 @@ export default function PurchaseBills() {
                     ))}
                   </div>
                 </div>
-              )}
-              </div>
               )}
               <div className="form-group">
                 <label className="form-label">Supplier Name *</label>

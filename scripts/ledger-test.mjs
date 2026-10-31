@@ -91,6 +91,12 @@ eq(item.closingQty, 7.5, 'Closing quantity');
 eq(item.rows[2].value, 4800, 'Sale value without GST');
 eq([item.avgCost, item.closingValue], [2000, 15000], 'Average cost and stock value without GST');
 eq(itemLedger({ ...oil, stock: 10.5 }, data).rows[0].qtyIn, 3, 'Stock entered before the first purchase becomes the opening stock');
+{
+  // A sale typed by name (not picked from Products) does not move Products' stock.
+  const typed = { bills: [{ ...sale('T1', '2026-11-03', 'Walk-in', 2, 2400), data: { ...sale('T1', '', '', 2, 2400).data, items: [{ name: 'groundnut oil 15 KG tin', quantity: 2, rate: 2400, taxPercent: 5 }] } }], purchases: [purchases[0]] };
+  const L = itemLedger({ ...oil, stock: 10 }, typed);
+  eq([L.rows[0].qtyIn, L.closingQty, !!L.rows[2].unlinked], [0, 8, true], 'A sale typed by name is in the ledger, flagged, and not mistaken for opening stock');
+}
 
 console.log('\n[Ledgers] cost of goods sold (the margin)');
 const cogs = costOfGoodsSold(data, { from: '2026-11-01', to: '2026-11-30' });
