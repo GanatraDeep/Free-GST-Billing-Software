@@ -70,26 +70,42 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $dir = 'C:\DH Test'
+          # Problems are reported as annotations (::error::) so they show on
+          # the run's summary page.
+          function Report([string]$what) {
+            $lines = @($what)
+            foreach ($f in @("$dir\_system\data\errors.log", "$dir\_system\data\port.txt")) {
+              if (Test-Path -LiteralPath $f) { $lines += "--- $f"; $lines += (Get-Content -LiteralPath $f -Tail 15) }
+            }
+            if (Test-Path -LiteralPath $dir) { $lines += '--- files'; $lines += (Get-ChildItem -LiteralPath $dir -Name) }
+            $lines += '--- processes: ' + ((Get-Process node, msedge, 'Divtech Hisaab' -ErrorAction SilentlyContinue | ForEach-Object { $_.ProcessName }) -join ', ')
+            Write-Host ('::error::' + (($lines -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'))
+            exit 1
+          }
           # Not Start-Process -Wait: that also waits for the app the installer
           # opens at the end (its server keeps running), so it never returns.
-          $p = Start-Process release-build\Divtech-Hisaab-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$dir" -PassThru
-          if (-not $p.WaitForExit(600000)) { throw 'Setup did not finish in 10 minutes' }
-          if ($p.ExitCode -ne 0) { throw "Setup exited with $($p.ExitCode)" }
+          $p = Start-Process release-build\Divtech-Hisaab-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$dir",'/LOG=setup.log' -PassThru
+          if (-not $p.WaitForExit(600000)) { Report 'Setup did not finish in 10 minutes' }
+          if ($p.ExitCode -ne 0) { Report ("Setup exited with $($p.ExitCode)`n" + ((Get-Content setup.log -Tail 20) -join "`n")) }
           foreach ($f in @("$dir\Divtech Hisaab.exe", "$dir\_system\server.js", "$dir\_system\node\node.exe", "$dir\_system\installed-by-setup.txt")) {
-            if (-not (Test-Path -LiteralPath $f)) { throw "Missing after install: $f" }
+            if (-not (Test-Path -LiteralPath $f)) { Report "Missing after install: $f" }
           }
           Start-Process -FilePath "$dir\Divtech Hisaab.exe"
           $ok = $false
+          $last = ''
           for ($i = 0; $i -lt 60 -and -not $ok; $i++) {
             Start-Sleep -Seconds 2
             try {
               $port = if (Test-Path "$dir\_system\data\port.txt") { (Get-Content "$dir\_system\data\port.txt").Trim() } else { 47371 }
               $h = Invoke-RestMethod "http://127.0.0.1:$port/api/health" -TimeoutSec 3
               $ok = $h.ok -eq $true
-            } catch { }
+            } catch { $last = $_.Exception.Message }
           }
-          if (-not $ok) { throw 'The installed app did not start' }
-          Write-Host 'Installed app answered /api/health'
+          if (-not $ok) { Report "The installed app did not answer /api/health in 2 minutes. Last error: $last" }
+          # The server knows it is a Setup install (updates, stop, restart).
+          $st = Invoke-RestMethod "http://127.0.0.1:$port/api/control-panel/status" -TimeoutSec 5
+          if (-not $st.actions.update -or -not $st.actions.stop) { Report ("Control panel actions wrong: " + ($st.actions | ConvertTo-Json -Compress)) }
+          Write-Host "Installed app answered on port $port"
           Get-Process node, msedge -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
       - uses: actions/upload-artifact@v4
