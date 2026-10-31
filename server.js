@@ -1549,7 +1549,7 @@ const CONTROL_ACTIONS = ['update', 'backup', 'restore', 'move', 'stop'];
 // v1.10.83 - Stop works everywhere: on macOS / Linux there is no stop script,
 // so the server stops itself (see launch-script below). The Mac and Linux
 // guides tell people to use it.
-const controlActions = () => Object.fromEntries(CONTROL_ACTIONS.map(a => [a, (a === 'stop' && (!isWindows || SETUP_INSTALL)) || (a === 'update' && SETUP_INSTALL) ? true : !!pickScript(a)]));
+const controlActions = () => Object.fromEntries(CONTROL_ACTIONS.map(a => [a, (a === 'stop' && (!isWindows || SETUP_INSTALL)) || ((a === 'update' || a === 'backup') && SETUP_INSTALL) ? true : !!pickScript(a)]));
 
 function runControlScript(scriptPath) {
   return new Promise((resolve) => {
@@ -1615,6 +1615,25 @@ app.get('/api/control-panel/status', (req, res) => {
 });
 
 app.post('/api/control-panel/backup', async (req, res) => {
+  // Divtech Hisaab - a Setup install has no scripts: copy the data folder to
+  // Documents\Divtech Hisaab Backups\manual-<date-time> here instead.
+  if (SETUP_INSTALL) {
+    try {
+      const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+      const dst = path.join(process.env.USERPROFILE || os.homedir(), 'Documents', 'Divtech Hisaab Backups', `manual-${stamp}`);
+      ensureDir(dst);
+      for (const entry of fs.readdirSync(DATA_DIR, { withFileTypes: true })) {
+        if (entry.name === 'backups' || entry.name === 'errors.log' || entry.name === 'port.txt') continue;
+        const src = path.join(DATA_DIR, entry.name);
+        if (entry.isDirectory()) copyDirRecursive(src, path.join(dst, entry.name));
+        else fs.copyFileSync(src, path.join(dst, entry.name));
+      }
+      res.json({ ok: true, stdout: `Backup saved in ${dst}` });
+    } catch (e) {
+      res.json({ ok: false, error: `The backup could not be saved: ${e.message}` });
+    }
+    return;
+  }
   const script = pickScript('backup');
   const result = await runControlScript(script);
   res.json(result);

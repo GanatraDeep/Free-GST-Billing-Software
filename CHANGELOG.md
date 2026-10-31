@@ -4,6 +4,28 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.11.3] - 2026-10-31
+
+### How to update
+
+**Current version:** 1.11.2  →  **New version:** 1.11.3
+
+1. Open the app and click **Update to v1.11.3** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+(ZIP users: extract `Divtech-Hisaab.zip` over your folder instead.)
+
+### Changed
+- **Divtech-Hisaab-Setup.exe** no longer carries any script files (PowerShell
+  or shell), which antivirus programs and browsers flagged as suspicious.
+- Control Panel → **Backup** works in a Setup install: it copies your data to
+  Documents\Divtech Hisaab Backups.
+
+---
+
 ## [1.11.2] - 2026-10-31
 
 ### How to update

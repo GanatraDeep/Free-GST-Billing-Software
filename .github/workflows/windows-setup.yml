@@ -90,6 +90,8 @@ jobs:
           foreach ($f in @("$dir\Divtech Hisaab.exe", "$dir\_system\server.js", "$dir\_system\node\node.exe", "$dir\_system\installed-by-setup.txt")) {
             if (-not (Test-Path -LiteralPath $f)) { Report "Missing after install: $f" }
           }
+          $scripts = @(Get-ChildItem -LiteralPath $dir -Recurse -File -Include *.ps1, *.hta, *.bat, *.cmd, *.vbs | ForEach-Object { $_.FullName })
+          if ($scripts.Count) { Report ("Script files were installed:`n" + ($scripts -join "`n")) }
           Start-Process -FilePath "$dir\Divtech Hisaab.exe"
           $ok = $false
           $last = ''
@@ -105,6 +107,8 @@ jobs:
           # The server knows it is a Setup install (updates, stop, restart).
           $st = Invoke-RestMethod "http://127.0.0.1:$port/api/control-panel/status" -TimeoutSec 5
           if (-not $st.actions.update -or -not $st.actions.stop) { Report ("Control panel actions wrong: " + ($st.actions | ConvertTo-Json -Compress)) }
+          $bk = Invoke-RestMethod "http://127.0.0.1:$port/api/control-panel/backup" -Method Post -ContentType 'application/json' -Body '{}' -TimeoutSec 30
+          if (-not $bk.ok) { Report ("Backup button failed: " + $bk.error) }
           Write-Host "Installed app answered on port $port"
           Get-Process node, msedge -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 

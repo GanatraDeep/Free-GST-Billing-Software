@@ -60,7 +60,9 @@ Type: files; Name: "{app}\Divtech Hisaab - MAC.command"
 Type: files; Name: "{app}\Divtech Hisaab - LINUX.sh"
 
 [Files]
-Source: "{#SourceDir}\_system\*"; DestDir: "{app}\_system"; Excludes: "\data\*"; Flags: recursesubdirs createallsubdirs ignoreversion
+; No script files: the ZIP version's PowerShell / shell launchers are not
+; needed here, and antivirus programs judge an installer by what it carries.
+Source: "{#SourceDir}\_system\*"; DestDir: "{app}\_system"; Excludes: "\data\*,*.ps1,*.sh,*.command"; Flags: recursesubdirs createallsubdirs ignoreversion
 Source: "{#LauncherExe}"; DestDir: "{app}"; DestName: "Divtech Hisaab.exe"; Flags: ignoreversion
 
 [Dirs]

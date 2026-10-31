@@ -29,13 +29,17 @@ git push
 ## 2. Publish a release (the setup file)
 
 ```bash
-git tag v1.11.0
-git push origin v1.11.0
+git tag v1.11.3
+git push origin v1.11.3
 ```
 
 GitHub Actions (the **Actions** tab on GitHub) builds the setup and publishes
 it under **Releases** in about 15 minutes. Download
 **`Divtech-Hisaab-Setup.exe`** from there (the ZIP is there too).
+
+Always download from the **Releases** page (right side of the repo's Code
+tab), never from an Actions run: those files are build checks, zipped again,
+and browsers warn about them.
 
 For each later update: change `version` in `package.json` and
 `docs-site/site.mjs`, add an entry at the top of `CHANGELOG.md`, commit, push,
