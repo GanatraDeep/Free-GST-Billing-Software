@@ -227,6 +227,18 @@ export default [
 <p>To see one series on the Dashboard, choose it under <b>Tax invoice series</b> in the <b>All Types</b> filter.</p>
 </section>
 
+<section id="sale-purchase-types">
+<h2>Sale types and purchase types</h2>
+<p>Below the invoice series are two small tables. <b>Sale types</b> (Cash, Retail Debit, Debit to start) are picked on each invoice; <b>Purchase types</b> (Cash, Debit, URD) on each purchase bill. See <a href="invoices.html#sale-types">Sale type</a> and <a href="purchases.html#purchase-types">Purchase type</a> for what each does.</p>
+<ul>
+  <li><b>Name</b>: as it shows on the buttons.</li>
+  <li><b>Payment</b>: <b>Cash, paid at once</b> (saved as paid, in the Cash book) or <b>Debit, paid later</b> (due until a receipt or payment is recorded).</li>
+  <li><b>GST party</b> (sales): the buyer is GST-registered, for your reference. <b>URD (no ITC)</b> (purchases): no input tax credit is taken on these bills.</li>
+  <li>The star makes a type the default for new forms; with none, the form asks every time. The box button hides a type you no longer use; old bills keep it.</li>
+</ul>
+<p>Click ${ui('Add a type')} for another one, then ${ui('Save sale types')} or ${ui('Save purchase types')}.</p>
+</section>
+
 <section id="own-numbering">
 <h3>Shared numbering or own numbering for this business</h3>
 <p>Shown under <b>Numbering for <i>your business</i></b> when you have more than one business in <a href="#business-profiles">Business Profiles</a>. Every business uses <b>Shared numbering</b> to start: one series for all of them. The line below names who shares it, such as <i>Shared by Firm 1, Firm 2</i>; saving a change then asks <b>Change numbering for all 2 businesses?</b></p>

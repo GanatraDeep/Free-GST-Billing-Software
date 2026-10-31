@@ -4,6 +4,49 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.12.0] - 2026-10-31
+
+### How to update
+
+**Current version:** 1.11.3  →  **New version:** 1.12.0
+
+1. Open the app and click **Update to v1.12.0** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **Suppliers** (purchase master) in the sidebar: supplier list with GSTIN,
+  registration, contact details, what you bought, paid and still owe, CSV
+  import and opening balances. Purchase bills fill the supplier's details from
+  it, and new suppliers join it by themselves.
+- **Sale types** on invoices: **Cash** (saved as paid, the cash goes into the
+  Cash book at once), **Retail Debit** and **Debit** (due until a receipt is
+  recorded). A debit invoice cannot be marked paid without recording the
+  payment. Rename or add types in Settings → Company.
+- **Purchase types** on purchase bills: **Cash** (paid in cash at once),
+  **Debit** (payable until a payment is recorded) and **URD** (unregistered
+  dealer: no input tax credit in GSTR-3B). Add more in Settings → Company.
+- **Bank book**: money in and out of the bank (bank transfer, UPI, cheque,
+  card), with the bank balance. Cash deposited in the bank (Cash book,
+  "Deposit to bank") and cash withdrawn (Bank book, "Cash withdrawal") show in
+  both books.
+- **Ledgers**: any ledger on one screen, with debit, credit and running
+  balance: each customer and supplier, each item (stock in and out, value
+  without GST, average cost), GST (CGST, SGST, IGST, cess), cash, bank, sales,
+  purchases and expenses. **Ledger** buttons on clients, suppliers and products.
+- Units **Tin**, **Drum**, **Carton** and **Quintal**, and **+ New unit** in
+  the product form.
+
+### Fixed
+- **Profit & Loss** now subtracts the **cost of goods sold** (items sold at
+  their average purchase rate, without GST) and shows **Gross profit**. Before,
+  purchases were left out and a bought-and-sold item showed a 100% margin.
+
+---
+
 ## [1.11.3] - 2026-10-31
 
 ### How to update

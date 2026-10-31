@@ -234,6 +234,47 @@ export default [
 <p>Your cash book is also saved in your backups. In <a href="backup.html#export-import">Export Backup</a> it travels with <b>Expenses</b>.</p>
 <div class="note tip"><strong>Something wrong?</strong><p>"Nothing to export": no lines are shown for the dates and search chosen; widen the dates. Print / PDF does nothing: allow pop-ups for the app; see <a href="troubleshooting.html#print-blocked">Print does nothing</a>.</p></div>
 </section>
+
+<section id="bank-book">
+<h2>Bank book</h2>
+<p>${ui('Bank book')} in the sidebar is the same screen for the bank: money in and out of your bank account, with the <b>Bank balance</b>. It fills itself from everything recorded with mode <b>Bank transfer</b>, <b>UPI</b>, <b>Cheque</b> or <b>Card</b>: receipts from customers, payments on invoices, payments to suppliers, expenses and payments against opening balances. Cash goes to the Cash book; nothing is in both.</p>
+<p>Add your own lines the same way as in the Cash book: the bank balance today as <b>Money in</b>, category <b>Opening balance</b>, to start; then bank charges, interest and so on.</p>
+<p><b>Cash into the bank, and back.</b> In the Cash book, add a <b>Money out</b> line with category <b>Deposit to bank</b>: it shows in the Bank book as money in by itself. In the Bank book, a <b>Money out</b> line with category <b>Cash withdrawal</b> shows in the Cash book as money in. Enter each one once, in the book the money leaves.</p>
+</section>
+`,
+},
+
+// =============================================================================
+{
+  slug: 'ledgers',
+  title: 'Ledgers',
+  lead: 'Any ledger on one screen: a customer, a supplier, an item, GST, cash, bank, sales, purchases or expenses, with debit, credit and the running balance.',
+  body: `
+<section id="open">
+<h2>Opening a ledger</h2>
+<p>Open ${ui('Ledgers')} in the sidebar, then pick the ledger in the list (type in <b>Find a ledger...</b> to jump to it), and the dates: <b>This financial year</b> to start, This month, Last month, All dates or your own dates. Everything before the first date is carried in as the opening balance. The ${ui('Ledger')} buttons on a client, a supplier and a product open the screen on that ledger.</p>
+<p>Nothing is typed into a ledger: every line comes from the invoices, receipts, purchase bills, payments, expenses and cash / bank book entries you have saved, so it is always up to date. To change a line, change the document it came from.</p>
+<p>${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} save the ledger shown, with its dates.</p>
+</section>
+
+<section id="kinds">
+<h2>The ledgers</h2>
+<div class="table-wrap"><table>
+  <tr><th>Ledger</th><th>Debit (Dr)</th><th>Credit (Cr)</th></tr>
+  <tr><td><b>Customer</b></td><td>Invoices (with the sale type: Cash, Debit...) and the opening balance they owed</td><td>Receipts and payments, credit notes. The balance is what they owe you (Dr).</td></tr>
+  <tr><td><b>Supplier</b></td><td>Payments to them</td><td>Purchase bills and the opening balance you owed. The balance is what you owe them (Cr).</td></tr>
+  <tr><td><b>Cash</b>, <b>Bank</b></td><td>Money in</td><td>Money out. The same lines as the <a href="cash-book.html">Cash book</a> and <a href="cash-book.html#bank-book">Bank book</a>.</td></tr>
+  <tr><td><b>GST</b> (all, CGST, SGST / UTGST, IGST, Cess)</td><td>GST on purchases and expenses (input tax credit), and GST given back on credit notes</td><td>GST on your sales. A Cr balance is GST to pay, a Dr balance credit carried forward. URD purchases give no credit and are left out.</td></tr>
+  <tr><td><b>Sales</b>, <b>Purchases</b>, <b>Expenses</b></td><td>Purchases, expenses, credit notes</td><td>Sales. Always <b>without GST</b>: the GST is in the GST ledgers.</td></tr>
+</table></div>
+</section>
+
+<section id="item">
+<h2>Item ledger (stock)</h2>
+<p>An item's ledger shows every movement of its stock: purchases in, sales out, goods returned on a credit note, and goods sent on a delivery challan. Each line has the quantity in or out, the rate and value <b>without GST</b>, the stock after it, the average cost and the stock value. The first line is the opening stock: whatever was in stock before the first purchase or sale here.</p>
+<p>The note under it gives, for the dates chosen, what was bought and sold, the cost of what was sold and the margin. The cost is the weighted average purchase rate, so a tin bought at 2,000 and sold at 2,400 shows a margin of 400 (16.7%). The same cost of goods sold is in <a href="reports.html#pl-statement">Reports, Profit &amp; Loss</a>.</p>
+<p>Purchase lines are matched to the product by name, so type the item on the purchase bill as it is in <a href="products.html">Products</a> (picking it from the list does that).</p>
+</section>
 `,
 },
 

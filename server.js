@@ -98,7 +98,7 @@ app.use((req, res, next) => {
 });
 
 // Ensure data directory and sub-directories exist
-const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book', 'opening-balances'];
+const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book', 'opening-balances', 'suppliers'];
 // v1.10.83 - a data folder the app may not write to (inside Program Files, a
 // read-only drive, antivirus "controlled folder access") or a full disk used
 // to crash here with a raw stack trace the launcher never showed. Say it in
@@ -407,6 +407,45 @@ app.post('/api/clients', (req, res) => {
 
 app.delete('/api/clients/:id', (req, res) => {
   const filePath = path.join(DATA_DIR, 'clients', safeFileName(req.params.id) + '.json');
+  deleteFile(filePath);
+  res.json({ success: true });
+});
+
+// ========================
+// SUPPLIERS (Divtech Hisaab - the supplier master; purchases still keep the
+// supplier's name and GSTIN on each bill, as before)
+// ========================
+app.get('/api/suppliers', (req, res) => {
+  const list = readAllFromDir('suppliers');
+  list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  res.json(list);
+});
+
+app.post('/api/suppliers', (req, res) => {
+  const s = req.body || {};
+  const name = String(s.name || '').trim();
+  if (!name || name.length > 200) return res.status(400).json({ error: 'Enter the supplier name.', code: 'bad-request' });
+  const text = (v, max) => String(v || '').trim().slice(0, max);
+  const supplier = {
+    id: s.id || 'sup_' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex'),
+    name,
+    gstin: text(s.gstin, 20).toUpperCase(),
+    registration: ['regular', 'composition', 'urd'].includes(s.registration) ? s.registration : (s.gstin ? 'regular' : 'urd'),
+    phone: text(s.phone, 40), email: text(s.email, 120),
+    address: text(s.address, 300), city: text(s.city, 80), state: text(s.state, 80), pin: text(s.pin, 12),
+    note: text(s.note, 500),
+    createdAt: text(s.createdAt, 40) || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const dir = path.join(DATA_DIR, 'suppliers');
+  const filePath = path.join(dir, safeFileName(supplier.id) + '.json');
+  if (!isPathInside(filePath, dir)) return errRes(res, 400, 'invalid-path');
+  writeJSON(filePath, supplier);
+  res.json({ success: true, id: supplier.id, supplier });
+});
+
+app.delete('/api/suppliers/:id', (req, res) => {
+  const filePath = path.join(DATA_DIR, 'suppliers', safeFileName(req.params.id) + '.json');
   deleteFile(filePath);
   res.json({ success: true });
 });
@@ -924,6 +963,7 @@ app.get('/api/export', (req, res) => {
     purchaseOrders: readAllFromDir('purchase-orders'),
     cashBook: readAllFromDir('cash-book'),
     openingBalances: readAllFromDir('opening-balances'),
+    suppliers: readAllFromDir('suppliers'),
     // v1.10.77 - never the PIN hash: a backup file can travel (email, Drive).
     meta: withoutLock(readJSON(META_PATH, {})),
     exportedAt: new Date().toISOString(),
@@ -959,6 +999,7 @@ app.post('/api/import', (req, res) => {
     purchaseOrderCount: 0, purchaseOrderSkipped: 0,
     cashBookCount: 0, cashBookSkipped: 0,
     openingCount: 0, openingSkipped: 0,
+    supplierCount: 0, supplierSkipped: 0,
   };
 
   // Helper: upsert one entity to a directory, honouring the overwrite flag.
@@ -978,6 +1019,7 @@ app.post('/api/import', (req, res) => {
   }
   (data.bills || []).forEach(b => upsertOne('bills', b, 'billCount', 'billSkipped'));
   (data.clients || []).forEach(c => upsertOne('clients', c, 'clientCount', 'clientSkipped'));
+  (data.suppliers || []).forEach(s => { if (s?.name) upsertOne('suppliers', s, 'supplierCount', 'supplierSkipped'); });
   (data.termsTemplates || []).forEach(t => upsertOne('templates', t, 'templateCount', 'templateSkipped'));
   (data.products || []).forEach(p => upsertOne('products', p, 'productCount', 'productSkipped'));
   (data.expenses || []).forEach(e => upsertOne('expenses', e, 'expenseCount', 'expenseSkipped'));

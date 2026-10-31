@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Package, Search, Plus, Edit3, Trash2, X, Save, Upload, Table2, Factory } from 'lucide-react';
+import { Package, Search, Plus, Edit3, Trash2, X, Save, Upload, Table2, Factory, BookOpen } from 'lucide-react';
+import { openLedger } from '../utils/openLedger';
 import { getAllProducts, saveProduct, deleteProduct, getProfile, getStockAlertSettings, getEnabledModules } from '../store';
-import { getAllUnits, getCountryConfig, formatCurrency, isModuleEnabled, isServiceProduct, trackedStock, filterUnitsByMode, getDefaultUnitForMode } from '../utils';
+import { getAllUnits, addCustomUnit, getCountryConfig, formatCurrency, isModuleEnabled, isServiceProduct, trackedStock, filterUnitsByMode, getDefaultUnitForMode } from '../utils';
 import { productsCsvToList, PRODUCTS_SAMPLE } from '../utils/listCsv';
 import CsvListImport from './CsvListImport';
 import { bomError, unitCost } from '../utils/manufacturing';
 import { BomEditor, MakeModal, ProductionList } from './Manufacturing';
 import { toast } from './Toast';
-import { confirmAction } from './ConfirmModal';
+import { confirmAction, promptAction } from './ConfirmModal';
 import HelpButton from './HelpButton';
 import ProductBulkEdit from './ProductBulkEdit';
 import TableExport from './TableExport';
@@ -287,11 +288,22 @@ export default function InventoryView() {
               <div className="form-group">
                 <label className="form-label">Unit</label>
                 <select className="form-input" value={form.unit}
-                  onChange={e => updateField('unit', e.target.value)}>
+                  onChange={async (e) => {
+                    if (e.target.value !== '__new') { updateField('unit', e.target.value); return; }
+                    // Divtech Hisaab - add a unit right here (Tin, Drum, Peti...).
+                    const label = (await promptAction({ title: 'New unit', message: 'For example Peti, Jar or Can. It is added to the list for every product and invoice.', placeholder: 'Unit name', confirmLabel: 'Add unit' }) || '').trim();
+                    if (!label) return;
+                    const known = getAllUnits().find((u) => u.label.toLowerCase() === label.toLowerCase());
+                    if (!known && !addCustomUnit(label)) { toast('Could not add that unit (20 letters at most)', 'error'); return; }
+                    setUnits(getAllUnits());
+                    updateField('unit', known ? known.label : label);
+                    if (!known) toast(`Unit "${label}" added`, 'success');
+                  }}>
                   {form.unit && !units.some(u => u.label === form.unit) && (
                     <option value={form.unit}>{form.unit}</option>
                   )}
                   {(form.kind === 'service' ? serviceUnits : units).map(u => <option key={u.label} value={u.label}>{u.label}{u.custom ? ' ★' : ''}</option>)}
+                  <option value="__new">+ New unit...</option>
                 </select>
               </div>
               {form.kind !== 'service' && (
@@ -386,6 +398,11 @@ export default function InventoryView() {
                     </td>
                     <td>
                       <div className="table-actions">
+                        {!isServiceProduct(product) && (
+                          <button className="icon-btn icon-btn-blue" onClick={() => openLedger(`item:${product.id}`)} title="Item ledger: stock in and out, value without GST" aria-label={`Ledger of ${product.name}`}>
+                            <BookOpen size={15} />
+                          </button>
+                        )}
                         <button className="icon-btn icon-btn-blue" onClick={() => openEdit(product)} title="Edit">
                           <Edit3 size={15} />
                         </button>

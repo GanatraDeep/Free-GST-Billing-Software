@@ -288,6 +288,9 @@ try {
   await rowNums.nth(0).fill('2');                // qty
   await rowNums.nth(1).fill('500');              // rate
   await sleep(800);
+  // Divtech Hisaab - a sale is Cash, Retail Debit or Debit; saving asks for one.
+  await page.getByRole('group', { name: 'Sale type' }).getByRole('button', { name: /^Debit/ }).click();
+  await sleep(300);
 
   // ERR-005: transform: scale() does not shrink the layout box, and a
   // centred overflow puts the left edge in unreachable negative scroll.
@@ -815,7 +818,11 @@ try {
 
   // ---- #61 / #62 / #64 item 5: what the invoice itself prints --------------
   await api('/api/profile', { businessName: 'Smoke Alpha', gstin: TEST_GSTIN, state: 'Punjab', country: 'India' });
-  const openDraft = async (draft) => {
+  const openDraft = async (input) => {
+    // Divtech Hisaab - a sale needs its sale type before it saves.
+    const draft = input?.details && !input.details.saleType
+      ? { ...input, details: { ...input.details, saleType: { id: 'debit', name: 'Debit', payment: 'credit', gst: true } } }
+      : input;
     await page.evaluate((draft) => {
       sessionStorage.setItem('gst_invoiceDraft', JSON.stringify(draft));
       sessionStorage.setItem('gst_currentView', 'new');

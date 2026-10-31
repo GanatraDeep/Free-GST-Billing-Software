@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { ShoppingCart, Plus, Edit3, Trash2, Search, X, Save, Download, Wand2, Eye, ClipboardList, IndianRupee, Wallet } from 'lucide-react';
 import HelpButton from './HelpButton';
+import { getAllSuppliers, saveSupplier, getDocTypes } from '../store';
 import { getAllPurchases, savePurchase, deletePurchase, getAllProducts, saveProduct, getProfile, getEnabledModules, getAllPurchaseOrders, savePurchaseOrder, getNextPoNumber } from '../store';
 import { formatCurrency, getFYOptions, belongsToProfile, isUnassignedToBusiness, isInterstateSupply, localToday, roundQty, splitPurchaseTax, isModuleEnabled, businessKeyOf, getAllUnits, TDS_SECTIONS } from '../utils';
 import { purchaseTdsAmount } from '../utils/tdsTcs';
@@ -15,7 +16,8 @@ import { confirmAction, promptAction } from './ConfirmModal';
 import { useCostCentres } from './useCostCentres';
 import { CostCentreSelect, CostCentreFilter } from './CostCentrePicker';
 import { matchesCentre, centreFields } from '../utils/costCentres';
-import { PURCHASE_STATUS_LABEL, OVERPAY_SLACK, purchaseStatus, purchaseBalance, purchasePaid, purchaseOwed, hasPurchasePayments, withPurchasePayments, markPurchasePaid, markPurchaseUnpaid, purchasePaymentModeName } from '../utils/purchasePayments';
+import { PURCHASE_STATUS_LABEL, OVERPAY_SLACK, purchaseStatus, purchaseBalance, purchasePaid, purchaseOwed, hasPurchasePayments, withPurchasePayments, markPurchasePaid, markPurchaseUnpaid, purchasePaymentModeName, purchasePaymentDue, newPurchasePaymentId } from '../utils/purchasePayments';
+import { activeTypes, defaultType, typeRef, isCashType } from '../utils/docTypes';
 import PurchasePaymentModal from './PurchasePaymentModal';
 import OpeningBalances, { useOpeningBalances } from './OpeningBalances';
 import { openingDue } from '../utils/openingBalances';
@@ -71,6 +73,8 @@ const emptyForm = {
   invoiceNumber: '',
   items: [{ ...emptyItem }],
   paymentStatus: 'Unpaid',
+  // Divtech Hisaab - Cash / Debit / URD (utils/docTypes.js).
+  purchaseType: null,
   interstate: false, // true ⇒ supplier charged IGST; false ⇒ CGST + SGST. Routes ITC correctly in GSTR-3B.
   applyRoundOff: false, // off by default — purchase bill totals are usually pre-rounded by the supplier. Users with suppliers that don't pre-round can opt in here.
   note: '',
@@ -203,6 +207,14 @@ export default function PurchaseBills() {
     loadPurchases();
   };
 
+  // Divtech Hisaab - the supplier master (Suppliers screen).
+  const [supplierMaster, setSupplierMaster] = useState([]);
+  useEffect(() => { getAllSuppliers().then((l) => setSupplierMaster(l || [])).catch(() => {}); }, []);
+  // Divtech Hisaab - purchase types (Cash / Debit / URD).
+  const [purchaseTypes, setPurchaseTypes] = useState([]);
+  useEffect(() => { getDocTypes('purchase').then(setPurchaseTypes).catch(() => {}); }, []);
+  const activePurchaseTypes = activeTypes(purchaseTypes);
+
   const loadPurchases = async () => {
     try {
       const [rows, prof, pos] = await Promise.all([
@@ -270,11 +282,12 @@ export default function PurchaseBills() {
 
   const totalStats = filtered.reduce((acc, p) => {
     const t = calcPurchaseTotal(p.items, !!p.applyRoundOff);
-    return { taxable: acc.taxable + t.taxable, tax: acc.tax + t.tax, total: acc.total + t.finalTotal, owed: acc.owed + purchaseBalance(p) };
+    // Divtech Hisaab - URD bills give no input tax credit.
+    return { taxable: acc.taxable + t.taxable, tax: acc.tax + (p.purchaseType?.urd ? 0 : t.tax), total: acc.total + t.finalTotal, owed: acc.owed + purchaseBalance(p) };
   }, { taxable: 0, tax: 0, total: 0, owed: 0 });
 
   const openAdd = () => {
-    setForm({ ...emptyForm, date: localToday(), items: [{ ...emptyItem }] });
+    setForm({ ...emptyForm, date: localToday(), items: [{ ...emptyItem }], purchaseType: typeRef(defaultType(purchaseTypes), 'purchase') });
     setEditingId(null);
     setShowForm(true);
   };
@@ -288,6 +301,7 @@ export default function PurchaseBills() {
       invoiceNumber: purchase.invoiceNumber || '',
       items: purchase.items && purchase.items.length > 0 ? purchase.items.map(i => ({ ...i })) : [{ ...emptyItem }],
       paymentStatus: purchase.paymentStatus || 'Unpaid',
+      purchaseType: purchase.purchaseType || null,
       interstate: !!purchase.interstate,
       // Detect round-off from older entries: if roundOff field exists and is
       // non-zero, treat applyRoundOff as on. Older entries without the field
@@ -611,6 +625,11 @@ export default function PurchaseBills() {
       toast('Add at least one item with a quantity and rate', 'warning');
       return;
     }
+    // Divtech Hisaab - a bill is Cash, Debit or URD.
+    if (activePurchaseTypes.length > 0 && !form.purchaseType) {
+      toast(`Pick the purchase type (${activePurchaseTypes.map((t) => t.name).join(' / ')})`, 'warning');
+      return;
+    }
     try {
       const totals = calcPurchaseTotal(form.items, form.applyRoundOff);
       const before = editingId ? purchases.find(p => p.id === editingId) : null;
@@ -647,6 +666,7 @@ export default function PurchaseBills() {
         applyRoundOff: !!form.applyRoundOff,
         roundOff: totals.roundOff,
         paymentStatus: form.paymentStatus,
+        ...(form.purchaseType ? { purchaseType: form.purchaseType } : {}),
         interstate: !!form.interstate,
         note: form.note.trim(),
         ...centreFields(form.costCentre, form.costCentreName),
@@ -663,10 +683,33 @@ export default function PurchaseBills() {
           toast(`Payments of ${formatCurrency(purchasePaid(purchase))} are already recorded, more than this bill now comes to (${formatCurrency(purchaseOwed(purchase))}). Change or delete a payment first (₹ button in the list).`, 'warning');
           return;
         }
-      } else if (form.paymentStatus === 'Paid' && (before?.paymentStatus || 'Unpaid') !== 'Paid') {
+      } else if (!form.purchaseType && form.paymentStatus === 'Paid' && (before?.paymentStatus || 'Unpaid') !== 'Paid') {
         purchase = markPurchasePaid(purchaseFields, localToday());
       }
+      // Divtech Hisaab - a cash purchase is paid in cash on the bill date (it
+      // shows in the Cash book); saving again re-works it out. Any other type
+      // drops that cash payment and stays due until a payment is recorded.
+      {
+        const kept = (purchase.payments || []).filter((x) => !x?.cashPurchase);
+        if ((purchase.payments || []).length !== kept.length) purchase = withPurchasePayments(purchase, kept);
+        if (isCashType(form.purchaseType)) {
+          const due = purchasePaymentDue(purchase);
+          if (due > 0.005) {
+            purchase = withPurchasePayments(purchase, [...kept, {
+              id: newPurchasePaymentId(), amount: due, date: form.date || localToday(), mode: 'cash', reference: '',
+              note: `Cash purchase (${form.purchaseType.name})`, recordedAt: new Date().toISOString(), auto: true, cashPurchase: true,
+            }]);
+          }
+        } else if (form.purchaseType && !kept.length) {
+          purchase = { ...purchase, paymentStatus: 'Unpaid' };
+        }
+      }
       await savePurchase(purchase);
+      // Divtech Hisaab - a new supplier joins the supplier master.
+      if (!supplierMaster.some(sm => (sm.name || '').trim().toLowerCase() === purchase.supplierName.toLowerCase())) {
+        saveSupplier({ name: purchase.supplierName, gstin: purchase.supplierGstin, address: purchase.supplierAddress, registration: purchase.supplierGstin ? 'regular' : 'urd' })
+          .then((saved) => setSupplierMaster((list) => [...list, saved])).catch(() => {});
+      }
 
       // v1.10.29 — reported: "items added in purchase bill also available
       // for sale means automatically added to the product page too".
@@ -806,6 +849,13 @@ export default function PurchaseBills() {
   // amount. See utils/purchasePayments.js.
   const changePaymentStatus = async (purchase, paymentStatus) => {
     if (purchaseStatus(purchase) === paymentStatus) return;
+    // Divtech Hisaab - a debit purchase is settled by recording the payment
+    // (cash, bank or UPI), so it lands in the right book.
+    if (paymentStatus === 'Paid' && purchase.purchaseType?.payment === 'credit') {
+      toast(`${purchase.purchaseType.name} bill: record the payment (mode and date) to mark it paid.`, 'info', 5000);
+      setPayPurchase(purchase);
+      return;
+    }
     if (paymentStatus === 'Partial') { setPayPurchase(purchase); return; }
     const next = paymentStatus === 'Paid' ? markPurchasePaid(purchase, localToday()) : markPurchaseUnpaid(purchase);
     try {
@@ -883,6 +933,17 @@ export default function PurchaseBills() {
   // spelling of a supplier wins.
   const supplierHistory = useMemo(() => {
     const seen = new Map();
+    // Divtech Hisaab - saved suppliers first: their details win.
+    for (const sup of supplierMaster) {
+      const name = (sup.name || '').trim();
+      if (!name) continue;
+      const inter = isInterstateSupply(sup.gstin, ownerProfile);
+      seen.set(name.toLowerCase(), {
+        name, gstin: (sup.gstin || '').trim(),
+        address: [sup.address, sup.city, sup.state, sup.pin].filter(Boolean).join(', '),
+        interstate: inter === null ? false : inter,
+      });
+    }
     for (const p of purchases) {
       const name = (p.supplierName || '').trim();
       if (!name) continue;
@@ -899,7 +960,7 @@ export default function PurchaseBills() {
       }
     }
     return [...seen.values()];
-  }, [purchases]);
+  }, [purchases, supplierMaster, ownerProfile]);
 
   // v1.10.54 (#42) — suggestions come from the product master FIRST, then
   // anything else that has been typed on a past bill.
@@ -1367,7 +1428,11 @@ export default function PurchaseBills() {
                     status: change them from the ₹ button in the list. A part
                     payment needs its amount, so Partly paid is not offered here
                     (an old bill already Partial keeps it). */}
-                {hasPurchasePayments(editingBill) ? (
+                {form.purchaseType && !hasPurchasePayments(editingBill) ? (
+                  <div className="form-input" style={{ background: 'var(--bg-secondary)', fontSize: '0.85rem' }}>
+                    {isCashType(form.purchaseType) ? 'Paid in cash on saving' : 'Unpaid until you record a payment (₹ button in the list)'}
+                  </div>
+                ) : hasPurchasePayments(editingBill) ? (
                   <div className="form-input" style={{ background: 'var(--bg-secondary)', fontSize: '0.85rem' }}>
                     {PURCHASE_STATUS_LABEL[purchaseStatus(editingBill)]} · {editingBill.payments.length} payment{editingBill.payments.length === 1 ? '' : 's'} (₹ button in the list)
                   </div>
@@ -1377,6 +1442,22 @@ export default function PurchaseBills() {
                   </select>
                 )}
               </div>
+              )}
+              {!isPo && activePurchaseTypes.length > 0 && (
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ color: form.purchaseType ? undefined : 'var(--danger)' }}>Purchase type * <HelpButton title="Purchase types" doc="purchases#purchase-types" size={13} /></label>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} role="group" aria-label="Purchase type">
+                    {[...activePurchaseTypes, ...(form.purchaseType && !activePurchaseTypes.some((t) => t.id === form.purchaseType.id) ? [form.purchaseType] : [])].map((t) => (
+                      <button key={t.id} type="button" aria-pressed={form.purchaseType?.id === t.id}
+                        className={`type-chip ${form.purchaseType?.id === t.id ? 'type-chip-active' : ''}`}
+                        title={t.note || (t.payment === 'cash' ? 'Paid in cash now' : 'Due until a payment is recorded')}
+                        onClick={() => updateField('purchaseType', typeRef(t, 'purchase'))}
+                        style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}>
+                        {t.name}{t.urd ? ' · no ITC' : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
               <div className="form-group">
                 <label className="form-label">Supplier Name *</label>
@@ -1683,7 +1764,7 @@ export default function PurchaseBills() {
                       <td className="text-muted">{p.date ? new Date(p.date).toLocaleDateString('en-IN') : ''}</td>
                       <td className="font-medium">{p.supplierName}</td>
                       <td className="text-muted" style={{ fontSize: '0.78rem' }}>{p.supplierGstin || '-'}</td>
-                      <td><span className="invoice-badge">{p.invoiceNumber}</span></td>
+                      <td><span className="invoice-badge">{p.invoiceNumber}</span>{p.purchaseType?.name && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>{p.purchaseType.name}{p.purchaseType.urd ? ' · no ITC' : ''}</div>}</td>
                       <td style={{ textAlign: 'right' }}>{formatCurrency(t.taxable)}</td>
                       <td style={{ textAlign: 'right' }} className="text-muted">{formatCurrency(t.tax)}</td>
                       <td style={{ textAlign: 'right' }} className="font-bold">{formatCurrency(t.finalTotal)}</td>

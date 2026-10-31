@@ -104,6 +104,29 @@ export default [
 <p><b>"Failed to save purchase"</b>: the app could not reach its data. See <a href="troubleshooting.html#saving">Saving problems</a>.</p></div>
 </section>
 
+<section id="purchase-types">
+<h2>Purchase type: Cash, Debit or URD</h2>
+<p>Each purchase bill says how it is paid. Click one of the <b>Purchase type</b> buttons on the form. You start with three; rename them or add more in <a href="settings.html#sale-purchase-types">Settings, Company</a>, under <b>Purchase types</b>.</p>
+<div class="table-wrap"><table>
+  <tr><th>Purchase type</th><th>What happens</th></tr>
+  <tr><td><b>Cash</b></td><td>Paid in cash when bought: the bill is saved as <b>Paid</b>, with a cash payment on the bill date, and shows in the <a href="cash-book.html">Cash book</a>.</td></tr>
+  <tr><td><b>Debit</b></td><td>Bought on credit: the bill stays <b>Unpaid</b> (you owe the supplier) until you <a href="#record-payment">record a payment</a> by bank, UPI or cash. Choosing <b>Paid</b> in the status list opens the payment window for that.</td></tr>
+  <tr><td><b>URD</b></td><td>Bought from an unregistered dealer. Its GST is <b>not</b> counted as input tax credit: it is left out of GSTR-3B, the <b>GST (ITC Eligible)</b> total and the <a href="ledgers.html">GST ledger</a>. It is paid later, like Debit (change that in Settings if you pay URD suppliers in cash).</td></tr>
+</table></div>
+<p>The type shows under the invoice number in the purchase list.</p>
+</section>
+
+<section id="suppliers">
+<h2>Suppliers (the purchase master)</h2>
+<p>${ui('Suppliers')} in the sidebar is your supplier list: name, GSTIN, registration (Regular, Composition or Unregistered), phone, email, address and a note. Each supplier shows what you bought from them, what you paid and what you still owe, including their <a href="clients.html#opening-balances">opening balance</a>.</p>
+<ul>
+  <li>${ui('Add supplier')} adds one; typing a GSTIN fills in the state. ${ui('Import CSV')} brings in a list (the same columns as <a href="clients.html">Clients</a>).</li>
+  <li>A supplier you type on a purchase bill for the first time is added to the list by itself. Suppliers from older bills show with a ${ui('Save as supplier')} button.</li>
+  <li>On the purchase form, picking a saved supplier fills in the GSTIN and address, and sets IGST for a supplier in another state.</li>
+  <li>${ui('Ledger')} opens the <a href="ledgers.html">supplier's ledger</a>: every bill and payment, with what you owe after each.</li>
+</ul>
+</section>
+
 <section id="purchase-tds">
 <h3>TDS on a purchase bill</h3>
 <p>If you must deduct income-tax TDS when you pay this supplier (a contractor under 194C, a professional under 194J, rent under 194I...), record it on the bill. Under the totals strip, tick <b>TDS deducted</b>:</p>

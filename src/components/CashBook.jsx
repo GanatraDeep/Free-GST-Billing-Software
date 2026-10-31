@@ -3,16 +3,16 @@
 // invoices, receipts and expenses shows here read-only (see utils/cashBook.js).
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Banknote, ArrowDownLeft, ArrowUpRight, Edit3, Trash2, Search, X, Save, ExternalLink } from 'lucide-react';
-import { getAllCashEntries, saveCashEntry, deleteCashEntry, getAllBills, getAllReceipts, getAllExpenses, getAllPurchases, getAllClients, getProfile } from '../store';
+import { getAllCashEntries, saveCashEntry, deleteCashEntry, getAllBills, getAllReceipts, getAllExpenses, getAllPurchases, getAllClients, getProfile, getAllOpeningBalances } from '../store';
 import { formatCurrency, belongsToProfile, localToday, parseLocalDate } from '../utils';
-import { CASH_CATEGORIES, validateCashEntry, linkedCashLines, ownCashLines, cashBookView, cashSummary, periodRange } from '../utils/cashBook';
+import { CASH_CATEGORIES, BANK_CATEGORIES, validateCashEntry, linkedMoneyLines, ownCashLines, contraLines, bookOfEntry, cashBookView, cashSummary, periodRange } from '../utils/cashBook';
 import { toast } from './Toast';
 import { confirmAction } from './ConfirmModal';
 import HelpButton from './HelpButton';
 import TableExport from './TableExport';
 
 const PERIODS = [['month', 'This month'], ['lastMonth', 'Last month'], ['fy', 'This financial year'], ['all', 'All dates'], ['custom', 'Choose dates']];
-const SOURCE_SCREEN = { receipts: 'Receipts', dashboard: 'the Dashboard', expenses: 'Expenses', purchases: 'Purchases' };
+const SOURCE_SCREEN = { receipts: 'Receipts', dashboard: 'the Dashboard', expenses: 'Expenses', purchases: 'Purchases', clients: 'Clients', suppliers: 'Suppliers', cashbook: 'the Cash book', bankbook: 'the Bank book' };
 const emptyForm = () => ({ type: 'in', amount: '', name: '', note: '', category: '', date: localToday() });
 const showDate = (d) => (d ? parseLocalDate(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 const inOut = (type, on) => ({
@@ -20,7 +20,15 @@ const inOut = (type, on) => ({
   ...(on ? { background: type === 'in' ? 'var(--success)' : 'var(--danger)', color: '#fff', borderColor: 'transparent' } : {}),
 });
 
-export default function CashBook({ onOpenView }) {
+// Divtech Hisaab - book 'bank' is the Bank book: money by bank transfer, UPI,
+// cheque or card, and the entries you add here (bank charges, interest...).
+const TEXT = {
+  cash: { title: 'Cash book', sub: 'Cash in and out, with the cash in hand', inHand: 'Cash in hand', entry: 'cash entry', empty: 'No cash entries yet. Add your cash in hand today as Money in, category Opening balance, to start.', doc: 'cash-book' },
+  bank: { title: 'Bank book', sub: 'Money in and out of the bank: transfers, UPI, cheques and cards', inHand: 'Bank balance', entry: 'bank entry', empty: 'Nothing in the bank book yet. Add the bank balance today as Money in, category Opening balance, to start. Receipts and payments by bank or UPI appear here by themselves.', doc: 'cash-book#bank-book' },
+};
+
+export default function CashBook({ onOpenView, book: bookKind = 'cash' }) {
+  const T = TEXT[bookKind] || TEXT.cash;
   const [entries, setEntries] = useState([]);
   const [linked, setLinked] = useState([]);
   const [names, setNames] = useState([]);
@@ -35,20 +43,24 @@ export default function CashBook({ onOpenView }) {
 
   const load = async () => {
     try {
-      const [own, bills, receipts, expenses, purchases, clients, prof] = await Promise.all([
-        getAllCashEntries(), getAllBills(), getAllReceipts(), getAllExpenses(), getAllPurchases().catch(() => []), getAllClients().catch(() => []), getProfile().catch(() => null),
+      const [own, bills, receipts, expenses, purchases, clients, prof, openings] = await Promise.all([
+        getAllCashEntries(), getAllBills(), getAllReceipts(), getAllExpenses(), getAllPurchases().catch(() => []), getAllClients().catch(() => []), getProfile().catch(() => null), getAllOpeningBalances().catch(() => []),
       ]);
       const mine = (rows) => (rows || []).filter((r) => belongsToProfile(r, prof));
       setProfile(prof);
-      setEntries(mine(own));
-      setLinked(linkedCashLines({ bills: mine(bills), receipts: mine(receipts), expenses: mine(expenses), purchases: mine(purchases) }));
+      setEntries(mine(own).filter((e) => bookOfEntry(e) === bookKind));
+      setLinked([
+        ...contraLines(mine(own), bookKind),
+        ...linkedMoneyLines({ bills: mine(bills), receipts: mine(receipts), expenses: mine(expenses), purchases: mine(purchases).filter((p) => (p.kind || 'bill') !== 'po'), openings: mine(openings) }, bookKind),
+      ]);
       // Names to pick from: clients (shared by every business) and names used here before.
       setNames([...new Set([...(clients || []).map((c) => c.name), ...mine(own).map((e) => e.name)].filter(Boolean))].sort());
     } catch {
-      toast('Could not load the cash book', 'error');
+      toast(`Could not load the ${T.title.toLowerCase()}`, 'error');
     }
   };
-  useEffect(() => { load(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [bookKind]);
 
   const lines = useMemo(() => [...ownCashLines(entries), ...linked], [entries, linked]);
   const summary = cashSummary(lines);
@@ -68,6 +80,7 @@ export default function CashBook({ onOpenView }) {
       ...(editing ? { id: editing.id, createdAt: editing.createdAt } : {}),
       type: form.type, date: form.date, amount: Number(form.amount),
       name: form.name, note: form.note, category: form.category,
+      ...(bookKind === 'bank' ? { book: 'bank' } : {}),
       // A new entry belongs to the business selected now; an edited one keeps its own.
       ownerGstin: editing ? editing.ownerGstin || '' : profile?.gstin || '',
       ownerName: editing ? editing.ownerName || '' : profile?.businessName || '',
@@ -100,8 +113,8 @@ export default function CashBook({ onOpenView }) {
 
   const handleDelete = async (entry) => {
     const ok = await confirmAction({
-      title: 'Delete this cash entry?',
-      message: `${entry.type === 'in' ? 'Money in' : 'Money out'} of ${formatCurrency(entry.amount)} on ${showDate(entry.date)}${entry.name ? ` (${entry.name})` : ''} is removed from the cash book, and cash in hand changes by that much.`,
+      title: `Delete this ${T.entry}?`,
+      message: `${entry.type === 'in' ? 'Money in' : 'Money out'} of ${formatCurrency(entry.amount)} on ${showDate(entry.date)}${entry.name ? ` (${entry.name})` : ''} is removed from the ${T.title.toLowerCase()}, and cash in hand changes by that much.`,
       confirmLabel: 'Delete', tone: 'danger',
     });
     if (!ok) return;
@@ -119,7 +132,7 @@ export default function CashBook({ onOpenView }) {
   const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
   const exportRows = book.rows.length ? [
     ...(range.from ? [[range.from, 'Opening balance', '', '', '', '', '', book.opening]] : []),
-    ...book.rows.map((l) => [l.date, l.name, l.note, l.category, l.label || 'Cash book', l.type === 'in' ? r2(l.amount) : '', l.type === 'out' ? r2(l.amount) : '', l.balance]),
+    ...book.rows.map((l) => [l.date, l.name, l.note, l.category, l.label || T.title, l.type === 'in' ? r2(l.amount) : '', l.type === 'out' ? r2(l.amount) : '', l.balance]),
     ['', search.trim() ? `Total (matching "${search.trim()}")` : 'Total', '', '', '', book.totals.in, book.totals.out, search.trim() ? '' : book.closing],
   ] : [];
 
@@ -132,8 +145,8 @@ export default function CashBook({ onOpenView }) {
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div>
-            <h1 className="page-title">Cash book <HelpButton title="Cash book" doc="cash-book" size={16} /></h1>
-            <p className="page-subtitle">Cash in and out, with the cash in hand</p>
+            <h1 className="page-title">{T.title} <HelpButton title={T.title} doc={T.doc} size={16} /></h1>
+            <p className="page-subtitle">{T.sub}</p>
           </div>
         </div>
       </div>
@@ -141,7 +154,7 @@ export default function CashBook({ onOpenView }) {
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
         <div className="stat-card">
           <div className="stat-icon stat-icon-blue"><Banknote size={22} /></div>
-          <div><p className="stat-label">Cash in hand<HelpButton title="Cash in hand" doc="cash-book#cash-in-hand" size={14} /></p><h2 className="stat-value" style={{ color: summary.inHand < 0 ? 'var(--danger)' : undefined }}>{formatCurrency(summary.inHand)}</h2></div>
+          <div><p className="stat-label">{T.inHand}<HelpButton title={T.inHand} doc="cash-book#cash-in-hand" size={14} /></p><h2 className="stat-value" style={{ color: summary.inHand < 0 ? 'var(--danger)' : undefined }}>{formatCurrency(summary.inHand)}</h2></div>
         </div>
         {[['Today', summary.today], ['This month', summary.month]].map(([label, t]) => (
           <div className="stat-card" key={label}>
@@ -158,7 +171,7 @@ export default function CashBook({ onOpenView }) {
       </div>
 
       {/* Quick entry: Enter saves. */}
-      <form className="glass-panel p-4 mb-6" onSubmit={handleSave} aria-label="Cash entry">
+      <form className="glass-panel p-4 mb-6" onSubmit={handleSave} aria-label={T.entry}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.75rem' }}>
           <h3 className="section-title" style={{ margin: 0 }}>{editing ? 'Edit entry' : 'New entry'}</h3>
           <HelpButton title={editing ? 'Edit entry' : 'Adding a cash entry'} doc={editing ? 'cash-book#edit-entry' : 'cash-book#add-entry'} size={16} />
@@ -186,7 +199,7 @@ export default function CashBook({ onOpenView }) {
             <label className="form-label" htmlFor="cash-category">Category</label>
             <input id="cash-category" type="text" className="form-input" list="cash-categories" maxLength={60} placeholder="Pick or type"
               value={form.category} onChange={(e) => update('category', e.target.value)} />
-            <datalist id="cash-categories">{CASH_CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
+            <datalist id="cash-categories">{(bookKind === 'bank' ? BANK_CATEGORIES : CASH_CATEGORIES).map((c) => <option key={c} value={c} />)}</datalist>
           </div>
           <div className="form-group" style={field}>
             <label className="form-label" htmlFor="cash-date">Date *</label>
@@ -209,7 +222,7 @@ export default function CashBook({ onOpenView }) {
           <div className="search-box" style={{ maxWidth: '300px' }}>
             <Search size={16} className="search-icon" />
             <input type="text" placeholder="Search name, note, category..." value={search} onChange={(e) => setSearch(e.target.value)}
-              className="search-input" aria-label="Search the cash book" />
+              className="search-input" aria-label={`Search the ${T.title.toLowerCase()}`} />
           </div>
           <select className="filter-select" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Dates">
             {PERIODS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
@@ -232,14 +245,14 @@ export default function CashBook({ onOpenView }) {
       <div className="glass-panel">
         <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
           <h3>{periodLabel} <span style={muted}>· In {formatCurrency(book.totals.in)} · Out {formatCurrency(book.totals.out)}</span><HelpButton title="The cash book list" doc="cash-book#list" size={16} /></h3>
-          <TableExport title="Cash book" filename={`Cash-book-${periodLabel}`}
+          <TableExport title={T.title} filename={`${T.title.replace(' ', '-')}-${periodLabel}`}
             subtitle={[profile?.businessName, periodLabel, search.trim() ? `matching "${search.trim()}"` : ''].filter(Boolean).join(', ')}
             headers={['Date', 'Name', 'Note', 'Category', 'From', 'Money in', 'Money out', 'Balance']} rows={exportRows} />
         </div>
         {book.rows.length === 0 ? (
           <div className="empty-state">
             <Banknote size={48} />
-            <p>{lines.length === 0 ? 'No cash entries yet. Add your cash in hand today as Money in, category Opening balance, to start.' : 'Nothing in these dates.'}</p>
+            <p>{lines.length === 0 ? T.empty : 'Nothing in these dates.'}</p>
           </div>
         ) : (
           <div className="table-scroll">

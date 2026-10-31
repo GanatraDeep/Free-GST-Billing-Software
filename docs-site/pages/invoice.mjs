@@ -69,6 +69,19 @@ export default [
 <p><b>The chips are greyed out.</b> The invoice is already saved. Use Duplicate to make a new document of another type.</p></div>
 </section>
 
+<section id="sale-types">
+<h2>Sale type: Cash, Retail Debit or Debit</h2>
+<p>A tax invoice or bill of supply also says how it is settled. Under the document type, click one of the <b>Sale type</b> buttons. You start with three; rename them or add more in <a href="settings.html#sale-purchase-types">Settings, Company</a>, under <b>Sale types</b>.</p>
+<div class="table-wrap"><table>
+  <tr><th>Sale type</th><th>Who buys</th><th>What happens on saving</th></tr>
+  <tr><td><b>Cash</b></td><td>A buyer without GST (retail), paying in cash</td><td>The invoice is saved as <b>Paid</b>, with a cash payment for its total on the invoice date. The cash shows in the <a href="cash-book.html">Cash book</a> at once.</td></tr>
+  <tr><td><b>Retail Debit</b></td><td>A buyer without GST who pays later, by bank or UPI</td><td>The invoice is <b>Unpaid</b> until you record a receipt for it. The money then shows in the <a href="cash-book.html#bank-book">Bank book</a> (or the Cash book, if the receipt is in cash).</td></tr>
+  <tr><td><b>Debit</b></td><td>A GST-registered party who pays later, by bank or UPI</td><td>The same as Retail Debit.</td></tr>
+</table></div>
+<p>The app asks for a sale type before saving, unless one is marked as the default in Settings. The client's last sale type is picked for you next time. A debit invoice cannot be set to <b>Paid</b> from the status list: the app opens <a href="dashboard.html">Record payment</a> instead, so the money lands in the right book. If you edit a cash invoice and its total changes, its cash payment follows the new total.</p>
+<p>The sale type shows under the document type on the Dashboard and in the client's invoices, and on every line of the <a href="ledgers.html">client's ledger</a>.</p>
+</section>
+
 <section id="goods-services">
 <h2>Goods, services or both</h2>
 <p>Under the type chips, <b>This invoice is for:</b> sets which units the Unit list offers and which unit a new row starts with. It does not change the tax.</p>

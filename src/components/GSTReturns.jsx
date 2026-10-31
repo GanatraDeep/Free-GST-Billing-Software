@@ -3,6 +3,7 @@ import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, Che
 import { getAllBills, getAllExpenses, getAllPurchases, getProfile, getEnabledModules } from '../store';
 import { hsnTable, stripEmpty } from '../utils/gstr1Json';
 import { formatCurrency, INVOICE_TYPES, getStateCode, formatDateGST, getFilingPeriod, hsnUqc, getFYOptions, belongsToProfile, toCsvLine, isCancelledBill, b2clThreshold, GST_PORTAL_RATES, setOffITC, splitLineTax, roundQty, placeOfSupplyLabel, countsAsSales, parseLocalDate, isModuleEnabled } from '../utils';
+import { isUrdPurchase } from '../utils/ledgers';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
 import { billInInr } from '../utils/fx';
@@ -873,7 +874,9 @@ export default function GSTReturns() {
   // ITC from purchases — route to IGST when the purchase is interstate (supplier charged IGST),
   // otherwise split CGST/SGST. Without this, an interstate purchase incorrectly added its tax
   // to CGST+SGST in the GSTR-3B Table 4(A).
-  const itcFromPurchases = filteredPurchases.reduce((acc, p) => {
+  // Divtech Hisaab - a URD purchase (unregistered dealer) gives no input tax credit.
+  const itcPurchases = filteredPurchases.filter(p => !isUrdPurchase(p));
+  const itcFromPurchases = itcPurchases.reduce((acc, p) => {
     const tax = p.totalTax || purchaseBookTotals(p).tax;
     if (p.interstate) {
       return { cgst: acc.cgst, sgst: acc.sgst, igst: acc.igst + tax };
@@ -883,7 +886,7 @@ export default function GSTReturns() {
   }, { cgst: 0, sgst: 0, igst: 0 });
   // Compensation cess paid on purchases is input tax credit too (GSTR-3B
   // Table 4(A) csamt); it was always reported as 0.
-  const itcCessFromPurchases = filteredPurchases.reduce((s, p) => s + purchaseBookTotals(p).cess, 0);
+  const itcCessFromPurchases = itcPurchases.reduce((s, p) => s + purchaseBookTotals(p).cess, 0);
   // Combined ITC
   const itcFromExpenses = {
     cgst: itcFromExpensesOnly.cgst + itcFromPurchases.cgst,
