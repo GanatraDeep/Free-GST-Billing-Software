@@ -39,6 +39,10 @@ Releases page and run it; it installs over your copy and keeps your data.
   purchases and expenses. **Ledger** buttons on clients, suppliers and products.
 - Units **Tin**, **Drum**, **Carton** and **Quintal**, and **+ New unit** in
   the product form.
+- **GST Returns → Whole period (Excel)**: GSTR-1 and GSTR-3B of the month (or
+  quarter / year) in one Excel file, one sheet per table, with a sales
+  register, purchase register and expenses with GST. **Excel (all tables)** on
+  each tab gives one return on its own.
 
 ### Fixed
 - **Profit & Loss** now subtracts the **cost of goods sold** (items sold at

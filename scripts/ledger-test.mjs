@@ -3,6 +3,8 @@ import {
   ledgerView, clientLedger, supplierLedger, gstLedger, salesLedger, purchasesLedger, moneyLedger,
   itemLedger, costOfGoodsSold, buildLedger, ledgerCatalog, side, isUrdPurchase,
 } from '../src/utils/ledgers.js';
+import { sheetNames, buildWorkbook } from '../src/utils/xlsx.js';
+import { unzipSync, strFromU8 } from 'fflate';
 import { typesList, typeProblem, defaultType, needsReceipt, typeRef, cleanType } from '../src/utils/docTypes.js';
 
 let passed = 0, failed = 0;
@@ -123,6 +125,14 @@ eq(needsReceipt({ data: { details: { saleType: typeRef(st[2]) } } }), true, 'A D
 eq(needsReceipt({ data: { details: { saleType: typeRef(st[0]) } } }), false, 'A Cash invoice is not');
 eq(needsReceipt({ data: { details: {} } }), false, 'Older invoices without a type work as before');
 eq(cleanType({ name: 'X', payment: 'weird' }, 'purchase').payment, 'credit', 'Unknown payment means credit');
+
+console.log('\n[Excel workbook]');
+eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
+{
+  const files = unzipSync(buildWorkbook([{ name: 'One', rows: [['A'], [1]] }, { name: 'Two', rows: [['B'], ['x']] }]));
+  eq(Object.keys(files).filter((k) => k.startsWith('xl/worksheets/')).length, 2, 'One sheet file per sheet');
+  eq((strFromU8(files['xl/workbook.xml']).match(/<sheet /g) || []).length, 2, 'Both sheets listed in the workbook');
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);
