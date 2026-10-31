@@ -4,6 +4,50 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.13.0] - 2026-11-01
+
+### How to update
+
+**Current version:** 1.12.0  →  **New version:** 1.13.0
+
+1. Open the app and click **Update to v1.13.0** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **Double-entry accounts.** Every invoice, receipt, purchase, payment,
+  expense, cash / bank entry and opening balance is now posted to accounts by
+  itself (debit = credit), so the books always agree.
+- **Accounts**: capital, loans taken (secured and unsecured), the bank
+  **CC / OD account** with its sanctioned limit (used and available shown),
+  fixed assets with a depreciation rate, investments, loans and deposits
+  given, other assets, liabilities, incomes and expenses, each with an opening
+  balance.
+- **Vouchers**: Payment, Receipt, Contra and Journal, numbered by type and
+  year (PV/26-27/0001...): loan received and repaid, interest on CC and loans,
+  capital brought in, drawings, cash into the CC, GST paid, depreciation.
+- **Final accounts**: trial balance, trading and profit & loss account and
+  balance sheet for any financial year; a **year-end checklist**; **close the
+  year** (entries dated in a closed year ask before they change); and the
+  **CA pack**: one Excel file with the statements, day book, cash and bank
+  books, every ledger, debtors, creditors, stock and all registers.
+- Depreciation worked out on the written-down value (half rate on additions
+  used under 180 days) and saved as a journal voucher.
+- Ledgers list every account, including CC, loans, assets and expense heads.
+- **GST Returns → Whole period (Excel)**: GSTR-1 and GSTR-3B of the month (or
+  quarter / year) in one Excel file, one sheet per table, with a sales
+  register, purchase register and expenses with GST. **Excel (all tables)** on
+  each tab gives one return on its own.
+
+### Changed
+- GST on purchases from an unregistered dealer (URD) is counted in the cost of
+  purchases, as it cannot be claimed.
+
+---
+
 ## [1.12.0] - 2026-10-31
 
 ### How to update

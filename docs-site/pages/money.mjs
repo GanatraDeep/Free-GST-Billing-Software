@@ -239,6 +239,7 @@ export default [
 <div class="table-wrap"><table>
   <tr><th>Button</th><th>What it saves</th></tr>
   <tr><td>${ui('JSON Export')}</td><td>The file you upload to the portal: <code>GSTR1_<i>GSTIN</i>_<i>MMYYYY</i>.json</code>. It is checked first: see <a href="#json-checks">Checks before the file is made</a>.</td></tr>
+  <tr><td>${ui('Excel (all tables)')}</td><td><code>GSTR1_<i>GSTIN</i>_<i>MMYYYY</i>.xlsx</code>: every GSTR-1 table of the period in one Excel file, one sheet each. See <a href="#excel-workbook">Excel for the whole period</a>.</td></tr>
   <tr><td>${ui('B2B')}</td><td><code>GSTR1_B2B_Invoices.csv</code>: one row per B2B invoice, in the portal's Table 4A layout</td></tr>
   <tr><td>${ui('B2C')}</td><td><code>GSTR1_B2C_Small.csv</code> (totals by type, place of supply and rate), and <code>GSTR1_B2C_Large.csv</code> if there are any large invoices</td></tr>
   <tr><td>${ui('HSN')}</td><td><code>GSTR1_HSN_Summary.csv</code>, in the column order of the portal's Table 12 template, with the unit code (UQC)</td></tr>
@@ -355,11 +356,23 @@ export default [
 <h3>GSTR-3B downloads</h3>
 <div class="table-wrap"><table>
   <tr><th>Button</th><th>What it saves</th></tr>
+  <tr><td>${ui('Excel (all tables)')}</td><td><code>GSTR3B_<i>GSTIN</i>_<i>MMYYYY</i>.xlsx</code>: the GSTR-3B tables, the purchase register and expenses with GST, one sheet each. See <a href="#excel-workbook">Excel for the whole period</a>.</td></tr>
   <tr><td>${ui('3B CSV')}</td><td><code>GSTR3B_Summary.csv</code>: rows for 3.1(a), 4(A) ITC available, 6.1 ITC utilised, 6.1 tax payable in cash, and ITC carried forward</td></tr>
   <tr><td>${ui('3B JSON')}</td><td><code>GSTR3B_<i>GSTIN</i>_<i>MMYYYY</i>.json</code> in the portal's GSTR-3B format: 3.1(a), 3.1(b), reverse charge 3.1(d) and Table 4(A)(5) with cess. Other rows are sent as 0.</td></tr>
   <tr><td>${ui('Mark Filed')}</td><td>Marks GSTR-3B filed for this period; use the <a href="#filed-status">3B pill</a> to undo</td></tr>
 </table></div>
 <p>${ui('3B JSON')} says "No data to export for this period" when the period has no invoices and no expenses, even if it has purchase bills. In that case use ${ui('3B CSV')}, or type the credit in on the portal.</p>
+</section>
+
+<section id="excel-workbook">
+<h2>Excel for the whole period</h2>
+<p>To send a month (or quarter, or year) to your CA in one go, choose the period at the top and click ${ui('Whole period (Excel)')} beside the tabs. You get one Excel file, <code>GST_<i>GSTIN</i>_<i>MMYYYY</i>_all.xlsx</code>, with a sheet for every table. Sheets starting <b>R1</b> are GSTR-1 and sheets starting <b>3B</b> are GSTR-3B. For one return only, use ${ui('Excel (all tables)')} on its tab.</p>
+<div class="table-wrap"><table>
+  <tr><th>Return</th><th>Sheets</th></tr>
+  <tr><td><b>GSTR-1</b></td><td><b>Summary</b> (business, GSTIN, period and rows on each sheet), <b>B2B (4A)</b>, <b>B2CL (5)</b>, <b>B2CS (7)</b>, <b>Exports (6A)</b>, <b>CDNR (9B)</b>, <b>CDNUR (9B)</b>, <b>HSN (12)</b>, <b>Docs (13)</b>, and a <b>Sales register</b> with every invoice and credit note (credit notes as minus). The table sheets have the same columns as the CSV files above.</td></tr>
+  <tr><td><b>GSTR-3B</b></td><td><b>Summary</b>, <b>3.1 Outward supplies</b> (rows (a) to (e)), <b>3.2 Inter-state B2C</b>, <b>4 ITC</b> (from purchase bills and from expenses, the total, and the GST on URD purchases that is not claimed), <b>6.1 Payment of tax</b>, a <b>Purchase register</b> with every purchase bill, and <b>Expenses with GST</b>.</td></tr>
+</table></div>
+<p>A table with nothing in the period has no sheet; the Summary sheet lists it as "nothing this period". Amounts are numbers, so Excel can add them up. The JSON files are still what you upload to the portal.</p>
 </section>
 
 <section id="gstr-2b">

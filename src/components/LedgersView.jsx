@@ -5,11 +5,8 @@
 // (utils/ledgers.js), so nothing is posted twice and nothing can drift.
 import { useState, useEffect, useMemo } from 'react';
 import { BookText, Search, X } from 'lucide-react';
-import {
-  getAllBills, getAllReceipts, getAllExpenses, getAllPurchases, getAllClients, getAllSuppliers,
-  getAllProducts, getAllOpeningBalances, getAllCashEntries, getProfile,
-} from '../store';
-import { formatCurrency, belongsToProfile, parseLocalDate } from '../utils';
+import useBooks from './useBooks';
+import { formatCurrency, parseLocalDate } from '../utils';
 import { periodRange } from '../utils/cashBook';
 import { ledgerCatalog, buildLedger, ledgerView, side } from '../utils/ledgers';
 import { LEDGER_PRESET_KEY } from '../utils/openLedger';
@@ -34,36 +31,13 @@ const readPreset = () => {
 };
 
 export default function LedgersView() {
-  const [data, setData] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const { data, profile, error } = useBooks();
   const [selected, setSelected] = useState(readPreset);
   const [filter, setFilter] = useState('');
   const [period, setPeriod] = useState('fy');
   const [custom, setCustom] = useState(() => periodRange('fy'));
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [bills, receipts, expenses, purchases, clients, suppliers, products, openings, cashEntries, prof] = await Promise.all([
-          getAllBills(), getAllReceipts(), getAllExpenses(), getAllPurchases().catch(() => []), getAllClients().catch(() => []),
-          getAllSuppliers().catch(() => []), getAllProducts().catch(() => []), getAllOpeningBalances().catch(() => []),
-          getAllCashEntries().catch(() => []), getProfile().catch(() => null),
-        ]);
-        if (!alive) return;
-        const mine = (rows) => (rows || []).filter((r) => belongsToProfile(r, prof));
-        setProfile(prof);
-        setData({
-          bills: mine(bills), receipts: mine(receipts), expenses: mine(expenses), purchases: mine(purchases),
-          openings: mine(openings), cashEntries: mine(cashEntries),
-          clients: clients || [], suppliers: suppliers || [], products: products || [],
-        });
-      } catch {
-        toast('Could not load the ledgers', 'error');
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  useEffect(() => { if (error) toast('Could not load the ledgers', 'error'); }, [error]);
 
   const catalog = useMemo(() => (data ? ledgerCatalog(data) : []), [data]);
   const shown = useMemo(() => {
@@ -166,7 +140,13 @@ export default function LedgersView() {
 
       <div className="glass-panel">
         <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h3>{title} <span style={muted}>· {periodLabel}</span></h3>
+          <h3>{title} <span style={muted}>· {periodLabel}</span>
+            {ledger?.account?.group === 'cc' && view && (() => {
+              const used = Math.max(0, -view.closing);
+              const limit = Number(ledger.account.limit) || 0;
+              return <span style={{ ...muted, display: 'block', fontWeight: 400 }}>Limit {formatCurrency(limit)} · used {formatCurrency(used)} · available {formatCurrency(Math.max(0, limit - used))}</span>;
+            })()}
+          </h3>
           {ledger && <TableExport title={title} subtitle={subtitle} filename={`${title.replace(/[^\w]+/g, '-')}-${periodLabel.replace(/[^\w]+/g, '-')}`} headers={exportHeaders} rows={exportRows} landscape={ledger.kind === 'item'} />}
         </div>
 

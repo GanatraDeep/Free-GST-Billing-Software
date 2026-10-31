@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, ChevronRight, AlertTriangle, BookOpen, BarChart3 } from 'lucide-react';
+import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, ChevronRight, AlertTriangle, BookOpen, BarChart3, FileSpreadsheet } from 'lucide-react';
+import { buildWorkbook } from '../utils/xlsx';
 import { getAllBills, getAllExpenses, getAllPurchases, getProfile, getEnabledModules } from '../store';
 import { hsnTable, stripEmpty } from '../utils/gstr1Json';
 import { formatCurrency, INVOICE_TYPES, getStateCode, formatDateGST, getFilingPeriod, hsnUqc, getFYOptions, belongsToProfile, toCsvLine, isCancelledBill, b2clThreshold, GST_PORTAL_RATES, setOffITC, splitLineTax, roundQty, placeOfSupplyLabel, countsAsSales, parseLocalDate, isModuleEnabled } from '../utils';
@@ -1028,10 +1029,53 @@ export default function GSTReturns() {
   // reverse charge), so it is not a NIL GSTR-3B even with no sales.
   const isNilReturn = filteredBills.length === 0 && filteredExpenses.length === 0 && filteredPurchases.length === 0;
 
+  // Divtech Hisaab - the CSV exports below also feed the month's Excel
+  // workbooks: while collectRef holds a list, emit() adds each table to it
+  // (as one sheet) instead of downloading, and say() keeps quiet.
+  const collectRef = useRef(null);
+  const emit = (filename, headers, rows) => {
+    if (collectRef.current) collectRef.current.push({ file: filename, headers, rows });
+    else downloadCSV(filename, headers, rows);
+  };
+  const say = (...args) => { if (!collectRef.current) toast(...args); };
+
+  // Reverse-charge purchases of the period (GSTR-3B 3.1(d)).
+  const rcmTotals = (() => {
+    const rcmPurchases = filteredPurchases.filter(p => !!p.reverseCharge);
+    const t = rcmPurchases.reduce((acc, p) => ({
+      txval: acc.txval + (Number(p.taxableAmount) || 0),
+      iamt: acc.iamt + (p.interstate ? (Number(p.totalTax) || 0) : 0),
+      camt: acc.camt + (p.interstate ? 0 : (Number(p.totalTax) || 0) / 2),
+      samt: acc.samt + (p.interstate ? 0 : (Number(p.totalTax) || 0) / 2),
+      csamt: acc.csamt + (Number(p.totalCess) || purchaseBookTotals(p).cess),
+    }), { txval: 0, iamt: 0, camt: 0, samt: 0, csamt: 0 });
+    return { txval: round2(t.txval), iamt: round2(t.iamt), camt: round2(t.camt), samt: round2(t.samt), csamt: round2(t.csamt) };
+  })();
+
+  // Table 3.2: inter-state supplies to unregistered persons, by place of supply.
+  const interStateB2CRows = (() => {
+    const byPos = {};
+    b2cBills.forEach(bill => {
+      const { client, items, details } = bill.data;
+      if (!billIsInterstate(bill)) return;
+      const pos = getStateCode(details?.placeOfSupply || client?.state || '');
+      const posName = client?.state || pos;
+      (items || []).forEach(item => {
+        if (!byPos[posName]) byPos[posName] = { pos: posName, taxable: 0, igst: 0 };
+        // v1.10.74 - pass the tax-inclusive flag like every other call,
+        // or a tax-inclusive bill's taxable value and IGST come out too high.
+        const split = billSplit(bill, item, true, !!bill.data?.taxInclusive);
+        byPos[posName].taxable += split.taxable;
+        byPos[posName].igst += split.igst;
+      });
+    });
+    return Object.values(byPos);
+  })();
+
   // ========== CSV Exports ==========
   const exportB2B = () => {
-    if (b2bRows.length === 0) { toast('No B2B data to export', 'warning'); return; }
-    downloadCSV('GSTR1_B2B_Invoices.csv',
+    if (b2bRows.length === 0) { say('No B2B data to export', 'warning'); return; }
+    emit('GSTR1_B2B_Invoices.csv',
       ['GSTIN/UIN', 'Receiver Name', 'Invoice Number', 'Invoice Date', 'Invoice Value', 'Place of Supply', 'Reverse Charge', 'Invoice Type', 'Supply Type', 'Taxable Value', 'CGST Amount', 'SGST Amount', 'IGST Amount'],
       b2bRegular.map(bill => {
         const { client, totals, details } = bill.data;
@@ -1039,11 +1083,11 @@ export default function GSTReturns() {
         const pos = getStateCode(details?.placeOfSupply || client?.state || '');
         return [client.gstin, client.name || bill.clientName || '', bill.invoiceNumber || '', formatDateGST(bill.invoiceDate), (totals?.total || 0).toFixed(2), placeOfSupplyLabel(pos), 'N', 'Regular', isInter ? 'Inter State' : 'Intra State', getTaxableAmount(totals).toFixed(2), isInter ? 0 : (totals?.cgst || 0).toFixed(2), isInter ? 0 : ((totals?.sgst || 0) + (totals?.utgst || 0)).toFixed(2), isInter ? (totals?.igst || 0).toFixed(2) : 0];
       }));
-    toast('B2B CSV downloaded — matches GSTR-1 Table 4A format', 'success');
+    say('B2B CSV downloaded — matches GSTR-1 Table 4A format', 'success');
   };
 
   const exportB2C = () => {
-    if (b2cRates.length === 0 && b2cLarge.length === 0) { toast('No B2C data to export', 'warning'); return; }
+    if (b2cRates.length === 0 && b2cLarge.length === 0) { say('No B2C data to export', 'warning'); return; }
     const b2csData = {};
     b2cSmall.forEach(bill => {
       const { profile: prof, client, items, details } = bill.data;
@@ -1059,17 +1103,17 @@ export default function GSTReturns() {
         b2csData[key].cess = (b2csData[key].cess || 0) + split.cess;
       });
     });
-    downloadCSV('GSTR1_B2C_Small.csv', ['Type', 'Place of Supply', 'Rate', 'Taxable Value', 'CGST Amount', 'SGST Amount', 'IGST Amount', 'Cess Amount'],
+    emit('GSTR1_B2C_Small.csv', ['Type', 'Place of Supply', 'Rate', 'Taxable Value', 'CGST Amount', 'SGST Amount', 'IGST Amount', 'Cess Amount'],
       Object.values(b2csData).map(d => [d.splyType === 'INTER' ? 'Inter State' : 'Intra State', placeOfSupplyLabel(d.pos), d.rate + '%', d.taxable.toFixed(2), d.cgst.toFixed(2), d.sgst.toFixed(2), d.igst.toFixed(2), (d.cess || 0).toFixed(2)]));
     if (b2cLarge.length > 0) {
-      downloadCSV('GSTR1_B2C_Large.csv', ['Invoice Number', 'Invoice Date', 'Invoice Value', 'Place of Supply', 'Taxable Value', 'IGST Amount', 'Cess Amount'],
+      emit('GSTR1_B2C_Large.csv', ['Invoice Number', 'Invoice Date', 'Invoice Value', 'Place of Supply', 'Taxable Value', 'IGST Amount', 'Cess Amount'],
         b2cLarge.map(bill => { const { client, totals, details } = bill.data; const pos = getStateCode(details?.placeOfSupply || client?.state || ''); return [bill.invoiceNumber, formatDateGST(bill.invoiceDate), (totals?.total || 0).toFixed(2), placeOfSupplyLabel(pos), getTaxableAmount(totals).toFixed(2), (totals?.igst || 0).toFixed(2), (totals?.cess || 0).toFixed(2)]; }));
     }
-    toast('B2C CSV downloaded', 'success');
+    say('B2C CSV downloaded', 'success');
   };
 
   const exportHSN = () => {
-    if (hsnRows.length === 0) { toast('No HSN data', 'warning'); return; }
+    if (hsnRows.length === 0) { say('No HSN data', 'warning'); return; }
     // v1.10.31 — GST-H3: key by hsn+rate+uqc so mixed-UQC items don't
     // aggregate nonsensically. GST-C3: cess included. GST-C2: UTGST folded.
     const hsnDetailed = {};
@@ -1101,7 +1145,7 @@ export default function GSTReturns() {
     //   HSN, Description, UQC, Total Quantity, Total Value, Rate,
     //   Taxable Value, Integrated Tax Amount, Central Tax Amount,
     //   State/UT Tax Amount, Cess Amount
-    downloadCSV(
+    emit(
       'GSTR1_HSN_Summary.csv',
       ['HSN', 'Description', 'UQC', 'Total Quantity', 'Total Value', 'Rate', 'Taxable Value', 'Integrated Tax Amount', 'Central Tax Amount', 'State/UT Tax Amount', 'Cess Amount'],
       Object.values(hsnDetailed).map(r => [
@@ -1118,41 +1162,41 @@ export default function GSTReturns() {
         r.cess.toFixed(2),
       ])
     );
-    toast('HSN CSV downloaded — GSTR-1 Table 12 format', 'success');
+    say('HSN CSV downloaded — GSTR-1 Table 12 format', 'success');
   };
 
   const exportCDNR = () => {
     const cdnrBills = creditNotes.filter(b => b.data?.client?.gstin);
     const cdnurBills = creditNotes.filter(b => !b.data?.client?.gstin);
-    if (cdnrBills.length === 0 && cdnurBills.length === 0) { toast('No Credit Notes', 'warning'); return; }
+    if (cdnrBills.length === 0 && cdnurBills.length === 0) { say('No Credit Notes', 'warning'); return; }
     if (cdnrBills.length > 0) {
-      downloadCSV('GSTR1_CDNR.csv', ['GSTIN/UIN', 'Receiver Name', 'Note Number', 'Note Date', 'Note Type', 'Place of Supply', 'Reverse Charge', 'Note Value', 'Taxable Value', 'IGST Amount', 'CGST Amount', 'SGST Amount'],
+      emit('GSTR1_CDNR.csv', ['GSTIN/UIN', 'Receiver Name', 'Note Number', 'Note Date', 'Note Type', 'Place of Supply', 'Reverse Charge', 'Note Value', 'Taxable Value', 'IGST Amount', 'CGST Amount', 'SGST Amount'],
         cdnrBills.map(bill => { const { client, totals } = bill.data; const isInter = billIsInterstate(bill); const pos = getStateCode(bill.data.details?.placeOfSupply || client?.state || ''); return [client.gstin, client.name || bill.clientName, bill.invoiceNumber, formatDateGST(bill.invoiceDate), 'C', pos, 'N', (totals?.total || 0).toFixed(2), getTaxableAmount(totals).toFixed(2), isInter ? (totals?.igst || 0).toFixed(2) : '0.00', isInter ? '0.00' : (totals?.cgst || 0).toFixed(2), isInter ? '0.00' : ((totals?.sgst || 0) + (totals?.utgst || 0)).toFixed(2)]; }));
     }
     if (cdnurBills.length > 0) {
-      downloadCSV('GSTR1_CDNUR.csv', ['Note Number', 'Note Date', 'Note Type', 'Place of Supply', 'Note Value', 'Taxable Value', 'IGST Amount', 'Cess Amount'],
+      emit('GSTR1_CDNUR.csv', ['Note Number', 'Note Date', 'Note Type', 'Place of Supply', 'Note Value', 'Taxable Value', 'IGST Amount', 'Cess Amount'],
         cdnurBills.map(bill => { const { client, totals } = bill.data; const pos = getStateCode(bill.data.details?.placeOfSupply || client?.state || ''); return [bill.invoiceNumber, formatDateGST(bill.invoiceDate), 'C', pos, (totals?.total || 0).toFixed(2), getTaxableAmount(totals).toFixed(2), (totals?.igst || 0).toFixed(2), (totals?.cess || 0).toFixed(2)]; }));
     }
-    toast('Credit Notes exported', 'success');
+    say('Credit Notes exported', 'success');
   };
 
   const exportExports = () => {
-    if (exportRows.length === 0) { toast('No export invoices', 'warning'); return; }
-    downloadCSV('GSTR1_Exports_6A.csv', ['Export Type', 'Invoice Number', 'Invoice Date', 'Invoice Value (INR)', 'Rate', 'Taxable Value (INR)', 'IGST (INR)', 'Cess (INR)', 'Client', 'Country', 'Currency', 'Exchange Rate'],
+    if (exportRows.length === 0) { say('No export invoices', 'warning'); return; }
+    emit('GSTR1_Exports_6A.csv', ['Export Type', 'Invoice Number', 'Invoice Date', 'Invoice Value (INR)', 'Rate', 'Taxable Value (INR)', 'IGST (INR)', 'Cess (INR)', 'Client', 'Country', 'Currency', 'Exchange Rate'],
       // An invoice with no rate has no rupee figures yet: left out (it is listed as an error).
       exportRows.filter(r => !r.missing).map(r => [r.type, r.invoiceNo, formatDateGST(r.date), r.value.toFixed(2), r.rates, r.taxable.toFixed(2), r.igst.toFixed(2), r.cess.toFixed(2), r.client, r.country, r.currency, r.missing ? 'MISSING' : r.fxRate]));
-    toast('Exports (Table 6A) CSV downloaded', 'success');
+    say('Exports (Table 6A) CSV downloaded', 'success');
   };
 
   const exportDocSummary = () => {
-    if (Object.keys(docSummary).length === 0) { toast('No documents', 'warning'); return; }
-    downloadCSV('GSTR1_Doc_Summary.csv', ['Document Type', 'Sr. No. From', 'Sr. No. To', 'Total Number', 'Cancelled'],
+    if (Object.keys(docSummary).length === 0) { say('No documents', 'warning'); return; }
+    emit('GSTR1_Doc_Summary.csv', ['Document Type', 'Sr. No. From', 'Sr. No. To', 'Total Number', 'Cancelled'],
       Object.entries(docSummary).map(([, d]) => [d.type, d.from, d.to, d.total, d.cancelled]));
-    toast('Document Summary CSV downloaded', 'success');
+    say('Document Summary CSV downloaded', 'success');
   };
 
   const exportGSTR3B = () => {
-    downloadCSV('GSTR3B_Summary.csv', ['Description', 'Taxable Value', 'IGST', 'CGST', 'SGST', 'Total'], [
+    emit('GSTR3B_Summary.csv', ['Description', 'Taxable Value', 'IGST', 'CGST', 'SGST', 'Total'], [
       ['3.1(a) Outward taxable supplies', outward31a.taxable.toFixed(2), outward31a.igst.toFixed(2), outward31a.cgst.toFixed(2), outward31a.sgst.toFixed(2), (outward31a.igst + outward31a.cgst + outward31a.sgst).toFixed(2)],
       ['3.1(b) Zero rated (exports, SEZ)', exportTotals.taxable.toFixed(2), exportTotals.igst.toFixed(2), '0.00', '0.00', exportTotals.igst.toFixed(2)],
       ['4(A) ITC Available', '', itcFromExpenses.igst.toFixed(2), itcFromExpenses.cgst.toFixed(2), itcFromExpenses.sgst.toFixed(2), (itcFromExpenses.igst + itcFromExpenses.cgst + itcFromExpenses.sgst).toFixed(2)],
@@ -1160,7 +1204,125 @@ export default function GSTReturns() {
       ['6.1 Tax Payable in cash', '', netTax.igst.toFixed(2), netTax.cgst.toFixed(2), netTax.sgst.toFixed(2), (netTax.igst + netTax.cgst + netTax.sgst).toFixed(2)],
       ['ITC carried forward', '', itcCarry.igst.toFixed(2), itcCarry.cgst.toFixed(2), itcCarry.sgst.toFixed(2), (itcCarry.igst + itcCarry.cgst + itcCarry.sgst).toFixed(2)],
     ]);
-    toast('GSTR-3B summary CSV downloaded', 'success');
+    say('GSTR-3B summary CSV downloaded', 'success');
+  };
+
+  // ========== Excel workbooks (Divtech Hisaab) ==========
+  // The month's returns as Excel, one sheet per table: GSTR-1, GSTR-3B, or
+  // both in one file. Amounts are numbers, so the CA can total them.
+  const R1_SHEETS = [
+    ['GSTR1_B2B_Invoices.csv', 'B2B (4A)'], ['GSTR1_B2C_Large.csv', 'B2CL (5)'], ['GSTR1_B2C_Small.csv', 'B2CS (7)'],
+    ['GSTR1_Exports_6A.csv', 'Exports (6A)'], ['GSTR1_CDNR.csv', 'CDNR (9B)'], ['GSTR1_CDNUR.csv', 'CDNUR (9B)'],
+    ['GSTR1_HSN_Summary.csv', 'HSN (12)'], ['GSTR1_Doc_Summary.csv', 'Docs (13)'],
+  ];
+  const cellNum = (v) => (typeof v === 'string' && /^-?\d+\.\d+$/.test(v) ? Number(v) : v);
+  const sheetRows = (headers, rows) => [headers, ...rows.map(r => r.map(cellNum))];
+  const periodText = (() => {
+    if (filterMode === 'month') return `${MONTHS[parseInt(monthFilter)] || ''} ${yearFilter}`;
+    if (filterMode === 'quarter') return `${QUARTERS.find(q => q.id === quarterFilter)?.label || quarterFilter} ${yearFilter}`;
+    return fyOptions.find(f => f.value === fyFilter)?.label || '';
+  })();
+  const coverSheet = (title, tables) => ({
+    name: 'Summary',
+    rows: [
+      [title, ''],
+      ['Business', profile?.businessName || ''],
+      ['GSTIN', profile?.gstin || ''],
+      ['Period', periodText],
+      ['Return period', getReturnPeriod()],
+      ['Made on', new Date().toLocaleString('en-IN')],
+      ['', ''],
+      ['Sheet', 'Rows'],
+      ...tables.map(([name, n]) => [name, n]),
+    ],
+  });
+  const gstr1Sheets = () => {
+    const out = [];
+    collectRef.current = out;
+    try { exportB2B(); exportB2C(); exportExports(); exportCDNR(); exportHSN(); exportDocSummary(); } finally { collectRef.current = null; }
+    const sheets = R1_SHEETS.map(([file, name]) => {
+      const t = out.find(o => o.file === file);
+      return t ? { name, rows: sheetRows(t.headers, t.rows) } : null;
+    }).filter(Boolean);
+    // Every invoice and credit note of the period, for checking.
+    const byDate = (a, b) => String(a.invoiceDate || a.date || '').localeCompare(String(b.invoiceDate || b.date || ''));
+    const register = [...filteredBills].sort(byDate).map(b => {
+      const t = b.data?.totals || {};
+      const inter = billIsInterstate(b);
+      const sign = (b.invoiceType || 'tax-invoice') === 'credit-note' ? -1 : 1;
+      return [formatDateGST(b.invoiceDate), b.invoiceNumber || '', INVOICE_TYPES[b.invoiceType || 'tax-invoice']?.label || b.invoiceType,
+        b.data?.details?.saleType?.name || '', b.data?.client?.name || b.clientName || '', b.data?.client?.gstin || '',
+        placeOfSupplyLabel(getStateCode(b.data?.details?.placeOfSupply || b.data?.client?.state || '')),
+        round2(sign * getTaxableAmount(t)), round2(sign * (inter ? 0 : (t.cgst || 0))), round2(sign * (inter ? 0 : (t.sgst || 0) + (t.utgst || 0))),
+        round2(sign * (inter ? (t.igst || 0) : 0)), round2(sign * (t.cess || 0)), round2(sign * (t.total || b.totalAmount || 0))];
+    });
+    sheets.push({ name: 'Sales register', rows: [['Date', 'Number', 'Document', 'Sale type', 'Customer', 'GSTIN', 'Place of supply', 'Taxable value', 'CGST', 'SGST/UTGST', 'IGST', 'Cess', 'Total'], ...register] });
+    return [coverSheet('GSTR-1', sheets.map(sh => [sh.name, sh.rows.length - 1]).concat(R1_SHEETS.filter(([f]) => !out.some(o => o.file === f)).map(([, n]) => [`${n}: nothing this period`, 0]))), ...sheets];
+  };
+  const gstr3bSheets = () => {
+    const sum = (o) => round2((o.igst || 0) + (o.cgst || 0) + (o.sgst || 0));
+    const urd = filteredPurchases.filter(isUrdPurchase).reduce((acc, p) => {
+      const tax = Number(p.totalTax) || purchaseBookTotals(p).tax;
+      if (p.interstate) return { ...acc, igst: acc.igst + tax };
+      return { ...acc, cgst: acc.cgst + tax / 2, sgst: acc.sgst + tax / 2 };
+    }, { igst: 0, cgst: 0, sgst: 0 });
+    const outward = [
+      ['(a) Outward taxable supplies (other than zero rated, nil rated and exempted)', round2(outward31a.taxable), round2(outward31a.igst), round2(outward31a.cgst), round2(outward31a.sgst), round2(outward31a.cess || 0)],
+      ['(b) Outward taxable supplies (zero rated)', round2(exportTotals.taxable), round2(exportTotals.igst), 0, 0, round2(exportTotals.cess || 0)],
+      ['(c) Other outward supplies (nil rated, exempted)', 0, 0, 0, 0, 0],
+      ['(d) Inward supplies (liable to reverse charge)', rcmTotals.txval, rcmTotals.iamt, rcmTotals.camt, rcmTotals.samt, rcmTotals.csamt],
+      ['(e) Non-GST outward supplies', 0, 0, 0, 0, 0],
+    ];
+    const itc = [
+      ['4(A)(5) All other ITC: purchase bills', round2(itcFromPurchases.igst), round2(itcFromPurchases.cgst), round2(itcFromPurchases.sgst), round2(itcCessFromPurchases)],
+      ['4(A)(5) All other ITC: expenses', round2(itcFromExpensesOnly.igst), round2(itcFromExpensesOnly.cgst), round2(itcFromExpensesOnly.sgst), 0],
+      ['4(A) ITC available (total)', round2(itcFromExpenses.igst), round2(itcFromExpenses.cgst), round2(itcFromExpenses.sgst), round2(itcCessFromPurchases)],
+      ['4(B) ITC reversed', 0, 0, 0, 0],
+      ['4(C) Net ITC available', round2(itcFromExpenses.igst), round2(itcFromExpenses.cgst), round2(itcFromExpenses.sgst), round2(itcCessFromPurchases)],
+      ['Not claimed: GST on URD purchases', round2(urd.igst), round2(urd.cgst), round2(urd.sgst), 0],
+    ];
+    const payment = [
+      ['Tax payable', round2(outputTax.igst), round2(outputTax.cgst), round2(outputTax.sgst), sum(outputTax)],
+      ['Paid through ITC', round2(setOff.used.igst), round2(setOff.used.cgst), round2(setOff.used.sgst), sum(setOff.used)],
+      ['Paid in cash', round2(netTax.igst), round2(netTax.cgst), round2(netTax.sgst), sum(netTax)],
+      ['ITC carried forward', round2(itcCarry.igst), round2(itcCarry.cgst), round2(itcCarry.sgst), sum(itcCarry)],
+    ];
+    const purchaseRegister = [...filteredPurchases].sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).map(p => {
+      const bt = purchaseBookTotals(p);
+      const tax = Number(p.totalTax) || bt.tax;
+      const taxable = Number(p.taxableAmount) || bt.taxable;
+      return [formatDateGST(p.date), p.supplierName || '', p.supplierGstin || '', p.invoiceNumber || '', p.purchaseType?.name || '',
+        p.interstate ? 'Inter-state' : 'Intra-state', round2(taxable), p.interstate ? round2(tax) : 0, p.interstate ? 0 : round2(tax / 2), p.interstate ? 0 : round2(tax / 2),
+        round2(bt.cess), round2(Number(p.totalAmount) || taxable + tax + bt.cess),
+        isUrdPurchase(p) ? 'No (URD)' : p.reverseCharge ? 'Yes (reverse charge)' : 'Yes'];
+    });
+    const expenseRegister = filteredExpenses.filter(e => (Number(e.gstAmount) || 0) > 0).map(e => [
+      formatDateGST(e.date), e.description || '', e.category || '', e.vendorName || '', e.vendorGstin || '',
+      round2((Number(e.amount) || 0) - (Number(e.gstAmount) || 0)), round2(Number(e.gstAmount) || 0), round2(Number(e.amount) || 0)]);
+    const sheets = [
+      { name: '3.1 Outward supplies', rows: [['Nature of supplies', 'Taxable value', 'IGST', 'CGST', 'SGST/UTGST', 'Cess'], ...outward] },
+      { name: '3.2 Inter-state B2C', rows: [['Place of supply', 'Taxable value', 'IGST'], ...interStateB2CRows.map(r => [r.pos, round2(r.taxable), round2(r.igst)])] },
+      { name: '4 ITC', rows: [['Details', 'IGST', 'CGST', 'SGST/UTGST', 'Cess'], ...itc] },
+      { name: '6.1 Payment of tax', rows: [['Description', 'IGST', 'CGST', 'SGST/UTGST', 'Total'], ...payment] },
+      { name: 'Purchase register', rows: [['Date', 'Supplier', 'GSTIN', 'Bill number', 'Purchase type', 'Supply', 'Taxable value', 'IGST', 'CGST', 'SGST/UTGST', 'Cess', 'Total', 'ITC claimed'], ...purchaseRegister] },
+      { name: 'Expenses with GST', rows: [['Date', 'Description', 'Category', 'Vendor', 'Vendor GSTIN', 'Value before GST', 'GST', 'Total'], ...expenseRegister] },
+    ];
+    return [coverSheet('GSTR-3B', sheets.map(sh => [sh.name, sh.rows.length - 1])), ...sheets];
+  };
+  const saveWorkbook = (sheets, filename) => {
+    const blob = new Blob([buildWorkbook(sheets)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const fileTag = () => `${profile?.gstin || 'GST'}_${getReturnPeriod()}`;
+  const exportGSTR1Excel = () => { saveWorkbook(gstr1Sheets(), `GSTR1_${fileTag()}.xlsx`); toast('GSTR-1 Excel downloaded: one sheet per table', 'success'); };
+  const exportGSTR3BExcel = () => { saveWorkbook(gstr3bSheets(), `GSTR3B_${fileTag()}.xlsx`); toast('GSTR-3B Excel downloaded: one sheet per table', 'success'); };
+  const exportAllExcel = () => {
+    const r1 = gstr1Sheets().map(sh => ({ ...sh, name: `R1 ${sh.name}` }));
+    const r3 = gstr3bSheets().map(sh => ({ ...sh, name: `3B ${sh.name}` }));
+    saveWorkbook([...r1, ...r3], `GST_${fileTag()}_all.xlsx`);
+    toast(`GSTR-1 and GSTR-3B for ${periodText} downloaded in one Excel file`, 'success');
   };
 
   // ========== GSTR-3B JSON Export (GSTN offline tool format, schema v1.7) ==========
@@ -1195,23 +1357,7 @@ export default function GSTReturns() {
       // v1.10.31 — GST-M10: RCM inward supplies populated from purchases
       // flagged as reverse-charge (was hardcoded 0 → self-remit RCM liability
       // never reported → interest u/s 50).
-      isup_rev: (() => {
-        // v1.10.74 - only this return period's purchases; was every purchase ever
-        // recorded, so past reverse-charge tax was declared again each period.
-        const rcmPurchases = filteredPurchases.filter(p => !!p.reverseCharge);
-        if (rcmPurchases.length === 0) return { txval: 0, iamt: 0, camt: 0, samt: 0, csamt: 0 };
-        const t = rcmPurchases.reduce((acc, p) => ({
-          txval: acc.txval + (Number(p.taxableAmount) || 0),
-          iamt: acc.iamt + (p.interstate ? (Number(p.totalTax) || 0) : 0),
-          camt: acc.camt + (p.interstate ? 0 : (Number(p.totalTax) || 0) / 2),
-          samt: acc.samt + (p.interstate ? 0 : (Number(p.totalTax) || 0) / 2),
-          csamt: acc.csamt + (Number(p.totalCess) || purchaseBookTotals(p).cess),
-        }), { txval: 0, iamt: 0, camt: 0, samt: 0, csamt: 0 });
-        return {
-          txval: round2(t.txval), iamt: round2(t.iamt),
-          camt: round2(t.camt), samt: round2(t.samt), csamt: round2(t.csamt),
-        };
-      })(),
+      isup_rev: rcmTotals,
       osup_nongst: { txval: 0 },
     };
 
@@ -1684,6 +1830,11 @@ export default function GSTReturns() {
             <tab.icon size={14} /> {tab.label}
           </button>
         ))}
+        <button className="btn btn-secondary" onClick={exportAllExcel} title="GSTR-1 and GSTR-3B of this period in one Excel file, a sheet for each table"
+          style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem', marginLeft: 'auto', color: '#047857', borderColor: '#a7f3d0' }}>
+          <FileSpreadsheet size={14} /> Whole period (Excel)
+        </button>
+        <HelpButton title="Excel for the whole period" doc="gst-returns#excel-workbook" size={16} style={{ alignSelf: 'center' }} />
         <HelpButton title="This tab" doc={{ gstr1: 'gst-returns#gstr-1', gstr3b: 'gst-returns#gstr-3b', gstr2b: 'gst-returns#gstr-2b', tds: 'gst-returns#tds-tcs', guide: 'gst-returns#filing-guide' }[activeTab]} size={16} style={{ alignSelf: 'center' }} />
       </div>
 
@@ -1693,6 +1844,7 @@ export default function GSTReturns() {
           {/* Actions bar */}
           <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <button className="btn btn-primary" onClick={exportGSTR1JSON} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Upload size={13} /> JSON Export</button>
+            <button className="btn btn-secondary" onClick={exportGSTR1Excel} title="Every GSTR-1 table of this period in one Excel file, one sheet each" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><FileSpreadsheet size={13} /> Excel (all tables)</button>
             <button className="btn btn-secondary" onClick={exportB2B} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Download size={13} /> B2B</button>
             <button className="btn btn-secondary" onClick={exportB2C} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Download size={13} /> B2C</button>
             <button className="btn btn-secondary" onClick={exportHSN} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Download size={13} /> HSN</button>
@@ -1977,6 +2129,7 @@ export default function GSTReturns() {
           <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem', alignItems: 'center' }}>
             <button className="btn btn-secondary" onClick={exportGSTR3B} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Download size={13} /> 3B CSV</button>
             <button className="btn btn-primary" onClick={exportGSTR3BJSON} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Upload size={13} /> 3B JSON</button>
+            <button className="btn btn-secondary" onClick={exportGSTR3BExcel} title="Every GSTR-3B table, the purchase register and expenses with GST, one sheet each" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><FileSpreadsheet size={13} /> Excel (all tables)</button>
             <HelpButton title="GSTR-3B downloads" doc="gst-returns#gstr-3b-files" size={16} />
             {!periodFiling.gstr3b && (
               <button className="btn btn-secondary" onClick={() => markFiled('gstr3b')} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', marginLeft: 'auto', color: '#059669', borderColor: '#bbf7d0' }}>
@@ -2002,23 +2155,7 @@ export default function GSTReturns() {
 
           {/* Table 3.2 — Inter-state Supplies */}
           {(() => {
-            const interStateB2C = {};
-            b2cBills.forEach(bill => {
-              const { client, items, details } = bill.data;
-              const isInter = billIsInterstate(bill);
-              if (!isInter) return;
-              const pos = getStateCode(details?.placeOfSupply || client?.state || '');
-              const posName = client?.state || pos;
-              (items || []).forEach(item => {
-                if (!interStateB2C[posName]) interStateB2C[posName] = { pos: posName, taxable: 0, igst: 0 };
-                // v1.10.74 - pass the tax-inclusive flag like every other call,
-                // or a tax-inclusive bill's taxable value and IGST come out too high.
-                const split = billSplit(bill, item, true, !!bill.data?.taxInclusive);
-                interStateB2C[posName].taxable += split.taxable;
-                interStateB2C[posName].igst += split.igst;
-              });
-            });
-            const rows = Object.values(interStateB2C);
+            const rows = interStateB2CRows;
             if (rows.length === 0) return null;
             return (
               <div className="glass-panel mb-4">

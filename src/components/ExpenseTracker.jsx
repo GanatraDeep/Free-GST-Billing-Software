@@ -4,6 +4,7 @@ import { getAllExpenses, saveExpense, deleteExpense, getProfile } from '../store
 import { formatCurrency, getFYOptions, belongsToProfile, isUnassignedToBusiness } from '../utils';
 import UnassignedBanner from './UnassignedBanner';
 import { toast } from './Toast';
+import { confirmClosedYear } from './useClosedYears';
 import { confirmAction } from './ConfirmModal';
 import HelpButton from './HelpButton';
 import TableExport from './TableExport';
@@ -181,6 +182,7 @@ export default function ExpenseTracker() {
 
   const handleSave = async () => {
     if (!form.description.trim()) { toast('Description is required', 'warning'); return; }
+    if (!(await confirmClosedYear(form.date, ownerProfile))) return;
     if (!form.amount || parseFloat(form.amount) <= 0) { toast('Enter a valid amount', 'warning'); return; }
     // v1.10.74 - GST % must be 0 to 100 (40% is a real rate, so no 28 cap).
     const gstPct = form.gstPercent === '' ? 0 : parseFloat(form.gstPercent);
@@ -217,6 +219,8 @@ export default function ExpenseTracker() {
   };
 
   const handleDelete = async (id) => {
+    const target = expenses.find((x) => x.id === id);
+    if (target && !(await confirmClosedYear(target.date, ownerProfile))) return;
     if (await confirmAction({
       title: 'Delete this expense?',
       message: 'The row is removed from your expense ledger. Any GST ITC claimed against this bill in past returns stays as filed.',

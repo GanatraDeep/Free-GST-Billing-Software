@@ -29,8 +29,8 @@ git push
 ## 2. Publish a release (the setup file)
 
 ```bash
-git tag v1.12.0
-git push origin v1.12.0
+git tag v1.13.0
+git push origin v1.13.0
 ```
 
 GitHub Actions (the **Actions** tab on GitHub) builds the setup and publishes

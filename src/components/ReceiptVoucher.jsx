@@ -6,6 +6,7 @@ import { OPENING_EVENT } from './OpeningBalances';
 import { formatCurrency, numberToWords, belongsToProfile, isUnassignedToBusiness, countsAsSales, businessKeyOf, localToday, amountDue, paymentStatusFor, isCancelledBill } from '../utils';
 import UnassignedBanner from './UnassignedBanner';
 import { toast } from './Toast';
+import { confirmClosedYear } from './useClosedYears';
 import { confirmAction } from './ConfirmModal';
 import HelpButton from './HelpButton';
 
@@ -154,6 +155,7 @@ export default function ReceiptVoucher() {
   const handleSave = async () => {
     if (!form.clientName.trim()) { toast('Client name required', 'warning'); return; }
     if (!form.amount || parseFloat(form.amount) <= 0) { toast('Enter valid amount', 'warning'); return; }
+    if (!(await confirmClosedYear(form.date, profile))) return;
     try {
       // v1.10.16 — Edit mode preserves the original receipt number and id so
       // the server upserts in place. Only new receipts reserve a fresh
@@ -273,6 +275,7 @@ export default function ReceiptVoucher() {
 
   const handleDelete = async (id) => {
     const rcp = receipts.find(r => r.id === id);
+    if (rcp && !(await confirmClosedYear(rcp.date, profile))) return;
     const onOpening = rcp && isOpeningRef(rcp.againstInvoice);
     if (await confirmAction({
       title: 'Delete this receipt?',
