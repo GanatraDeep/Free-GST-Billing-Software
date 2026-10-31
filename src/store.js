@@ -4,6 +4,7 @@
 import { getFinancialYearLabel, parseLocalDate, nextCounterValue, startFor, numberSeriesFor, counterKeyFor, formatDocNumber, INVOICE_TYPES, savedPdfNameFor, stockUpdates } from './utils';
 import { poCounterKey, formatPoNumber } from './utils/purchaseOrders';
 import { SERIES_META_KEY, seriesCounterKey, formatSeriesNumber } from './utils/invoiceSeries';
+import { SALE_TYPES_KEY, PURCHASE_TYPES_KEY, typesList } from './utils/docTypes';
 
 import { logProblem } from './utils/problemLog';
 
@@ -278,6 +279,17 @@ export const getNextInvoiceNumber = async (prefix = 'INV', { peek = false, expli
   });
 };
 
+// ---- Sale and purchase types (Divtech Hisaab) ----
+// Cash / Retail Debit / Debit and Cash / Debit / URD by default; the user's
+// own lists live in meta.json (utils/docTypes.js).
+export const getDocTypes = async (kind = 'sale') => {
+  const { value } = await apiFetch(`${API}/meta/${kind === 'sale' ? SALE_TYPES_KEY : PURCHASE_TYPES_KEY}`);
+  return typesList(value, kind);
+};
+export const saveDocTypes = (kind, list) => apiFetch(`${API}/meta/${kind === 'sale' ? SALE_TYPES_KEY : PURCHASE_TYPES_KEY}`, {
+  method: 'POST', body: JSON.stringify({ value: list || [] }),
+});
+
 // ---- Invoice series (Divtech Hisaab) ----
 // The business's own tax-invoice series, in meta.json so backups carry them.
 export const getInvoiceSeries = async () => {
@@ -368,6 +380,14 @@ export const getAllClients = async () => {
 export const deleteClient = async (id) => {
   return apiFetch(`${API}/clients/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
+
+// ---- Suppliers (Divtech Hisaab) ----
+export const getAllSuppliers = async () => apiFetch(`${API}/suppliers`);
+export const saveSupplier = async (supplier) => {
+  const res = await apiFetch(`${API}/suppliers`, { method: 'POST', body: JSON.stringify(supplier) });
+  return res.supplier || { ...supplier, id: res.id };
+};
+export const deleteSupplier = async (id) => apiFetch(`${API}/suppliers/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
 // ---- Terms Templates ----
 export const getTermsTemplates = async () => {
@@ -655,6 +675,7 @@ export const exportAllData = async (selection) => {
   if (sel.receipts)       data.receipts = all.receipts;
   if (sel.purchases)      data.purchases = all.purchases;
   if (sel.purchases)      data.purchaseOrders = all.purchaseOrders; // v1.10.83 (#112) - travel with purchase bills
+  if (sel.purchases)      data.suppliers = all.suppliers; // Divtech Hisaab - the supplier master travels with purchases
   if (sel.meta)           data.meta = all.meta; // includes regionMode, enabledModules, etc. on server
   if (sel.localStorage)   data.localStorage = collectLocalStorage();
 
@@ -711,6 +732,7 @@ export const importData = async (jsonString, selection) => {
   if (sel.receipts && data.receipts)             payload.receipts = data.receipts;
   if (sel.purchases && data.purchases)           payload.purchases = data.purchases;
   if (sel.purchases && data.purchaseOrders)      payload.purchaseOrders = data.purchaseOrders;
+  if (sel.purchases && data.suppliers)           payload.suppliers = data.suppliers;
   if (sel.meta && data.meta)                     payload.meta = data.meta;
 
   const result = await apiFetch(`${API}/import`, { method: 'POST', body: JSON.stringify(payload) });

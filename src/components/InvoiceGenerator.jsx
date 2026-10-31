@@ -2,10 +2,12 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { Maximize2, ArrowLeft, Plus, Trash2, Download, UserPlus, Pencil, Settings, ChevronUp, ChevronDown, MessageCircle, Check, Loader, Truck, Printer, Eye, EyeOff, QrCode } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
-import { getInvoiceSeries } from '../store';
+import { getInvoiceSeries, getDocTypes } from '../store';
+import { activeTypes, defaultType, typeRef } from '../utils/docTypes';
+import { DOC_TYPES_EVENT } from './DocTypesSettings';
 import { seriesForBusiness, defaultSeries, seriesOfBill } from '../utils/invoiceSeries';
 import { saveBill, deleteBill, applyStockChanges, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllRecurring, getAllBills, getEnabledModules, getBusinessType } from '../store';
-import { INVOICE_TYPES, isModuleEnabled, businessKeyOf, GST_DOC_NUMBER, COUNTRIES, printedSubtotal, deliveryChargeLine, stockEffect, appliedStock, stockDelta, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, REMOVED_TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, clientYearToDate, htmlHasText, ORDER_DETAIL_FIELDS, invoiceOptionOn, DEFAULT_DECLARATION, decodeGstin, safePageBoundaries, localToday, toLocalIsoDate, parseLocalDate, paymentStatusFor, getStateCode } from '../utils';
+import { INVOICE_TYPES, isModuleEnabled, businessKeyOf, GST_DOC_NUMBER, COUNTRIES, printedSubtotal, deliveryChargeLine, stockEffect, appliedStock, stockDelta, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, REMOVED_TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, clientYearToDate, htmlHasText, ORDER_DETAIL_FIELDS, invoiceOptionOn, DEFAULT_DECLARATION, decodeGstin, safePageBoundaries, localToday, toLocalIsoDate, parseLocalDate, paymentStatusFor, getStateCode, countsAsSales, amountDue } from '../utils';
 import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
 import { confirmAction, promptAction } from './ConfirmModal';
@@ -831,6 +833,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   // True once the user clicks a series on this invoice: a client's usual
   // series then no longer overrides it.
   const seriesPicked = useRef(false);
+  // Divtech Hisaab - the sale type of a sale (Cash / Retail Debit / Debit),
+  // kept in details.saleType. A cash sale is paid in cash on saving; a debit
+  // sale stays due until a receipt is recorded.
+  const [saleTypes, setSaleTypes] = useState([]);
+  const saleTypePicked = useRef(!!(draft?.details?.saleType || editingBill?.data?.details?.saleType));
+  const isSaleDoc = countsAsSales({ invoiceType });
+  const pickSaleType = (t) => setDetails((prev) => ({ ...prev, saleType: typeRef(t, 'sale') }));
   const warnedLongNumber = useRef(false);
 
   const typeConfig = INVOICE_TYPES[invoiceType];
@@ -993,8 +1002,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     if (!hasRealItem) {
       return 'Add at least one item with a quantity and rate before saving.';
     }
+    // Divtech Hisaab - a sale is Cash, Retail Debit or Debit: it decides
+    // whether the money is in hand now or due on a receipt.
+    if (isSaleDoc && saleTypes.length > 0 && !details.saleType) {
+      return `Pick the sale type (${saleTypes.map((t) => t.name).join(' / ')}) before saving.`;
+    }
     return null;
-  }, [client?.name, items, editingBill]);
+  }, [client?.name, items, editingBill, isSaleDoc, saleTypes, details.saleType]);
 
   // Debounced auto-save (2s after last change), gated on meaningful content.
   //
@@ -1302,6 +1316,22 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       setDetails((prev) => ({ ...prev, invoiceNumber: num }));
     } catch { /* keep the number shown; Save reserves the right one */ }
   };
+  useEffect(() => {
+    let live = true;
+    const load = () => getDocTypes('sale').then((list) => {
+      if (!live) return;
+      const active = activeTypes(list);
+      setSaleTypes(active);
+      const def = defaultType(list);
+      if (isNewDocument && !saleTypePicked.current && def) {
+        setDetails((prev) => (prev.saleType ? prev : { ...prev, saleType: typeRef(def, 'sale') }));
+      }
+    }).catch(() => {});
+    load();
+    window.addEventListener(DOC_TYPES_EVENT, load);
+    return () => { live = false; window.removeEventListener(DOC_TYPES_EVENT, load); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (!bizKey) return undefined;
     let live = true;
@@ -1713,6 +1743,9 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     if (isNewDocument && !seriesPicked.current && cli.preferredSeries && cli.preferredSeries !== seriesRef.current && seriesList.some((x) => x.id === cli.preferredSeries)) {
       applySeries(cli.preferredSeries);
     }
+    // Divtech Hisaab - and the sale type this client usually buys on.
+    const usualType = isNewDocument && !saleTypePicked.current && cli.preferredSaleType && saleTypes.find((t) => t.id === cli.preferredSaleType);
+    if (usualType) pickSaleType(usualType);
     toast(`Loaded client: ${cli.name}`, 'info');
   };
 
@@ -1921,6 +1954,17 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       } catch { /* non-fatal — reconciliation pass will catch it */ }
     }
     if (creditPlan?.targetEntry) seedPayments.push(creditPlan.targetEntry);
+    // Divtech Hisaab - a cash sale is paid in cash on the invoice date: the
+    // cash is recorded with it (and shows in the Cash book). Saving again
+    // re-works it out, so a changed total or type keeps it right.
+    for (let i = seedPayments.length - 1; i >= 0; i -= 1) if (seedPayments[i]?.cashSale) seedPayments.splice(i, 1);
+    if (isSaleDoc && details.saleType?.payment === 'cash') {
+      const othersPaid = seedPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const due = Math.round((amountDue({ totalAmount: totals.total, data: { totals } }) - othersPaid) * 100) / 100;
+      if (due > 0.005) {
+        seedPayments.push({ id: `cash_${finalInvoiceNumber}`, amount: due, date: details.invoiceDate, mode: 'cash', note: `Cash sale (${details.saleType.name})`, recordedAt: new Date().toISOString(), auto: true, cashSale: true });
+      }
+    }
     const seedPaidAmount = seedPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
     // v1.10.41 — Recompute status from the merged paid amount rather
     // than trusting editingBill.status. If a payment was recorded on
@@ -2046,8 +2090,10 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           const nextCustomH = invoiceOptions.customPaperHeight || 297;
           // Divtech Hisaab - remember the series of a tax invoice for next time.
           const nextSeries = invoiceType === 'tax-invoice' && details.seriesId ? details.seriesId : (cli.preferredSeries || '');
+          const nextSaleType = isSaleDoc && details.saleType?.id ? details.saleType.id : (cli.preferredSaleType || '');
           const changed = cli.preferredPaperSize !== nextPaperSize
             || (cli.preferredSeries || '') !== nextSeries
+            || (cli.preferredSaleType || '') !== nextSaleType
             || cli.preferredCurrency !== nextCurrency
             || cli.preferredCustomPaperWidth !== nextCustomW
             || cli.preferredCustomPaperHeight !== nextCustomH;
@@ -2059,6 +2105,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
               preferredCustomPaperWidth: nextCustomW,
               preferredCustomPaperHeight: nextCustomH,
               preferredSeries: nextSeries,
+              preferredSaleType: nextSaleType,
             };
             saveClient(updatedClient).then(() => {
               // Refresh the in-memory clients list so subsequent
@@ -3734,6 +3781,23 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
                 </div>
               );
             })()}
+
+            {/* Divtech Hisaab - the sale type: Cash (paid now, in the Cash book),
+                Retail Debit / Debit (due until a receipt is recorded). */}
+            {isSaleDoc && saleTypes.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }} role="group" aria-label="Sale type">
+                <span style={{ fontSize: '0.78rem', color: details.saleType ? 'var(--text-muted)' : 'var(--danger)', marginRight: '0.25rem' }}>Sale type: <HelpButton title="Sale type" doc="invoices#sale-types" size={16} /></span>
+                {[...saleTypes, ...(details.saleType && !saleTypes.some((t) => t.id === details.saleType.id) ? [details.saleType] : [])].map((t) => (
+                  <button key={t.id} type="button" aria-pressed={details.saleType?.id === t.id}
+                    className={`type-chip ${details.saleType?.id === t.id ? 'type-chip-active' : ''}`}
+                    onClick={() => { saleTypePicked.current = true; isDirty.current = true; pickSaleType(t); }}
+                    title={t.note || (t.payment === 'cash' ? 'Paid in cash now' : 'Due until a receipt is recorded')}
+                    style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}>
+                    {t.name} <span style={{ opacity: 0.7 }}>· {t.payment === 'cash' ? 'paid now' : 'on credit'}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Goods / Services / Mixed selector — drives default line-item unit
                 (Hrs vs Nos) and filters the unit dropdown. Stays out of the way

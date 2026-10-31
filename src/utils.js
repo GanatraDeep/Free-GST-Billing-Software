@@ -1674,6 +1674,11 @@ export const BUILTIN_UNITS = [
   { label: 'Bag',     uqc: 'BAG', kind: 'goods' },
   { label: 'Roll',    uqc: 'ROL', kind: 'goods' },
   { label: 'Bottle',  uqc: 'BTL', kind: 'goods' },
+  // Divtech Hisaab - edible oil trade: tins, drums, cartons, quintals.
+  { label: 'Tin',     uqc: 'CAN', kind: 'goods' },
+  { label: 'Drum',    uqc: 'DRM', kind: 'goods' },
+  { label: 'Carton',  uqc: 'CTN', kind: 'goods' },
+  { label: 'Quintal', uqc: 'QTL', kind: 'goods' },
 ];
 
 // Default unit per invoice mode — used when adding a new line item so the user
@@ -1740,7 +1745,8 @@ export const removeCustomUnit = (label) => {
   try { localStorage.setItem(CUSTOM_UNITS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
 };
 
-export const getAllUnits = () => [...BUILTIN_UNITS, ...getCustomUnits()];
+// A custom unit added before it became built in (Tin, say) is shown once.
+export const getAllUnits = () => [...BUILTIN_UNITS, ...getCustomUnits().filter((c) => !BUILTIN_UNITS.some((u) => u.label.toLowerCase() === String(c.label).toLowerCase()))];
 
 export const getUnitUQC = (label) => {
   const u = getAllUnits().find(x => x.label === label);
@@ -1916,9 +1922,12 @@ export const MENU_ITEMS = [
   { id: 'inventory', label: 'Products', module: 'inventory', section: 'main', help: 'Your product and service list, with stock.' },
   { id: 'expenses', label: 'Expenses', module: 'expenses', section: 'main', help: 'Rent, salaries and other running costs.' },
   { id: 'purchases', label: 'Purchases', module: 'purchases', section: 'main', help: 'Bills from your suppliers, for stock and input tax credit.' },
+  { id: 'suppliers', label: 'Suppliers', module: 'suppliers', section: 'main', help: 'Your supplier list (purchase master): GSTIN, address, what you owe each one.' },
   { id: 'recurring', label: 'Recurring', module: 'recurring', section: 'main', help: 'Invoices that repeat every week, month or year.' },
   { id: 'receipts', label: 'Receipts', module: 'receipts', section: 'main', help: 'Payment receipts for money you receive.' },
   { id: 'cashbook', label: 'Cash book', module: 'cashBook', section: 'main', help: 'Cash in and out with names and notes, and the cash in hand.' },
+  { id: 'bankbook', label: 'Bank book', module: 'bankBook', section: 'main', help: 'Money in and out of the bank: transfers, UPI, cheques, with the bank balance.' },
+  { id: 'ledgers', label: 'Ledgers', module: 'ledgers', section: 'main', help: 'Any ledger: a customer, a supplier, an item, GST, cash, bank, sales or purchases.' },
   { id: 'reports', label: 'Reports', module: 'reports', section: 'main', help: 'Sales, profit and loss, dues and stock reports.' },
   { id: 'filing', label: 'GST returns', module: 'gstReturns', section: 'main', indiaOnly: true, help: 'GSTR-1 and GSTR-3B files, with a filing guide.' },
   { id: 'incometax', label: 'Income tax', module: 'incomeTax', section: 'main', indiaOnly: true, help: 'Old vs new regime calculator and bank statement import.' },

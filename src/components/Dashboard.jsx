@@ -7,6 +7,7 @@ import { seriesForBusiness, seriesOfBill } from '../utils/invoiceSeries';
 import { openingDue } from '../utils/openingBalances';
 import { getAllBills, saveBill, getAllProducts, applyStockChanges, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts, markSavedPdfCancelled, getEnabledModules } from '../store';
 import { businessKeyOf, formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile, salesSign, isCancelledBill, markPaidPatch, markUnpaidPatch, stockEffect, appliedStock, stockDelta, SALES_INVOICE_TYPES, localToday, amountDue, paymentStatusFor, isModuleEnabled, TDS_SECTIONS, findLowStock, trackedStock } from '../utils';
+import { needsReceipt } from '../utils/docTypes';
 import { billInInr, billCurrency as fxBillCurrency, baseCurrencyOf } from '../utils/fx';
 import { withClientTds } from '../utils/tdsTcs';
 import { prepareEInvoices, parseIrpResponse, matchIrnEntries, downloadJson, einvoiceFileName } from '../utils/einvoice';
@@ -591,6 +592,13 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
   };
 
   const changeStatus = async (bill, newStatus) => {
+    // Divtech Hisaab - a debit (credit) sale is settled by a receipt, so the
+    // money lands in the Cash or Bank book: open Record payment instead.
+    if (newStatus === 'paid' && needsReceipt(bill) && !isCancelledBill(bill)) {
+      toast(`${bill.data.details.saleType.name} invoice: record the payment (cash, bank or UPI) to mark it paid.`, 'info', 5000);
+      openPaymentModal(bill);
+      return;
+    }
     // v1.10.67 (#66 item 12) / v1.10.76 - moving into or out of Cancelled moves
     // the stock (into it from the dropdown too, which used to skip that).
     const plan = isCancelledBill(bill) !== (newStatus === 'cancelled') ? planStock(bill, newStatus) : { bill, changes: {} };
@@ -883,8 +891,13 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
   const bulkMarkStatus = async (newStatus) => {
     // v1.10.76 (#83) - payment statuses only apply to real sales; a ticked
     // quotation or challan is left alone unless it is being un-cancelled.
-    const sel = getSelectedBills().filter((b) => isCancelledBill(b) || SALES_INVOICE_TYPES.includes(b.invoiceType || 'tax-invoice'));
-    if (sel.length === 0) { toast('Payment status only applies to tax invoices and bills of supply', 'info'); return; }
+    const picked = getSelectedBills().filter((b) => isCancelledBill(b) || SALES_INVOICE_TYPES.includes(b.invoiceType || 'tax-invoice'));
+    // Divtech Hisaab - debit sales are settled by recording a receipt, not by "Mark paid".
+    const sel = newStatus === 'paid' ? picked.filter((b) => isCancelledBill(b) || !needsReceipt(b)) : picked;
+    if (newStatus === 'paid' && sel.length < picked.length) {
+      toast(`${picked.length - sel.length} debit invoice${picked.length - sel.length === 1 ? '' : 's'} left out: record a receipt for each to mark it paid.`, 'info', 6000);
+    }
+    if (sel.length === 0) { if (picked.length === 0) toast('Payment status only applies to tax invoices and bills of supply', 'info'); return; }
     if (!await confirmAction({
       title: `Mark ${sel.length} invoice${sel.length !== 1 ? 's' : ''} as ${STATUS_CONFIG[newStatus]?.label || newStatus}?`,
       message: newStatus === 'paid'
@@ -1831,7 +1844,7 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
                       {visibleColumns.date && <td className="text-muted">{new Date(bill.invoiceDate).toLocaleDateString('en-IN')}</td>}
                       {visibleColumns.invoice && <td><span className="invoice-badge">{bill.invoiceNumber}</span>
                         {bill.einvoice?.irn && <span title={`IRN ${bill.einvoice.irn}`} style={{ marginLeft: 6, fontSize: '0.65rem', fontWeight: 700, color: '#059669' }}>IRN</span>}</td>}
-                      {visibleColumns.type && <td><span className="type-badge">{(INVOICE_TYPES[bill.invoiceType || 'tax-invoice'])?.label}</span></td>}
+                      {visibleColumns.type && <td><span className="type-badge">{(INVOICE_TYPES[bill.invoiceType || 'tax-invoice'])?.label}</span>{bill.data?.details?.saleType?.name && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>{bill.data.details.saleType.name}</div>}</td>}
                       {visibleColumns.client && <td className="font-medium td-client" title={bill.clientName}>
                         {bill.clientName}
                         {bill.data?.internalNote && (

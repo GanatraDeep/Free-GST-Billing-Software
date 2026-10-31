@@ -79,10 +79,10 @@ export default [
   <tr><th>Card</th><th>What it is</th></tr>
   <tr><td><b>Revenue (ex. tax)</b></td><td>Your sales without GST (and without any TCS collected on the invoices). Credit notes are subtracted.</td></tr>
   <tr><td><b>Expenses (ex. GST)</b></td><td>Your <a href="expenses.html">expenses</a> without the GST on them.</td></tr>
-  <tr><td><b>Net Profit</b> or <b>Net Loss</b></td><td>Revenue minus expenses. Green for a profit; red with a minus sign for a loss.</td></tr>
+  <tr><td><b>Net Profit</b> or <b>Net Loss</b></td><td>Revenue minus the cost of the goods sold, minus expenses. Green for a profit; red with a minus sign for a loss.</td></tr>
   <tr><td><b>Margin</b></td><td>Profit as a percentage of revenue. ₹20,000 profit on ₹1,00,000 revenue is a 20% margin.</td></tr>
 </table></div>
-<p>Purchase bills (stock you bought to sell) are <b>not</b> subtracted here; this is sales less expenses. For profit after purchases, use <a href="#cost-centres">By cost centre</a> (its Total row is the whole business) or <a href="income-tax.html#itr-summary">Income Tax, ITR Summary</a>.</p>
+<p>Goods you bought and sold count at their cost: the <b>cost of goods sold</b> is each item sold at its average purchase rate without GST (see the <a href="ledgers.html#item">item ledger</a>). Stock still on the shelf is not a cost yet. Cost of goods is counted for rupee invoices only.</p>
 <p>The same period choice appears on the Client Analytics and Product Performance tabs.</p>
 </section>
 
@@ -94,18 +94,20 @@ export default [
   <tr><td><b>Total Revenue</b></td><td>Everything billed in the period, GST included, less credit notes.</td></tr>
   <tr><td><b>Less: GST Collected</b></td><td>The GST (and TCS) on those invoices. It belongs to the government.</td></tr>
   <tr><td><b>Net Revenue</b></td><td>What you actually earned from sales.</td></tr>
+  <tr><td><b>Less: Cost of goods sold</b></td><td>What the goods you sold cost you, at their average purchase rate without GST. Below it, a count of sale lines whose item has no purchase rate yet (set one in <a href="products.html">Products</a>, or record its purchase).</td></tr>
+  <tr><td><b>Gross Profit</b></td><td>Net Revenue minus the cost of goods sold: your trading margin.</td></tr>
   <tr><td><b>Total Expenses</b></td><td>Expenses with their GST.</td></tr>
   <tr><td><b>Less: GST on Expenses (ITC)</b></td><td>The GST on those expenses, which comes back to you as input tax credit.</td></tr>
   <tr><td><b>Net Expenses</b></td><td>What the expenses really cost you.</td></tr>
-  <tr><td><b>Net Profit</b> / <b>Net Loss</b></td><td>Net Revenue minus Net Expenses.</td></tr>
+  <tr><td><b>Net Profit</b> / <b>Net Loss</b></td><td>Gross Profit minus Net Expenses.</td></tr>
 </table></div>
 <p>With more than one currency, the card says <b>Showing USD invoices only</b> (or whichever currency you picked).</p>
-<div class="note tip"><strong>Something wrong?</strong><p>Profit looks too high: purchases are not subtracted on this tab (see above), and an expense entered without its GST split counts in full. Revenue looks too low: check that the invoices are not saved as proforma or challans, and are not cancelled.</p></div>
+<div class="note tip"><strong>Something wrong?</strong><p>Profit looks too high: an item sold has no purchase rate (the count under Cost of goods sold), or its purchase bill names it differently from Products. An expense entered without its GST split counts in full. Revenue looks too low: check that the invoices are not saved as proforma or challans, and are not cancelled.</p></div>
 </section>
 
 <section id="monthly-breakdown">
 <h3>Monthly Breakdown</h3>
-<p>One row for each month that had sales or expenses in the period, oldest first, with <b>Revenue</b>, <b>Expenses</b> and <b>Profit/Loss</b> for that month, all without GST. A profit shows in green, a loss in red. Months with nothing in them are left out.</p>
+<p>One row for each month that had sales or expenses in the period, oldest first, with <b>Revenue</b>, <b>Cost of goods</b>, <b>Expenses</b> and <b>Profit/Loss</b> for that month, all without GST. A profit shows in green, a loss in red. Months with nothing in them are left out.</p>
 <p>The card appears only when the period has some activity. ${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} export it with a <b>Total</b> row at the bottom.</p>
 <ol class="steps">
   <li><strong>Pick the year</strong>Filter By <b>Fiscal Year</b>, and the year.</li>

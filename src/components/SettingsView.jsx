@@ -23,6 +23,7 @@ import { BusinessTypePanel, FeaturesPanel, useFeatureDraft } from './FeatureSett
 import { rekeyCentres } from '../utils/costCentres';
 import InvoiceNumberSettings from './InvoiceNumberSettings';
 import InvoiceSeriesSettings from './InvoiceSeriesSettings';
+import DocTypesSettings from './DocTypesSettings';
 import SignatureImages, { SIGN_LAYOUTS } from './SignatureImages';
 import { PURPOSE_CODES } from '../utils/purposeCodes';
 import { getBackupsList, restoreBackup, triggerBackup, deleteBackup, getTrashedBills, restoreTrashedBill, purgeTrashedBill, runUpdateNow, saveBill, applyStockChanges, getBackupFolder, setBackupFolder } from '../store';
@@ -833,9 +834,9 @@ export default function SettingsView({ onSaved }) {
           boxShadow: '0 4px 20px rgba(15, 23, 42, 0.08)',
         }}>
         <style>{JUMP_NAV_SECTIONS.map(([id]) => id)
-          .concat('section-costcentres', 'section-invoice-series')
+          .concat('section-costcentres', 'section-invoice-series', 'section-doc-types')
           .filter((id) => id !== activeSection && !(id === 'section-costcentres' && activeSection === 'section-modules')
-            && !(id === 'section-invoice-series' && activeSection === 'section-company'))
+            && !((id === 'section-invoice-series' || id === 'section-doc-types') && activeSection === 'section-company'))
           .map((id) => `#${id}`).join(', ') + ' { display: none !important; }'}</style>
         <nav className="settings-jumpnav" aria-label="Settings sections" style={{
           display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center',
@@ -1530,6 +1531,11 @@ export default function SettingsView({ onSaved }) {
       {/* Divtech Hisaab - the business's own invoice series (A, AB, BB...).
           Outside the Company form: it has its own form and Save. */}
       <div id="section-invoice-series" style={{ order: 1 }}><InvoiceSeriesSettings profile={activeBusiness} /></div>
+      {/* Divtech Hisaab - Cash / Retail Debit / Debit sales, Cash / Debit / URD purchases. */}
+      <div id="section-doc-types" style={{ order: 1 }}>
+        <DocTypesSettings kind="sale" />
+        <DocTypesSettings kind="purchase" />
+      </div>
 
       {/* ---- Multi-Business Profiles ---- */}
       {/* v1.10.36 — Moved from ~line 1300 (was 500+ lines below the

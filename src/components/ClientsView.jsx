@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Search, FileText, ChevronDown, ChevronUp, Trash2, X, MessageCircle, Mail, Plus, Edit3, Copy, Upload, Download, Wallet } from 'lucide-react';
+import { Users, Search, FileText, ChevronDown, ChevronUp, Trash2, X, MessageCircle, Mail, Plus, Edit3, Copy, Upload, Download, Wallet, BookOpen } from 'lucide-react';
+import { openLedger } from '../utils/openLedger';
 import HelpButton from './HelpButton';
 import { getAllClients, getAllBills, deleteClient, saveClient, deleteBill, saveBill, getProfile, deleteReceipt, applyStockChanges, trashSavedPdf } from '../store';
 import { formatCurrency, INVOICE_TYPES, markPaidPatch, markUnpaidPatch, salesSign, countsAsSales, isCancelledBill, amountDue, localToday, parseLocalDate, appliedStock, stockDelta } from '../utils';
+import { needsReceipt } from '../utils/docTypes';
 import { getPrintSettings } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
 import { confirmAction } from './ConfirmModal';
@@ -687,6 +689,12 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
   };
 
   const changeStatus = async (bill, newStatus) => {
+    // Divtech Hisaab - a debit sale is settled by a receipt (Receipts or the
+    // Dashboard's Record payment), so the money lands in the Cash / Bank book.
+    if (newStatus === 'paid' && needsReceipt(bill)) {
+      toast(`${bill.data.details.saleType.name} invoice: record a receipt for it (Receipts, or Record payment on the Dashboard) to mark it paid.`, 'info', 6000);
+      return;
+    }
     const updated = { ...bill, status: newStatus };
     if (newStatus === 'paid') Object.assign(updated, markPaidPatch(bill));
     // v1.10.77 (#86) - Unpaid takes back the "Marked paid" payment, as on the Dashboard.
@@ -950,7 +958,7 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                                 <tr key={bill.id} className={isOverdue ? 'row-overdue' : ''}>
                                   <td className="text-muted">{new Date(bill.invoiceDate).toLocaleDateString('en-IN')}</td>
                                   <td><span className="invoice-badge">{bill.invoiceNumber}</span></td>
-                                  <td><span className="type-badge">{(INVOICE_TYPES[bill.invoiceType || 'tax-invoice'])?.label}</span></td>
+                                  <td><span className="type-badge">{(INVOICE_TYPES[bill.invoiceType || 'tax-invoice'])?.label}</span>{bill.data?.details?.saleType?.name && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 4 }}>{bill.data.details.saleType.name}</span>}</td>
                                   <td className="font-bold" style={{ textAlign: 'right' }}>{formatCurrency(bill.totalAmount, bill.currency || bill.data?.invoiceOptions?.currency || 'INR')}</td>
                                   <td>
                                     <select className="status-select" value={isOverdue && status !== 'overdue' ? 'overdue' : status}
@@ -994,6 +1002,10 @@ export default function ClientsView({ onEdit, onDuplicate, onNew }) {
                       </div>
                     )}
                     <div className="client-actions-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border)' }}>
+                      <button className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }} onClick={() => openLedger(`client:${clientName}`)}
+                        title="Every invoice, credit note and receipt of this client with the running balance">
+                        <BookOpen size={13} /> Ledger
+                      </button>
                       {savedClient ? (
                         <>
                           <button className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }} onClick={() => openEditClient(savedClient)}>

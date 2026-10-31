@@ -20,6 +20,12 @@
  */
 import { belongsToProfile, getFinancialYearStart, toLocalIsoDate } from '../utils.js';
 
+// Divtech Hisaab - the Bank book (bank, UPI, cheque, card) uses the same
+// records and rules; its own entries carry book: 'bank'.
+export const BANK_CATEGORIES = ['Opening balance', 'Cash withdrawal', 'Bank charges', 'Interest', 'Transfer', 'Other'];
+// The categories that move money between the two books (a contra entry).
+export const DEPOSIT_TO_BANK = 'Deposit to bank';
+export const CASH_WITHDRAWAL = 'Cash withdrawal';
 export const CASH_CATEGORIES = ['Opening balance', 'Sales', 'Advance', 'Salary', 'Tea & snacks', 'Transport', 'Owner drawing', 'Deposit to bank', 'Other'];
 
 const MAX_AMOUNT = 1e11;
@@ -60,6 +66,7 @@ export function cleanCashEntry(e) {
     name: str(e.name),
     note: str(e.note),
     category: str(e.category),
+    ...(e.book === 'bank' ? { book: 'bank' } : {}),
     ownerGstin: str(e.ownerGstin),
     ownerName: str(e.ownerName),
     createdAt: str(e.createdAt) || new Date().toISOString(),
@@ -68,6 +75,10 @@ export function cleanCashEntry(e) {
 }
 
 const isCash = (mode) => String(mode || '').trim().toLowerCase() === 'cash';
+// Bank, UPI, cheque and card all go through the bank account.
+const BANK_MODES = ['bank-transfer', 'bank', 'upi', 'cheque', 'card', 'neft', 'rtgs', 'imps', 'online', 'net-banking'];
+export const isBankMode = (mode) => BANK_MODES.includes(String(mode || '').trim().toLowerCase().replace(/\s+/g, '-'));
+export const bookOfEntry = (e) => (e?.book === 'bank' ? 'bank' : 'cash');
 const inRupees = (currency) => !currency || currency === 'INR';
 const billCurrency = (b) => b?.currency || b?.data?.invoiceOptions?.currency || 'INR';
 // As the Dashboard compares them: 'Bank Transfer' on a receipt is 'bank-transfer' on a payment.
@@ -88,7 +99,9 @@ const weakMatch = (p, r, bill) => linkedTo(r, bill)
 
 // Cash recorded elsewhere, as read-only lines. Pass this business's records.
 // `view` is the screen the line was made on (to open it from the cash book).
-export function linkedCashLines({ bills = [], receipts = [], expenses = [], purchases = [] } = {}) {
+// Invoice payments that have no receipt of their own, as [bill, payment]:
+// a paired payment is counted once, as its receipt.
+export function unpairedBillPayments({ bills = [], receipts = [] } = {}) {
   const paired = new Set(); // receipts that are the record of a payment
   // Pairs a payment with a receipt not yet taken; false when there is none.
   const pair = (match) => ([bill, p]) => {
@@ -97,12 +110,21 @@ export function linkedCashLines({ bills = [], receipts = [], expenses = [], purc
     return !!r;
   };
   const payments = bills.flatMap((bill) => (bill?.payments || bill?.data?.payments || []).map((p) => [bill, p]));
-  const unpaired = payments.filter((x) => !pair(strongMatch)(x)).filter((x) => !pair(weakMatch)(x));
+  return payments.filter((x) => !pair(strongMatch)(x)).filter((x) => !pair(weakMatch)(x));
+}
+
+export function linkedCashLines(src = {}) { return linkedMoneyLines(src, 'cash'); }
+export function linkedBankLines(src = {}) { return linkedMoneyLines(src, 'bank'); }
+
+// Money recorded elsewhere for one book ('cash' or 'bank'), as read-only lines.
+export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], purchases = [], openings = [] } = {}, book = 'cash') {
+  const inBook = book === 'bank' ? isBankMode : isCash;
+  const unpaired = unpairedBillPayments({ bills, receipts });
   // A paired payment is shown once, as its receipt (cash or not, as the
   // receipt says). An unpaired cash payment is shown from the invoice.
   const lines = [];
   for (const [bill, p] of unpaired) {
-    if (!isCash(p.mode) || !inRupees(billCurrency(bill)) || !(Number(p.amount) > 0)) continue;
+    if (!inBook(p.mode) || !inRupees(billCurrency(bill)) || !(Number(p.amount) > 0)) continue;
     const no = bill.invoiceNumber || bill.id;
     lines.push({
       key: `payment:${bill.id}:${p.id || `${p.date}:${p.amount}`}`,
@@ -115,7 +137,7 @@ export function linkedCashLines({ bills = [], receipts = [], expenses = [], purc
     });
   }
   for (const r of receipts) {
-    if (!isCash(r.paymentMode) || !inRupees(r.currency) || !(Number(r.amount) > 0)) continue;
+    if (!inBook(r.paymentMode) || !inRupees(r.currency) || !(Number(r.amount) > 0)) continue;
     lines.push({
       key: `receipt:${r.id}`,
       source: 'receipt', view: 'receipts',
@@ -125,7 +147,7 @@ export function linkedCashLines({ bills = [], receipts = [], expenses = [], purc
     });
   }
   for (const e of expenses) {
-    if (!isCash(e.paymentMode) || !inRupees(e.currency) || !(Number(e.amount) > 0)) continue;
+    if (!inBook(e.paymentMode) || !inRupees(e.currency) || !(Number(e.amount) > 0)) continue;
     lines.push({
       key: `expense:${e.id}`,
       source: 'expense', view: 'expenses', label: 'Expense',
@@ -137,7 +159,7 @@ export function linkedCashLines({ bills = [], receipts = [], expenses = [], purc
   }
   for (const p of purchases) {
     for (const x of (Array.isArray(p?.payments) ? p.payments : [])) {
-      if (!isCash(x?.mode) || !(Number(x.amount) > 0)) continue;
+      if (!inBook(x?.mode) || !(Number(x.amount) > 0)) continue;
       lines.push({
         key: `purchase:${p.id}:${x.id || `${x.date}:${x.amount}`}`,
         source: 'purchase', view: 'purchases', label: `Purchase bill ${p.invoiceNumber || p.id} payment`,
@@ -147,8 +169,35 @@ export function linkedCashLines({ bills = [], receipts = [], expenses = [], purc
       });
     }
   }
+  // Divtech Hisaab - payments against opening balances (a receipt against
+  // one is already listed above as a receipt).
+  for (const o of openings) {
+    for (const x of (Array.isArray(o?.payments) ? o.payments : [])) {
+      if (x?.receiptNo || !inBook(x?.mode) || !(Number(x.amount) > 0)) continue;
+      lines.push({
+        key: `opening:${o.id}:${x.id || `${x.date}:${x.amount}`}`,
+        source: 'opening', view: o.party === 'client' ? 'clients' : 'suppliers',
+        label: 'Against opening balance',
+        type: o.party === 'client' ? 'in' : 'out', date: x.date || '', amount: r2(x.amount),
+        name: o.name || '', note: x.note || '', category: '', at: '',
+      });
+    }
+  }
   return lines;
 }
+
+// Divtech Hisaab - the other side of a contra entry: cash deposited in the
+// bank shows as money in on the Bank book, a cash withdrawal as money in on
+// the Cash book. Pass every own entry of this business (both books).
+export const contraLines = (entries = [], book = 'cash') => entries
+  .filter((e) => bookOfEntry(e) !== book && e.type === 'out'
+    && e.category === (book === 'bank' ? DEPOSIT_TO_BANK : CASH_WITHDRAWAL))
+  .map((e) => ({
+    key: `contra:${e.id}`, source: 'contra', view: book === 'bank' ? 'cashbook' : 'bankbook',
+    label: book === 'bank' ? 'Cash deposited (Cash book)' : 'Cash withdrawn (Bank book)',
+    type: 'in', date: e.date || '', amount: r2(e.amount),
+    name: e.name || '', note: e.note || '', category: e.category, at: e.createdAt || '',
+  }));
 
 // The user's own entries as lines.
 export const ownCashLines = (entries = []) => entries.map((e) => ({
