@@ -2,7 +2,7 @@
 // and purchase bills (Purchases). The parsing and the arithmetic live in
 // src/utils/bulkCsv.js; this is the window around them: template, export,
 // pick a file, see what will happen, import.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileSpreadsheet, Upload, Download, X } from 'lucide-react';
 import {
   getProfile, getAllBills, saveBill, getAllProducts, saveProduct, applyStockChanges,
@@ -11,7 +11,9 @@ import {
 import { belongsToProfile, isCancelledBill, isInterstateSupply, roundQty, localToday } from '../utils';
 import {
   salesCsvToBills, billsToSalesCsv, purchaseCsvToRecords, purchasesToCsv, SALES_TEMPLATE, SALES_TEMPLATE_CASH_ROW, PURCHASE_TEMPLATE,
+  importedStockFix,
 } from '../utils/bulkCsv';
+import { confirmAction } from './ConfirmModal';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
 
@@ -26,12 +28,57 @@ export default function BulkCsvImport({ kind = 'sales', onDone }) {
   const sales = kind === 'sales';
   const [open, setOpen] = useState(false);
   const [plan, setPlan] = useState(null); // { fileName, result, ctx }
-  const [adjustStock, setAdjustStock] = useState(false);
+  // Divtech Hisaab - on to start, as the purchase import always adds stock:
+  // sales invoices left unlinked never took their quantities out of Products.
+  const [adjustStock, setAdjustStock] = useState(true);
+  // Invoices imported earlier with this off: their stock can be taken out now.
+  const [stockFix, setStockFix] = useState(null);
   const [addClients, setAddClients] = useState(true);
   const [busy, setBusy] = useState(false);
   const [fileText, setFileText] = useState('');
 
   const close = () => { if (!busy) { setOpen(false); setPlan(null); setFileText(''); } };
+
+  const loadStockFix = async () => {
+    if (!sales) return;
+    try {
+      const [profile, bills, products] = await Promise.all([getProfile().catch(() => null), getAllBills(), getAllProducts().catch(() => [])]);
+      const fix = importedStockFix(bills.filter((b) => belongsToProfile(b, profile)), products);
+      setStockFix(fix.bills.length ? fix : null);
+    } catch { setStockFix(null); }
+  };
+  useEffect(() => { if (open) loadStockFix(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const runStockFix = async () => {
+    if (!stockFix) return;
+    const list = stockFix.byProduct.map(([n, q]) => `${n} ${q > 0 ? '+' : ''}${roundQty(q)}`).join(', ');
+    if (!(await confirmAction({
+      title: 'Take their stock out now?',
+      message: `${stockFix.bills.length} imported invoice${stockFix.bills.length === 1 ? ' was' : 's were'} saved without moving stock. Each line is linked to the product of the same name and Products' stock changes by: ${list}. The invoices, GST and totals do not change.`,
+      confirmLabel: 'Update stock',
+    }))) return;
+    setBusy(true);
+    const stock = {};
+    let done = 0;
+    try {
+      try {
+        for (const [i, bill] of stockFix.bills.entries()) {
+          await saveBill(bill, { overwrite: true });
+          done += 1;
+          // Only the stock of invoices actually saved is moved.
+          for (const [id, d] of Object.entries(stockFix.deltas[i] || {})) stock[id] = (stock[id] || 0) + d;
+        }
+      } finally {
+        if (Object.keys(stock).length) await applyStockChanges(stock);
+      }
+      toast(`Stock updated from ${done} imported invoice${done === 1 ? '' : 's'}`, 'success');
+      await loadStockFix();
+      onDone?.();
+    } catch (err) {
+      toast(`Stopped after ${done} invoice${done === 1 ? '' : 's'}: ${err.message}. Open this window again to finish.`, 'error', 8000);
+      await loadStockFix();
+    } finally { setBusy(false); }
+  };
 
   // Reads everything the conversion needs and works out what the file holds.
   const preview = async (text, fileName, stock = adjustStock) => {
@@ -174,9 +221,18 @@ export default function BulkCsvImport({ kind = 'sales', onDone }) {
                 <input type="file" accept=".csv,text/csv" onChange={pickFile} style={{ display: 'none' }} />
               </label>
             </div>
+            {sales && stockFix && (
+              <div className="notice notice-warning" style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                <strong>{stockFix.bills.length} imported invoice{stockFix.bills.length === 1 ? '' : 's'} did not take stock out</strong> (imported with the stock box unticked):{' '}
+                {stockFix.byProduct.map(([n, q]) => `${n} ${roundQty(-q)}`).join(', ')} still in Products.
+                <div style={{ marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-primary" onClick={runStockFix} disabled={busy}>Take it out of stock now</button>
+                </div>
+              </div>
+            )}
             {sales && (
               <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-                <label><input type="checkbox" checked={adjustStock} onChange={(e) => { setAdjustStock(e.target.checked); if (fileText) preview(fileText, plan?.fileName, e.target.checked); }} /> Take sold quantities out of product stock (leave off for old invoices)</label>
+                <label><input type="checkbox" checked={adjustStock} onChange={(e) => { setAdjustStock(e.target.checked); if (fileText) preview(fileText, plan?.fileName, e.target.checked); }} /> Take sold quantities out of product stock (untick only for old invoices whose stock is already counted in Products)</label>
                 <label><input type="checkbox" checked={addClients} onChange={(e) => setAddClients(e.target.checked)} /> Add new clients to Clients</label>
               </div>
             )}
@@ -185,6 +241,13 @@ export default function BulkCsvImport({ kind = 'sales', onDone }) {
                 <strong>{plan.fileName}</strong>: {ready} {sales ? 'invoice' : 'bill'}{ready === 1 ? '' : 's'} ready
                 {r.skipped.length > 0 && <> · {r.skipped.length} already there (skipped)</>}
                 {sales && r.newClients.length > 0 && <> · {r.newClients.length} new client{r.newClients.length === 1 ? '' : 's'}</>}
+                {sales && (() => {
+                  // What the import will do to Products' stock.
+                  const out = {};
+                  for (const b of r.bills) for (const it of b.data.items) if (it.productId && b.data.stockApplied?.[it.productId]) out[it.name] = (out[it.name] || 0) + (Number(it.quantity) || 0);
+                  const names = Object.entries(out);
+                  return <p style={{ margin: '0.5rem 0 0' }}>{names.length ? <>Stock out: {names.map(([n, q]) => `${n} ${roundQty(q)}`).join(', ')}</> : <span className="text-muted">Stock: no change{adjustStock ? ' (no item matches a product name)' : ''}</span>}</p>;
+                })()}
                 {(r.warnings || []).map((w) => <p key={w} style={{ color: 'var(--warning, #b45309)', margin: '0.5rem 0 0' }}>{w}</p>)}
                 {r.errors.length > 0 && (
                   <>

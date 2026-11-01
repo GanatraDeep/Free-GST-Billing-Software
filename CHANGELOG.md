@@ -4,6 +4,40 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.14.3] - 2026-11-02
+
+### How to update
+
+**Current version:** 1.14.2  →  **New version:** 1.14.3
+
+1. Open the app and click **Update to v1.14.3** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **HSN-wise summaries in the GSTR-3B Excel**: an **HSN outward** sheet
+  (sales by HSN, rate and unit, net of credit notes, as GSTR-1 Table 12) and
+  an **HSN inward** sheet (purchases by HSN net of returns, with URD
+  purchases on their own lines, freight under reverse charge as SAC 9965 and
+  expenses with GST), with quantity, taxable value, IGST, CGST, SGST, cess
+  and totals. They are in the combined GSTR-1 + GSTR-3B file too.
+
+### Fixed
+- **Sales imported from CSV did not reduce product stock.** "Take sold
+  quantities out of product stock" was off unless ticked, while the purchase
+  import always adds stock, so Products' stock (and the month's closing
+  stock) stayed too high. It is now on to start, and the preview shows how
+  much stock each import takes out.
+- **Repair for invoices already imported that way:** the sales CSV window
+  now shows how many imported invoices did not take stock out and how much,
+  with a **Take it out of stock now** button. Each line is linked to the
+  product of the same name; the invoices, GST and totals do not change.
+
+---
+
 ## [1.14.2] - 2026-11-01
 
 ### How to update

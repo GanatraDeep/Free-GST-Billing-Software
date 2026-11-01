@@ -12,6 +12,7 @@
 import {
   computeInvoiceTotals, stockEffect, toCsvLine, INVOICE_TYPES, getStateCode,
   stateNameForCode, resolveLineDiscount, SALES_INVOICE_TYPES, amountDue,
+  isCancelledBill, isServiceProduct, stockDelta,
 } from '../utils.js';
 import { purchaseTotals } from './purchaseOrders.js';
 import { withPurchasePayments, purchasePaymentDue, newPurchasePaymentId, markPurchasePaid } from './purchasePayments.js';
@@ -317,6 +318,48 @@ export function salesCsvToBills(text, { profile = {}, products = [], adjustStock
   const warnings = order.warning ? [order.warning] : [];
   if (noType.length) warnings.push(`${noType.length} invoice${noType.length === 1 ? ' has' : 's have'} no Sale Type (${noType.slice(0, 3).join(', ')}${noType.length > 3 ? '...' : ''}). Fill the Sale Type column (${types.map((x) => x.name).join(' / ')}) or mark a default type in Settings.`);
   return { bills, errors, skipped, newClients: [...newClients.values()], warnings };
+}
+
+/**
+ * Divtech Hisaab - invoices imported with "Take sold quantities out of
+ * product stock" off are saved with their lines not linked to products, so
+ * Products' stock never went down. This links each such line to the product
+ * of the same name (goods only) and works out the stock to take out.
+ * Returns { bills: [updated bills], deltas: [stock change of each], changes: { productId: qty }, lines, byProduct: [[name, qty]] }.
+ * Only imported invoices that are not cancelled are touched; a line already
+ * linked, or with no product of its name, is left as it is.
+ */
+export function importedStockFix(bills = [], products = []) {
+  const byName = new Map((products || []).filter((p) => !isServiceProduct(p))
+    .map((p) => [String(p.name || '').trim().toLowerCase(), p]));
+  const out = [];
+  const deltas = [];
+  const changes = {};
+  let lines = 0;
+  for (const b of bills || []) {
+    if (!b?.importedAt || !b.data || isCancelledBill(b)) continue;
+    const type = b.invoiceType || b.data.invoiceType || 'tax-invoice';
+    let linked = 0;
+    const items = (b.data.items || []).map((it) => {
+      if (it.productId || !(Number(it.quantity) > 0)) return it;
+      const p = byName.get(String(it.name || '').trim().toLowerCase());
+      if (!p) return it;
+      linked += 1;
+      return { ...it, productId: p.id };
+    });
+    if (!linked) continue;
+    const before = b.data.stockApplied || {};
+    const after = stockEffect(items, type, b.status);
+    const delta = stockDelta(before, after);
+    if (!Object.keys(delta).length) continue;
+    lines += linked;
+    for (const [id, d] of Object.entries(delta)) changes[id] = Math.round(((changes[id] || 0) + d) * 1000) / 1000;
+    out.push({ ...b, data: { ...b.data, items, stockApplied: after }, stockFixedAt: new Date().toISOString() });
+    deltas.push(delta);
+  }
+  const names = new Map((products || []).map((p) => [p.id, p.name]));
+  const byProduct = Object.entries(changes).map(([id, q]) => [names.get(id) || id, q]);
+  return { bills: out, deltas, changes, lines, byProduct };
 }
 
 // Bills -> CSV in the import's own columns (one row per item).
