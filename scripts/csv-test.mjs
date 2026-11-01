@@ -98,6 +98,20 @@ console.log('\n[#101] Bulk CSV import / export of sales and purchase bills');
     const back = salesCsvToBills(billsToSalesCsv(cashRes.bills), { profile, products });
     j(back.bills.map((x) => `${x.data.details.saleType?.name}/${x.status}/${x.totalAmount}`), ['Debit/unpaid/1026.6', 'Cash/paid/170'], 'export -> import keeps the Sale Type');
   }
+  {
+    const { importedStockFix } = await import('../src/utils/bulkCsv.js');
+    const j = (a, b2, label) => eq(JSON.stringify(a), JSON.stringify(b2), label);
+    const prods = [{ id: 'p1', name: 'Steel rod 8mm', unit: 'Kg', stock: 100 }, { id: 's1', name: 'Cutting charges', kind: 'service' }];
+    const unticked = salesCsvToBills(SALES_TEMPLATE, { profile, products: prods });
+    const fix = importedStockFix(unticked.bills, prods);
+    j([fix.bills.length, fix.lines, fix.changes, fix.byProduct], [1, 1, { p1: -10 }, [['Steel rod 8mm', -10]]], 'Repair: an invoice imported without stock is linked by name and takes its 10 out (a service line is left alone)');
+    j([fix.bills[0].data.items[0].productId, fix.bills[0].data.stockApplied, fix.bills[0].totalAmount], ['p1', { p1: -10 }, unticked.bills[0].totalAmount], 'its stock record is set and the invoice total does not change');
+    j(importedStockFix(fix.bills, prods).bills.length, 0, 'running the repair again changes nothing');
+    j(importedStockFix(salesCsvToBills(SALES_TEMPLATE, { profile, products: prods, adjustStock: true }).bills, prods).bills.length, 0, 'invoices imported with the box ticked need no repair');
+    j(importedStockFix(unticked.bills.map((b) => ({ ...b, status: 'cancelled' })), prods).bills.length, 0, 'a cancelled invoice is not touched');
+    j(importedStockFix(unticked.bills.map((b) => ({ ...b, importedAt: undefined })), prods).bills.length, 0, 'an invoice typed in on the screen is not touched');
+    j(importedStockFix(salesCsvToBills(SALES_TEMPLATE.replace(/Tax Invoice/g, 'Credit Note'), { profile, products: prods }).bills, prods).changes, { p1: 10 }, 'a credit note puts its stock back');
+  }
   const again = salesCsvToBills(billsToSalesCsv(res.bills), { profile, products, adjustStock: true });
   eq(again.bills[0].totalAmount, b.totalAmount, 'export -> import gives the same invoice total');
 
@@ -127,6 +141,32 @@ console.log('\n[#101] Bulk CSV import / export of sales and purchase bills');
   eq(purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',No,', ',,'), { profile, purchaseTypes, inferInterstate: () => true }).purchases[0].interstate, true, 'blank Inter-state is worked out from the GSTIN');
   const back = purchaseCsvToRecords(purchasesToCsv([p, c]), { profile, purchaseTypes }).purchases;
   eq(back.map((x) => [x.totalAmount, x.purchaseType?.name, x.applyRoundOff].join('/')).join(' '), '7098/Debit/true 4410/Cash/false', 'purchase export -> import round trip keeps Bill Type and Round Off');
+}
+
+console.log('\n[HSN-wise inward summary for GSTR-3B]');
+{
+  const { inwardHsnRows, hsnSheetRows } = await import('../src/utils/hsnSummary.js');
+  const purchases = [
+    { id: 'a', date: '2026-10-01', items: [{ name: 'COTTONSEED OIL', hsn: '15122910', quantity: 30, rate: 2400, taxPercent: 5 }] },
+    { id: 'b', date: '2026-10-06', items: [{ name: 'COTTONSEED OIL', hsn: '15122910', quantity: 75, rate: 2600, taxPercent: 5 }] },
+    { id: 'r', date: '2026-10-08', isReturn: true, items: [{ name: 'COTTONSEED OIL', hsn: '15122910', quantity: 5, rate: 2600, taxPercent: 5 }] },
+    { id: 'i', date: '2026-10-09', interstate: true, items: [{ name: 'GROUNDNUT OIL', hsn: '15089010', quantity: 10, rate: 3000, taxPercent: 5 }] },
+    { id: 'u', date: '2026-10-10', purchaseType: { id: 'urd', name: 'URD', urd: true }, items: [{ name: 'Loose oil', quantity: 2, rate: 500, taxPercent: 5 }] },
+    { id: 'po', kind: 'po', date: '2026-10-11', items: [{ name: 'COTTONSEED OIL', hsn: '15122910', quantity: 999, rate: 1, taxPercent: 5 }] },
+  ];
+  const freight = [{ id: 'f', date: '2026-10-03', transporter: 'T', amount: 4000, rcmRate: 5 }];
+  const expenses = [{ id: 'x', date: '2026-10-04', category: 'Rent', amount: 11800, gstAmount: 1800 }];
+  const products = [{ name: 'COTTONSEED OIL', unit: 'Tin' }, { name: 'GROUNDNUT OIL', unit: 'Kg' }];
+  const rows = inwardHsnRows({ purchases, freight, expenses, products });
+  const j = (a, b2, label) => eq(JSON.stringify(a), JSON.stringify(b2), label);
+  const cs = rows.find((r) => r.hsn === '15122910');
+  j([cs.kind, cs.quantity, cs.taxable, cs.cgst, cs.sgst, cs.igst, cs.uqc], ['ITC', 100, 254000, 6350, 6350, 0, 'CAN'], 'Cottonseed: 30 + 75 - 5 returned = 100 tins, taxable 2,54,000, CGST + SGST, Tin as CAN; a purchase order is left out');
+  j([rows.find((r) => r.hsn === '15089010').igst, rows.find((r) => r.hsn === '15089010').uqc], [1500, 'KGS'], 'Inter-state purchase: IGST; unit taken from the product (Kg -> KGS)');
+  j(rows.map((r) => r.kind), ['ITC', 'ITC', 'URD', 'RCM', 'EXP'], 'Rows grouped: purchases with ITC, URD, freight under RCM, expenses');
+  j([rows[3].hsn, rows[3].taxable, rows[3].totalTax], ['9965', 4000, 200], 'Freight: SAC 9965, 4,000 with 200 under reverse charge');
+  j([rows[4].taxable, rows[4].rate, rows[4].totalTax], [10000, 18, 1800], 'Expense with GST: value before GST and its rate worked out');
+  const sheet = hsnSheetRows(rows, { inward: true });
+  j([sheet[0][0], sheet.length, sheet[sheet.length - 1][0], sheet[sheet.length - 1][6]], ['Type', rows.length + 2, 'Total', 299000], 'Sheet: header, one line per row, total of taxable value');
 }
 
 console.log('\n[Review] Import never merges different invoices or double-books a bill');

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, ChevronRight, AlertTriangle, BookOpen, BarChart3, FileSpreadsheet, IndianRupee } from 'lucide-react';
 import { buildWorkbook } from '../utils/xlsx';
 import GstPaidModal from './GstPaidModal';
-import { getAllBills, getAllExpenses, getAllPurchases, getAllFreight, getProfile, getEnabledModules } from '../store';
+import { getAllBills, getAllExpenses, getAllPurchases, getAllFreight, getAllProducts, getProfile, getEnabledModules } from '../store';
+import { inwardHsnRows, hsnSheetRows } from '../utils/hsnSummary';
 import { freightTax, freightRcmTotals, freightAccountName } from '../utils/freight';
 import { hsnTable, stripEmpty } from '../utils/gstr1Json';
 import { formatCurrency, INVOICE_TYPES, getStateCode, formatDateGST, getFilingPeriod, hsnUqc, getFYOptions, belongsToProfile, toCsvLine, isCancelledBill, b2clThreshold, GST_PORTAL_RATES, setOffITC, splitLineTax, roundQty, placeOfSupplyLabel, countsAsSales, parseLocalDate, isModuleEnabled } from '../utils';
@@ -517,6 +518,7 @@ export default function GSTReturns() {
   const [expenses, setExpenses] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [freight, setFreight] = useState([]);
+  const [products, setProducts] = useState([]);
   const [profile, setProfile] = useState({});
   const [filterMode, setFilterMode] = useState('month');
   const [fyFilter, setFyFilter] = useState('');
@@ -587,6 +589,8 @@ export default function GSTReturns() {
       try { const pur = await getAllPurchases(); setPurchases((pur || []).filter(r => belongsToProfile(r, p))); } catch { /* ignore — older servers don't have this endpoint */ }
       // Divtech Hisaab - freight (jakat) under reverse charge.
       try { const fr = await getAllFreight(); setFreight((fr || []).filter(r => belongsToProfile(r, p))); } catch { /* older server */ }
+      // Units of purchase lines (for the inward HSN summary's UQC).
+      try { setProducts((await getAllProducts()) || []); } catch { /* none */ }
     } catch { toast('Failed to load data', 'error'); }
   };
 
@@ -1334,6 +1338,11 @@ export default function GSTReturns() {
       fr.push(['Total', '', '', '', '', '', '', '', round2(freightRcm.taxable + freightRcm.exempt), '', freightRcm.igst, freightRcm.cgst, freightRcm.sgst, freightRcm.tax]);
       sheets.splice(4, 0, { name: 'RCM freight register', rows: [['Date', 'Transporter', 'GSTIN', 'LR no.', 'Vehicle', 'Goods', 'Freight account', 'Purchase bill', 'Freight', 'RCM rate %', 'IGST', 'CGST', 'SGST/UTGST', 'RCM total'], ...fr] });
     }
+    // Divtech Hisaab - HSN-wise summaries of outward supplies (as GSTR-1
+    // Table 12, net of credit notes) and inward supplies (purchases net of
+    // returns, freight under RCM, expenses with GST).
+    sheets.push({ name: 'HSN outward', rows: hsnSheetRows(hsnRows.map(r => ({ ...r, uqc: hsnUqc({ hsn: r.hsn, unit: r.uqc }) }))) });
+    sheets.push({ name: 'HSN inward', rows: hsnSheetRows(inwardHsnRows({ purchases: filteredPurchases, freight: filteredFreight, expenses: filteredExpenses, products }), { inward: true }) });
     return [coverSheet('GSTR-3B', sheets.map(sh => [sh.name, sh.rows.length - 1])), ...sheets];
   };
   const saveWorkbook = (sheets, filename) => {
@@ -2164,7 +2173,7 @@ export default function GSTReturns() {
             <button className="btn btn-secondary" onClick={exportGSTR3B} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Download size={13} /> 3B CSV</button>
             <button className="btn btn-primary" onClick={exportGSTR3BJSON} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Upload size={13} /> 3B JSON</button>
             <button className="btn btn-secondary" onClick={() => setShowGstPaid(true)} title="The accounting entry for this period's GST: credit used across heads and the tax paid, as one voucher" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', color: '#047857', borderColor: '#a7f3d0' }}><IndianRupee size={13} /> Record GST paid</button>
-            <button className="btn btn-secondary" onClick={exportGSTR3BExcel} title="Every GSTR-3B table, the purchase register and expenses with GST, one sheet each" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><FileSpreadsheet size={13} /> Excel (all tables)</button>
+            <button className="btn btn-secondary" onClick={exportGSTR3BExcel} title="Every GSTR-3B table, the purchase and freight registers, expenses with GST and the HSN-wise inward / outward summaries, one sheet each" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><FileSpreadsheet size={13} /> Excel (all tables)</button>
             <HelpButton title="GSTR-3B downloads" doc="gst-returns#gstr-3b-files" size={16} />
             {!periodFiling.gstr3b && (
               <button className="btn btn-secondary" onClick={() => markFiled('gstr3b')} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', marginLeft: 'auto', color: '#059669', borderColor: '#bbf7d0' }}>
