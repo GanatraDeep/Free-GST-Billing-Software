@@ -2305,7 +2305,8 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       if (!skipStockDeduction) {
         for (const product of moved) {
           if (!(changes[product.id] < 0)) continue;
-          if (product.stock <= 0) toast(`${product.name} is now out of stock!`, 'warning');
+          if (product.stock < 0) toast(`${product.name} stock is now ${product.stock} (below zero)`, 'warning');
+          else if (product.stock === 0) toast(`${product.name} is now out of stock!`, 'warning');
           else if (product.stock <= 5) toast(`${product.name} has only ${product.stock} left in stock`, 'warning');
         }
       }

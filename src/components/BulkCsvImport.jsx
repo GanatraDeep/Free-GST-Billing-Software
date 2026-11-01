@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { FileSpreadsheet, Upload, Download, X } from 'lucide-react';
 import {
   getProfile, getAllBills, saveBill, getAllProducts, saveProduct, applyStockChanges,
-  getAllClients, saveClient, getAllPurchases, savePurchase,
+  getAllClients, saveClient, getAllPurchases, savePurchase, getDocTypes,
 } from '../store';
 import { belongsToProfile, isCancelledBill, isInterstateSupply, roundQty, localToday } from '../utils';
 import {
@@ -41,8 +41,9 @@ export default function BulkCsvImport({ kind = 'sales', onDone }) {
       const result = salesCsvToBills(text, { profile, products, clients, adjustStock: stock, existingIds: new Set(bills.map((b) => b.id)) });
       setPlan({ fileName, result });
     } else {
-      const existing = (await getAllPurchases()).filter((p) => belongsToProfile(p, profile));
-      const result = purchaseCsvToRecords(text, { profile, existing, inferInterstate: (g) => isInterstateSupply(g, profile) });
+      const [all, purchaseTypes] = await Promise.all([getAllPurchases(), getDocTypes('purchase').catch(() => [])]);
+      const existing = all.filter((p) => belongsToProfile(p, profile));
+      const result = purchaseCsvToRecords(text, { profile, existing, purchaseTypes, inferInterstate: (g) => isInterstateSupply(g, profile) });
       setPlan({ fileName, result });
     }
   };

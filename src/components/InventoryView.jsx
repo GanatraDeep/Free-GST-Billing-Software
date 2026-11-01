@@ -405,7 +405,11 @@ export default function InventoryView() {
                         <span className="text-muted" title="A service has no stock">Service</span>
                       ) : trackedStock(product) === null ? (
                         <span className="text-muted" title="No stock entered, so it is not counted">-</span>
-                      ) : trackedStock(product) <= 0 ? (
+                      ) : trackedStock(product) < 0 ? (
+                        // Divtech Hisaab - sold or adjusted below zero: show the real figure, so
+                        // the shortfall can be seen and fixed with a purchase or an adjustment.
+                        <span style={{ color: '#dc2626', fontWeight: 600 }} title="Stock is below zero: more went out than came in">{trackedStock(product)}</span>
+                      ) : trackedStock(product) === 0 ? (
                         <span style={{ color: '#dc2626', fontWeight: 600 }}>Out of Stock</span>
                       ) : (stockAlerts.enabled !== false && trackedStock(product) <= Number(stockAlerts.threshold ?? 5)) ? (
                         <span style={{ color: '#d97706', fontWeight: 600 }}>{product.stock}</span>

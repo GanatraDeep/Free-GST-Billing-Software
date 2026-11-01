@@ -80,12 +80,32 @@ console.log('\n[#101] Bulk CSV import / export of sales and purchase bills');
   const again = salesCsvToBills(billsToSalesCsv(res.bills), { profile, products, adjustStock: true });
   eq(again.bills[0].totalAmount, b.totalAmount, 'export -> import gives the same invoice total');
 
-  const pur = purchaseCsvToRecords(PURCHASE_TEMPLATE, { profile });
+  const { typesList } = await import('../src/utils/docTypes.js');
+  const purchaseTypes = typesList(null, 'purchase');
+  const eqj = (a, b, label) => eq(JSON.stringify(a), JSON.stringify(b), label);
+  const pur = purchaseCsvToRecords(PURCHASE_TEMPLATE, { profile, purchaseTypes });
   const p = pur.purchases[0];
-  eq([pur.purchases.length, p.taxableAmount, p.totalTax, p.totalAmount, p.ownerGstin].join(','), '1,6000,1080,7080,27AAAAA0000A1Z5', 'purchase: totals as the purchase form, filed under the business');
-  eq(purchaseCsvToRecords(PURCHASE_TEMPLATE, { profile, existing: [{ supplierGstin: '27AAACG1234K1Z2', invoiceNumber: 'sup/552' }] }).skipped.length, 1, 'a supplier bill already booked is skipped');
-  eq(purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',No,', ',,'), { profile, inferInterstate: () => true }).purchases[0].interstate, true, 'blank Inter-state is worked out from the GSTIN');
-  eq(purchaseCsvToRecords(purchasesToCsv([p]), { profile }).purchases[0].totalAmount, 7080, 'purchase export -> import round trip');
+  eq([pur.purchases.length, p.taxableAmount, Math.round(p.totalTax * 100) / 100, p.totalAmount, p.ownerGstin].join(','), '2,6015,1082.7,7098,27AAAAA0000A1Z5', 'purchase: totals as the purchase form (round off Yes: 7,097.70 -> 7,098), filed under the business');
+  eqj([p.applyRoundOff, Math.round(p.roundOff * 100) / 100, p.purchaseType?.name, p.paymentStatus], [true, 0.3, 'Debit', 'Unpaid'], 'Bill Type Debit and Round Off Yes are kept; a Debit bill stays due');
+  const c = pur.purchases[1];
+  eqj([c.purchaseType?.name, c.paymentStatus, c.payments?.length, c.payments?.[0]?.mode, c.payments?.[0]?.amount, c.applyRoundOff], ['Cash', 'Paid', 1, 'cash', 4410, false], 'Bill Type Cash: paid in cash on the bill date, as the form does');
+  const badType = purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',Debit,Yes', ',Credit card,Yes'), { profile, purchaseTypes });
+  eqj([badType.purchases.length, /not one of your purchase types/.test(badType.errors.join(' '))], [1, true], 'an unknown Bill Type is an error for that bill only');
+  eq(/Round Off "maybe"/.test(purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',Debit,Yes', ',Debit,maybe'), { profile, purchaseTypes }).errors.join(' ')), true, 'Round Off must be Yes or No');
+  const urd = purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',Debit,Yes', ',urd,No'), { profile, purchaseTypes }).purchases[0];
+  eqj([urd.purchaseType?.urd, urd.applyRoundOff, urd.totalAmount], [true, false, 7097.7], 'Bill Type matched in any case (URD); Round Off No keeps paise');
+  const noType = purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',Debit,Yes', ',,'), { profile, purchaseTypes });
+  eqj([noType.purchases[0].purchaseType, /no Bill Type/.test(noType.warnings.join(' '))], [undefined, true], 'a blank Bill Type with no default type is warned about');
+  eq(purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',Debit,Yes', ',,'), { profile, purchaseTypes: purchaseTypes.map((t) => ({ ...t, isDefault: t.id === 'debit' })) }).purchases[0].purchaseType?.name, 'Debit', 'a blank Bill Type takes the default type');
+  const paise = purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',100,60.15,18,', ',10,2000.15,5,'), { profile, purchaseTypes }).purchases[0];
+  eqj([paise.totalAmount, paise.roundOff], [21002, 0.42], 'Round off lands on a whole rupee even when the total has more than two decimals (21,001.575 -> 21,002)');
+  const oldFile = 'Invoice Number,Invoice Date,Supplier Name,Item Name,Quantity,Rate,GST %,Payment Status\nX1,2026-10-03,Old Supplier,Rice,1,100,5,Paid\n';
+  const old = purchaseCsvToRecords(oldFile, { profile }).purchases[0];
+  eqj([old.totalAmount, old.paymentStatus, old.applyRoundOff], [105, 'Paid', false], 'a file without the two new columns imports as before');
+  eq(purchaseCsvToRecords(PURCHASE_TEMPLATE, { profile, purchaseTypes, existing: [{ supplierGstin: '27AAACG1234K1Z2', invoiceNumber: 'sup/552' }] }).skipped.length, 1, 'a supplier bill already booked is skipped');
+  eq(purchaseCsvToRecords(PURCHASE_TEMPLATE.replace(',No,', ',,'), { profile, purchaseTypes, inferInterstate: () => true }).purchases[0].interstate, true, 'blank Inter-state is worked out from the GSTIN');
+  const back = purchaseCsvToRecords(purchasesToCsv([p, c]), { profile, purchaseTypes }).purchases;
+  eq(back.map((x) => [x.totalAmount, x.purchaseType?.name, x.applyRoundOff].join('/')).join(' '), '7098/Debit/true 4410/Cash/false', 'purchase export -> import round trip keeps Bill Type and Round Off');
 }
 
 console.log('\n[Review] Import never merges different invoices or double-books a bill');

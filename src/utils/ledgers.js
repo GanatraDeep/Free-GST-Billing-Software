@@ -17,7 +17,7 @@ import { salesSign, isCancelledBill, amountDue, calculateLineItemTax } from '../
 import { purchaseTotals } from './purchaseOrders.js';
 import { purchaseOwed, purchaseTotal, hasPurchasePayments, purchaseStatus } from './purchasePayments.js';
 import { partyKey, OPENING_REF } from './openingBalances.js';
-import { unpairedBillPayments, bookOfEntry, isBankMode, DEPOSIT_TO_BANK, CASH_WITHDRAWAL } from './cashBook.js';
+import { unpairedBillPayments, onCancelledBill, bookOfEntry, isBankMode, DEPOSIT_TO_BANK, CASH_WITHDRAWAL } from './cashBook.js';
 import { freightTax, freightAccountName } from './freight.js';
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -245,9 +245,11 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
     post(doc, modeAccount(p.mode, p.account, refund ? 'out' : 'in'), refund ? -amt : amt, p.date || b.invoiceDate, `Invoice ${b.invoiceNumber || b.id} ${refund ? 'refund' : 'payment'} - ${name || ''}`, p.note || '', 'dashboard');
   }
   // Receipts.
+  // A receipt against a cancelled invoice is undone with it (money given back).
+  const voidedReceipt = onCancelledBill(bills);
   for (const r of receipts) {
     const amt = Number(r.amount) || 0;
-    if ((r.currency && r.currency !== 'INR') || !(amt > 0)) continue;
+    if ((r.currency && r.currency !== 'INR') || !(amt > 0) || voidedReceipt(r)) continue;
     const onOpening = String(r.againstInvoice || '').trim().toLowerCase() === OPENING_REF.toLowerCase();
     const doc = `rcp:${r.id}`;
     const ref = [r.receiptNo, onOpening ? '' : r.againstInvoice].filter(Boolean).join(' · ');
