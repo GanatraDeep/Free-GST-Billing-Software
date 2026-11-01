@@ -37,8 +37,23 @@ Releases page and run it; it installs over your copy and keeps your data.
 - **Record GST paid** on GSTR-3B: one voucher for the period's GST, with
   credit used across heads, tax paid in cash, interest and late fee, from the
   bank, cash or CC.
+- **Freight (jakat) under reverse charge**: a new **Freight (RCM)** screen for
+  transporters' bilties, with goods, LR, vehicle, rate and how it was paid.
+  Each goods gets its own freight account (Freight - Groundnut oil...), a
+  direct expense. The GST goes into GSTR-3B 3.1(d) and 4(A)(3) (ISRC in the
+  JSON), is paid in cash in Table 6 and the Net GST Payable, and has its own
+  **RCM freight register** sheet in the GSTR-3B Excel and a register to print
+  or export for the GST filer. Record GST paid fills in the RCM.
+- **Copies for one print**: a **Copies** box (1 to 4) next to Print on the
+  invoice, so one print can be a single page even when Settings asks for 3.
 
 ### Fixed
+- **Invoices cut off when printed or saved as PDF**: with margins left at 0,
+  the PDF now keeps a 6 mm printer-safe margin on every side. The copy label
+  (ORIGINAL FOR RECIPIENT...) sits in its own band at the top instead of over
+  the business name, and page numbers count within each copy.
+- GSTR-3B now adds tax under reverse charge to what is paid in cash (it was
+  only reported in 3.1(d)).
 - The automatic browser tests no longer fail when they run just after
   midnight in India (they used UTC dates). The daily subscription reminder
   also follows the local day now.

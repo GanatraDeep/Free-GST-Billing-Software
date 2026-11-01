@@ -309,6 +309,19 @@ export function getPrintSettings() {
   }
 }
 
+// Divtech Hisaab - most office printers cannot print the last 4-5 mm at each
+// edge, so an A4 / A5 invoice laid out edge to edge came out cut. Until the
+// user sets margins themselves, sheet paper gets a 6 mm printer-safe margin.
+// Thermal rolls are left as they are.
+export const SAFE_MARGIN_MM = 6;
+export function withSafeMargins(ps, thermal = false) {
+  const zero = ['marginTop', 'marginBottom', 'marginLeft', 'marginRight'].every((k) => !(Number(ps?.[k]) > 0));
+  if (thermal || ps?.marginsSetByUser || !zero) return ps;
+  return { ...ps, marginTop: SAFE_MARGIN_MM, marginBottom: SAFE_MARGIN_MM, marginLeft: SAFE_MARGIN_MM, marginRight: SAFE_MARGIN_MM };
+}
+// How many copies (Original / Duplicate / Triplicate...) a print makes by default.
+export const defaultCopies = (ps) => (ps?.multiCopyEnabled ? Math.max(1, Number(ps.multiCopyCount) || 1) : 1);
+
 export function savePrintSettings(settings) {
   try {
     localStorage.setItem('gst_printSettings', JSON.stringify(settings));

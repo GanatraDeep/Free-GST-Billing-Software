@@ -17,14 +17,14 @@ import { toast } from './Toast';
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const HEAD_NAME = { igst: 'IGST', cgst: 'CGST', sgst: 'SGST / UTGST', cess: 'Cess' };
 
-export default function GstPaidModal({ periodLabel, returnPeriod, liability, credit, cessDue = 0, profile, onClose, onOpenVouchers }) {
+export default function GstPaidModal({ periodLabel, returnPeriod, liability, credit, cessDue = 0, rcm = 0, profile, onClose, onOpenVouchers }) {
   const { moves, payable } = useMemo(() => gstSetOffMoves(liability, credit), [liability, credit]);
   const [vouchers, setVouchers] = useState(null);
   const money = useMoneyAccounts();
   const [form, setForm] = useState(() => ({
     date: localToday(), from: 'bank', challan: '',
     igst: String(r2(payable.igst) || ''), cgst: String(r2(payable.cgst) || ''), sgst: String(r2(payable.sgst) || ''), cess: String(r2(cessDue) || ''),
-    interest: '', lateFee: '',
+    rcm: String(r2(rcm) || ''), interest: '', lateFee: '',
   }));
   const [busy, setBusy] = useState(false);
   const tag = `gst:${returnPeriod}`;
@@ -34,8 +34,8 @@ export default function GstPaidModal({ periodLabel, returnPeriod, liability, cre
   const existing = (vouchers || []).find((v) => v.tag === tag);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const cash = { igst: form.igst, cgst: form.cgst, sgst: form.sgst, cess: form.cess };
-  const lines = gstPaymentLines({ moves, cash, interest: form.interest, lateFee: form.lateFee, from: form.from });
-  const total = r2(['igst', 'cgst', 'sgst', 'cess', 'interest', 'lateFee'].reduce((s, k) => s + (Number(form[k]) || 0), 0));
+  const lines = gstPaymentLines({ moves, cash, rcm: form.rcm, interest: form.interest, lateFee: form.lateFee, from: form.from });
+  const total = r2(['igst', 'cgst', 'sgst', 'cess', 'rcm', 'interest', 'lateFee'].reduce((s, k) => s + (Number(form[k]) || 0), 0));
   const crossMoves = moves.filter((m) => m.from !== m.to);
 
   const save = async (e) => {
@@ -80,6 +80,10 @@ export default function GstPaidModal({ periodLabel, returnPeriod, liability, cre
               <input id={`gstpay-${h}`} type="number" min="0" step="0.01" className="form-input" value={form[h]} onChange={set(h)} placeholder="0" />
             </div>
           ))}
+          <div>
+            <label style={label} htmlFor="gstpay-rcm">Reverse charge (freight)</label>
+            <input id="gstpay-rcm" type="number" min="0" step="0.01" className="form-input" value={form.rcm} onChange={set('rcm')} placeholder="0" />
+          </div>
           <div>
             <label style={label} htmlFor="gstpay-int">Interest</label>
             <input id="gstpay-int" type="number" min="0" step="0.01" className="form-input" value={form.interest} onChange={set('interest')} placeholder="0" />

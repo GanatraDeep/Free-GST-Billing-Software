@@ -18,6 +18,7 @@ import { purchaseTotals } from './purchaseOrders.js';
 import { purchaseOwed, purchaseTotal, hasPurchasePayments, purchaseStatus } from './purchasePayments.js';
 import { partyKey, OPENING_REF } from './openingBalances.js';
 import { unpairedBillPayments, bookOfEntry, isBankMode, DEPOSIT_TO_BANK, CASH_WITHDRAWAL } from './cashBook.js';
+import { freightTax, freightAccountName } from './freight.js';
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const r3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
@@ -125,7 +126,8 @@ const SYSTEM = {
   'tds-receivable': ['TDS deducted by customers', 'current-assets'], 'tds-payable': ['TDS deducted from suppliers (payable)', 'duties-taxes'],
   'tcs-payable': ['TCS collected (payable)', 'duties-taxes'], 'round-off': ['Round off', 'indirect-expenses'],
   interest: ['Bank interest', 'indirect-expenses'], 'discount-received': ['Discount received', 'indirect-incomes'],
-  'stock-adjust': ['Stock adjustments (shortage / excess)', 'purchases'], 'stock-excess': ['Stock found in excess', 'indirect-incomes'], advances: ['Advances (cash / bank book)', 'loans-advances'], drawings: ['Drawings', 'capital'],
+  'stock-adjust': ['Stock adjustments (shortage / excess)', 'purchases'],
+  'rcm-payable': ['GST payable under reverse charge (RCM)', 'duties-taxes'], 'stock-excess': ['Stock found in excess', 'indirect-incomes'], advances: ['Advances (cash / bank book)', 'loans-advances'], drawings: ['Drawings', 'capital'],
   stock: ['Opening stock', 'stock'], 'opening-diff': ['Difference in opening balances', 'capital'], suspense: ['Suspense (money in other modes)', 'suspense'],
 };
 // Expense categories that are part of buying goods (trading account).
@@ -138,7 +140,7 @@ export function accountInfo(id, accounts = []) {
   const arg = rest.join(':');
   if (type === 'client') return { id, name: arg, group: 'sundry-debtors', party: 'client' };
   if (type === 'supplier') return { id, name: arg, group: 'sundry-creditors', party: 'supplier' };
-  if (type === 'expense') return { id, name: arg || 'General expenses', group: DIRECT_EXPENSES.includes(arg.toLowerCase()) ? 'direct-expenses' : 'indirect-expenses' };
+  if (type === 'expense') return { id, name: arg || 'General expenses', group: DIRECT_EXPENSES.includes(arg.toLowerCase()) || /^freight\b/i.test(arg) ? 'direct-expenses' : 'indirect-expenses' };
   if (type === 'cashcat') return { id, name: `${arg} (cash / bank book)`, group: 'indirect-expenses' };
   if (type === 'acc') {
     const a = accounts.find((x) => x.id === arg);
@@ -170,7 +172,7 @@ const CATEGORY_ACCOUNT = {
 
 // All postings of this business's records: [{ key, doc, account, date,
 // particulars, ref, dr, cr, view }]. Rupee documents only.
-export function postings({ bills = [], receipts = [], purchases = [], expenses = [], openings = [], cashEntries = [], vouchers = [], accounts = [], products = [], stockAdjustments = [] } = {}) {
+export function postings({ bills = [], receipts = [], purchases = [], expenses = [], openings = [], cashEntries = [], vouchers = [], accounts = [], products = [], stockAdjustments = [], freight = [] } = {}) {
   const out = [];
   // amount > 0 debits the account, < 0 credits it.
   const post = (doc, account, amount, date, particulars, ref = '', view = '', key = '') => {
@@ -306,6 +308,23 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
     post(doc, `expense:${e.category || 'General expenses'}`, (Number(e.amount) || 0) - gst, e.date, [e.category, who].filter(Boolean).join(' - ') || 'Expense', e.invoiceNumber || '', 'expenses', doc);
     for (const h of HEADS) post(doc, `gst:${h}`, split[h], e.date, `Input tax on expense - ${e.vendorName || e.category || ''}`, e.invoiceNumber || '', 'expenses');
     post(doc, modeAccount(e.paymentMode, e.account, 'out'), -(Number(e.amount) || 0), e.date, `Expense - ${who}`.replace(/\s+-\s*$/, ''), [e.category, e.note].filter(Boolean).join(' · '), 'expenses');
+  }
+
+  // Freight (jakat) for goods brought in, on that goods' freight account. The
+  // GST under reverse charge is your own liability (paid in cash with the
+  // GSTR-3B) and comes back as input tax credit.
+  for (const f of freight) {
+    const doc = `frt:${f.id}`;
+    const x = freightTax(f);
+    const label = `Freight${f.goods ? ` on ${f.goods}` : ''} - ${f.transporter || ''}`;
+    const ref = [f.lrNo ? `LR ${f.lrNo}` : '', f.againstBill].filter(Boolean).join(' · ');
+    post(doc, `expense:${freightAccountName(f.goods)}`, x.taxable, f.date, `${f.transporter || 'Freight'}${f.lrNo ? ` (LR ${f.lrNo})` : ''}`, f.againstBill || '', 'freight', doc);
+    const payTo = f.paymentMode === 'credit' ? supplierAcc(f.transporter) : modeAccount(f.paymentMode, f.account, 'out');
+    post(doc, payTo, -x.taxable, f.date, f.paymentMode === 'credit' ? `Freight${f.goods ? ` on ${f.goods}` : ''}${f.lrNo ? ` (LR ${f.lrNo})` : ''}` : label, ref, 'freight');
+    if (x.tax > 0.005) {
+      for (const h of ['igst', 'cgst', 'sgst']) post(doc, `gst:${h}`, x[h], f.date, `Input tax on freight (RCM) - ${f.transporter || ''}`, ref, 'freight');
+      post(doc, 'rcm-payable', -x.tax, f.date, `GST on freight under reverse charge - ${f.transporter || ''}`, ref, 'freight');
+    }
   }
 
   // Your own Cash book and Bank book entries.
@@ -512,7 +531,7 @@ export function ledgerCatalog(data = {}) {
   const supplierNames = uniq([...suppliers.map((s) => s.name), ...used('supplier:')]);
   const mine = (groups) => accounts.filter((a) => groups.includes(a.group)).sort((a, b) => a.name.localeCompare(b.name)).map((a) => ({ id: `acc:${a.id}`, name: a.name }));
   const expenseNames = [...new Set(used('expense:'))].sort();
-  const other = [...new Set(all.map((p) => p.account))].filter((id) => ['tds-receivable', 'tds-payable', 'tcs-payable', 'round-off', 'interest', 'advances', 'drawings', 'stock', 'opening-diff', 'suspense', 'discount-received', 'stock-adjust', 'stock-excess'].includes(id) || id.startsWith('cashcat:'));
+  const other = [...new Set(all.map((p) => p.account))].filter((id) => ['tds-receivable', 'tds-payable', 'tcs-payable', 'round-off', 'interest', 'advances', 'drawings', 'stock', 'opening-diff', 'suspense', 'discount-received', 'stock-adjust', 'stock-excess', 'rcm-payable'].includes(id) || id.startsWith('cashcat:'));
   return [
     { group: 'Cash and bank', items: [{ id: 'cash', name: 'Cash' }, { id: 'bank', name: 'Bank' }, ...mine(['bank-accounts', 'cc'])] },
     { group: 'Customers', items: clientNames.map((n) => ({ id: `client:${n}`, name: n })) },
@@ -694,7 +713,7 @@ export function postableAccounts(data = {}) {
     { group: 'Income', items: [...mine(['indirect-incomes', 'direct-incomes']), ...sys(['sales'])] },
     { group: 'Customers', items: uniq([...clients.map((c) => c.name), ...used('client:')]).map((n) => ({ id: `client:${n}`, name: n })) },
     { group: 'Suppliers', items: uniq([...suppliers.map((s) => s.name), ...used('supplier:')]).map((n) => ({ id: `supplier:${n}`, name: n })) },
-    { group: 'GST, TDS and TCS', items: sys(['gst:cgst', 'gst:sgst', 'gst:igst', 'gst:cess', 'tds-payable', 'tds-receivable', 'tcs-payable']) },
+    { group: 'GST, TDS and TCS', items: sys(['gst:cgst', 'gst:sgst', 'gst:igst', 'gst:cess', 'rcm-payable', 'tds-payable', 'tds-receivable', 'tcs-payable']) },
     { group: 'Other', items: sys(['purchases', 'advances', 'round-off', 'suspense', 'opening-diff']) },
   ].filter((g) => g.items.length);
 }

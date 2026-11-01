@@ -1923,6 +1923,7 @@ export const MENU_ITEMS = [
   { id: 'expenses', label: 'Expenses', module: 'expenses', section: 'main', help: 'Rent, salaries and other running costs.' },
   { id: 'purchases', label: 'Purchases', module: 'purchases', section: 'main', help: 'Bills from your suppliers, for stock and input tax credit.' },
   { id: 'suppliers', label: 'Suppliers', module: 'suppliers', section: 'main', help: 'Your supplier list (purchase master): GSTIN, address, what you owe each one.' },
+  { id: 'freight', label: 'Freight (RCM)', module: 'freight', section: 'main', help: 'Jakat / bhada on goods brought in, by goods, with GST under reverse charge for GSTR-3B.' },
   { id: 'recurring', label: 'Recurring', module: 'recurring', section: 'main', help: 'Invoices that repeat every week, month or year.' },
   { id: 'receipts', label: 'Receipts', module: 'receipts', section: 'main', help: 'Payment receipts for money you receive.' },
   { id: 'cashbook', label: 'Cash book', module: 'cashBook', section: 'main', help: 'Cash in and out with names and notes, and the cash in hand.' },

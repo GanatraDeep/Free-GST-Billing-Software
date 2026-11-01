@@ -27,12 +27,14 @@ export function gstSetOffMoves(liability = {}, credit = {}) {
 
 // Voucher lines: credit moved between heads, the cash paid on each head
 // (and cess), interest and late fee, all from `from` (cash, bank or a CC).
-export function gstPaymentLines({ moves = [], cash = {}, interest = 0, lateFee = 0, from = 'bank' }) {
+export function gstPaymentLines({ moves = [], cash = {}, rcm = 0, interest = 0, lateFee = 0, from = 'bank' }) {
   const net = new Map();
   const add = (acc, amt) => net.set(acc, r2((net.get(acc) || 0) + amt));
   for (const m of moves) if (m.from !== m.to) { add(`gst:${m.to}`, m.amount); add(`gst:${m.from}`, -m.amount); }
   let paid = 0;
   for (const h of [...HEADS, 'cess']) { const a = r2(cash[h]); if (a > 0) { add(`gst:${h}`, a); paid += a; } }
+  // GST under reverse charge (freight from a GTA...) is paid in cash too.
+  if (r2(rcm) > 0) { add('rcm-payable', r2(rcm)); paid += r2(rcm); }
   if (r2(interest) > 0) { add('expense:GST interest', r2(interest)); paid += r2(interest); }
   if (r2(lateFee) > 0) { add('expense:GST late fee', r2(lateFee)); paid += r2(lateFee); }
   if (paid > 0) add(from, -r2(paid));

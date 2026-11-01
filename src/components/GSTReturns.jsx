@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, ChevronRight, AlertTriangle, BookOpen, BarChart3, FileSpreadsheet, IndianRupee } from 'lucide-react';
 import { buildWorkbook } from '../utils/xlsx';
 import GstPaidModal from './GstPaidModal';
-import { getAllBills, getAllExpenses, getAllPurchases, getProfile, getEnabledModules } from '../store';
+import { getAllBills, getAllExpenses, getAllPurchases, getAllFreight, getProfile, getEnabledModules } from '../store';
+import { freightTax, freightRcmTotals, freightAccountName } from '../utils/freight';
 import { hsnTable, stripEmpty } from '../utils/gstr1Json';
 import { formatCurrency, INVOICE_TYPES, getStateCode, formatDateGST, getFilingPeriod, hsnUqc, getFYOptions, belongsToProfile, toCsvLine, isCancelledBill, b2clThreshold, GST_PORTAL_RATES, setOffITC, splitLineTax, roundQty, placeOfSupplyLabel, countsAsSales, parseLocalDate, isModuleEnabled } from '../utils';
 import { isUrdPurchase, purchaseSign } from '../utils/ledgers';
@@ -515,6 +516,7 @@ export default function GSTReturns() {
   const [cancelledBills, setCancelledBills] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [freight, setFreight] = useState([]);
   const [profile, setProfile] = useState({});
   const [filterMode, setFilterMode] = useState('month');
   const [fyFilter, setFyFilter] = useState('');
@@ -583,6 +585,8 @@ export default function GSTReturns() {
       setExpenses((e || []).filter(r => belongsToProfile(r, p))); setProfile(p || {});
       // Purchases endpoint may not exist on older server versions
       try { const pur = await getAllPurchases(); setPurchases((pur || []).filter(r => belongsToProfile(r, p))); } catch { /* ignore — older servers don't have this endpoint */ }
+      // Divtech Hisaab - freight (jakat) under reverse charge.
+      try { const fr = await getAllFreight(); setFreight((fr || []).filter(r => belongsToProfile(r, p))); } catch { /* older server */ }
     } catch { toast('Failed to load data', 'error'); }
   };
 
@@ -891,11 +895,16 @@ export default function GSTReturns() {
   // Compensation cess paid on purchases is input tax credit too (GSTR-3B
   // Table 4(A) csamt); it was always reported as 0.
   const itcCessFromPurchases = itcPurchases.reduce((s, p) => s + purchaseSign(p) * purchaseBookTotals(p).cess, 0);
+  // Divtech Hisaab - freight under reverse charge: the GST paid on it is
+  // credit again (4(A)(3), ISRC in the JSON).
+  const filteredFreight = freight.filter(f => filterByPeriod(f.date));
+  const freightRcm = freightRcmTotals(filteredFreight);
+  const itcFromFreight = { igst: freightRcm.igst, cgst: freightRcm.cgst, sgst: freightRcm.sgst };
   // Combined ITC
   const itcFromExpenses = {
-    cgst: itcFromExpensesOnly.cgst + itcFromPurchases.cgst,
-    sgst: itcFromExpensesOnly.sgst + itcFromPurchases.sgst,
-    igst: itcFromExpensesOnly.igst + itcFromPurchases.igst,
+    cgst: itcFromExpensesOnly.cgst + itcFromPurchases.cgst + itcFromFreight.cgst,
+    sgst: itcFromExpensesOnly.sgst + itcFromPurchases.sgst + itcFromFreight.sgst,
+    igst: itcFromExpensesOnly.igst + itcFromPurchases.igst + itcFromFreight.igst,
   };
   // v1.10.76 (#81) - credit set off across heads in the legal order (see setOffITC).
   const setOff = setOffITC(outputTax, itcFromExpenses);
@@ -1051,9 +1060,11 @@ export default function GSTReturns() {
       camt: acc.camt + (p.interstate ? 0 : (Number(p.totalTax) || 0) / 2),
       samt: acc.samt + (p.interstate ? 0 : (Number(p.totalTax) || 0) / 2),
       csamt: acc.csamt + (Number(p.totalCess) || purchaseBookTotals(p).cess),
-    }), { txval: 0, iamt: 0, camt: 0, samt: 0, csamt: 0 });
+    }), { txval: freightRcm.taxable, iamt: freightRcm.igst, camt: freightRcm.cgst, samt: freightRcm.sgst, csamt: 0 });
     return { txval: round2(t.txval), iamt: round2(t.iamt), camt: round2(t.camt), samt: round2(t.samt), csamt: round2(t.csamt) };
   })();
+  // Tax under reverse charge is paid in cash; credit cannot pay it.
+  const rcmCash = { igst: rcmTotals.iamt, cgst: rcmTotals.camt, sgst: rcmTotals.samt };
 
   // Table 3.2: inter-state supplies to unregistered persons, by place of supply.
   const interStateB2CRows = (() => {
@@ -1205,6 +1216,7 @@ export default function GSTReturns() {
       ['4(A) ITC Available', '', itcFromExpenses.igst.toFixed(2), itcFromExpenses.cgst.toFixed(2), itcFromExpenses.sgst.toFixed(2), (itcFromExpenses.igst + itcFromExpenses.cgst + itcFromExpenses.sgst).toFixed(2)],
       ['6.1 ITC utilised', '', setOff.used.igst.toFixed(2), setOff.used.cgst.toFixed(2), setOff.used.sgst.toFixed(2), (setOff.used.igst + setOff.used.cgst + setOff.used.sgst).toFixed(2)],
       ['6.1 Tax Payable in cash', '', netTax.igst.toFixed(2), netTax.cgst.toFixed(2), netTax.sgst.toFixed(2), (netTax.igst + netTax.cgst + netTax.sgst).toFixed(2)],
+      ['6.1 Reverse charge payable in cash', '', rcmCash.igst.toFixed(2), rcmCash.cgst.toFixed(2), rcmCash.sgst.toFixed(2), (rcmCash.igst + rcmCash.cgst + rcmCash.sgst).toFixed(2)],
       ['ITC carried forward', '', itcCarry.igst.toFixed(2), itcCarry.cgst.toFixed(2), itcCarry.sgst.toFixed(2), (itcCarry.igst + itcCarry.cgst + itcCarry.sgst).toFixed(2)],
     ]);
     say('GSTR-3B summary CSV downloaded', 'success');
@@ -1277,6 +1289,7 @@ export default function GSTReturns() {
       ['(e) Non-GST outward supplies', 0, 0, 0, 0, 0],
     ];
     const itc = [
+      ['4(A)(3) Inward supplies liable to reverse charge: freight', round2(itcFromFreight.igst), round2(itcFromFreight.cgst), round2(itcFromFreight.sgst), 0],
       ['4(A)(5) All other ITC: purchase bills', round2(itcFromPurchases.igst), round2(itcFromPurchases.cgst), round2(itcFromPurchases.sgst), round2(itcCessFromPurchases)],
       ['4(A)(5) All other ITC: expenses', round2(itcFromExpensesOnly.igst), round2(itcFromExpensesOnly.cgst), round2(itcFromExpensesOnly.sgst), 0],
       ['4(A) ITC available (total)', round2(itcFromExpenses.igst), round2(itcFromExpenses.cgst), round2(itcFromExpenses.sgst), round2(itcCessFromPurchases)],
@@ -1288,6 +1301,7 @@ export default function GSTReturns() {
       ['Tax payable', round2(outputTax.igst), round2(outputTax.cgst), round2(outputTax.sgst), sum(outputTax)],
       ['Paid through ITC', round2(setOff.used.igst), round2(setOff.used.cgst), round2(setOff.used.sgst), sum(setOff.used)],
       ['Paid in cash', round2(netTax.igst), round2(netTax.cgst), round2(netTax.sgst), sum(netTax)],
+      ['Reverse charge, paid in cash', round2(rcmCash.igst), round2(rcmCash.cgst), round2(rcmCash.sgst), sum(rcmCash)],
       ['ITC carried forward', round2(itcCarry.igst), round2(itcCarry.cgst), round2(itcCarry.sgst), sum(itcCarry)],
     ];
     const purchaseRegister = [...filteredPurchases].sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).map(p => {
@@ -1311,6 +1325,15 @@ export default function GSTReturns() {
       { name: 'Purchase register', rows: [['Date', 'Supplier', 'GSTIN', 'Bill number', 'Purchase type', 'Supply', 'Taxable value', 'IGST', 'CGST', 'SGST/UTGST', 'Cess', 'Total', 'ITC claimed'], ...purchaseRegister] },
       { name: 'Expenses with GST', rows: [['Date', 'Description', 'Category', 'Vendor', 'Vendor GSTIN', 'Value before GST', 'GST', 'Total'], ...expenseRegister] },
     ];
+    // Divtech Hisaab - the freight (jakat) RCM register the GST filer asks for.
+    if (filteredFreight.length) {
+      const fr = [...filteredFreight].sort((a, b) => String(a.date).localeCompare(String(b.date))).map(f => {
+        const x = freightTax(f);
+        return [formatDateGST(f.date), f.transporter || '', f.transporterGstin || '', f.lrNo || '', f.vehicleNo || '', f.goods || '', freightAccountName(f.goods), f.againstBill || '', x.taxable, x.rate, x.igst, x.cgst, x.sgst, x.tax];
+      });
+      fr.push(['Total', '', '', '', '', '', '', '', round2(freightRcm.taxable + freightRcm.exempt), '', freightRcm.igst, freightRcm.cgst, freightRcm.sgst, freightRcm.tax]);
+      sheets.splice(4, 0, { name: 'RCM freight register', rows: [['Date', 'Transporter', 'GSTIN', 'LR no.', 'Vehicle', 'Goods', 'Freight account', 'Purchase bill', 'Freight', 'RCM rate %', 'IGST', 'CGST', 'SGST/UTGST', 'RCM total'], ...fr] });
+    }
     return [coverSheet('GSTR-3B', sheets.map(sh => [sh.name, sh.rows.length - 1])), ...sheets];
   };
   const saveWorkbook = (sheets, filename) => {
@@ -1369,12 +1392,12 @@ export default function GSTReturns() {
       itc_avl: [
         { ty: 'IMPG', iamt: 0, camt: 0, samt: 0, csamt: 0 },
         { ty: 'IMPS', iamt: 0, camt: 0, samt: 0, csamt: 0 },
-        { ty: 'ISRC', iamt: 0, camt: 0, samt: 0, csamt: 0 },
+        { ty: 'ISRC', iamt: round2(itcFromFreight.igst), camt: round2(itcFromFreight.cgst), samt: round2(itcFromFreight.sgst), csamt: 0 },
         { ty: 'ISD',  iamt: 0, camt: 0, samt: 0, csamt: 0 },
         { ty: 'OTH',
-          iamt: round2(itcFromExpenses.igst),
-          camt: round2(itcFromExpenses.cgst),
-          samt: round2(itcFromExpenses.sgst),
+          iamt: round2(itcFromExpenses.igst - itcFromFreight.igst),
+          camt: round2(itcFromExpenses.cgst - itcFromFreight.cgst),
+          samt: round2(itcFromExpenses.sgst - itcFromFreight.sgst),
           csamt: round2(itcCessFromPurchases),
         },
       ],
@@ -1718,7 +1741,8 @@ export default function GSTReturns() {
 
   // ========== RENDER ==========
   const totalTax = grandTotals.cgst + grandTotals.sgst + grandTotals.igst;
-  const netPayable = netTax.igst + netTax.cgst + netTax.sgst;
+  const rcmPayable = round2(rcmCash.igst + rcmCash.cgst + rcmCash.sgst);
+  const netPayable = netTax.igst + netTax.cgst + netTax.sgst + rcmPayable;
 
   return (
     <div className="dashboard-container">
@@ -2129,7 +2153,7 @@ export default function GSTReturns() {
       {/* ===================== GSTR-3B TAB ===================== */}
       {showGstPaid && (
         <GstPaidModal periodLabel={periodText} returnPeriod={getReturnPeriod()} profile={profile}
-          liability={outputTax} credit={itcFromExpenses}
+          liability={outputTax} credit={itcFromExpenses} rcm={freightRcm.tax}
           cessDue={Math.max(0, Math.round(((outward31a.cess || 0) + (exportTotals.cess || 0) - itcCessFromPurchases) * 100) / 100)}
           onClose={() => setShowGstPaid(false)} onOpenVouchers={() => window.dispatchEvent(new CustomEvent('divtech-open-view', { detail: 'vouchers' }))} />
       )}
@@ -2159,6 +2183,7 @@ export default function GSTReturns() {
                   <tr><td className="font-medium">(a) Outward taxable supplies (other than zero-rated, nil-rated and exempted)</td><td style={{ textAlign: 'right' }}>{formatCurrency(outward31a.taxable)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(outward31a.igst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(outward31a.cgst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(outward31a.sgst)}</td></tr>
                   <tr><td className="font-medium">(b) Zero-rated supplies (exports, SEZ)</td><td style={{ textAlign: 'right' }}>{formatCurrency(exportTotals.taxable)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(exportTotals.igst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(0)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(0)}</td></tr>
                   <tr><td className="font-medium">(c) Other outward supplies (nil rated, exempted)</td><td style={{ textAlign: 'right' }}>{formatCurrency(0)}</td><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>N/A</td></tr>
+                  {rcmTotals.txval > 0 && <tr><td className="font-medium">(d) Inward supplies liable to reverse charge{freightRcm.taxable > 0 ? ` (freight ${formatCurrency(freightRcm.taxable)})` : ''}</td><td style={{ textAlign: 'right' }}>{formatCurrency(rcmTotals.txval)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(rcmTotals.iamt)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(rcmTotals.camt)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(rcmTotals.samt)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -2195,6 +2220,7 @@ export default function GSTReturns() {
               <table className="data-table" style={{ minWidth: '500px' }}>
                 <thead><tr><th>Details</th><th style={{ textAlign: 'right' }}>IGST</th><th style={{ textAlign: 'right' }}>CGST</th><th style={{ textAlign: 'right' }}>SGST</th></tr></thead>
                 <tbody>
+                  {freightRcm.tax > 0 && <tr><td className="font-medium">(A)(3) Reverse charge: freight</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromFreight.igst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromFreight.cgst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromFreight.sgst)}</td></tr>}
                   <tr><td className="font-medium">(A) ITC Available — All other ITC</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromExpenses.igst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromExpenses.cgst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromExpenses.sgst)}</td></tr>
                   <tr className="font-bold"><td>Net ITC Available</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromExpenses.igst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromExpenses.cgst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(itcFromExpenses.sgst)}</td></tr>
                 </tbody>
@@ -2220,6 +2246,13 @@ export default function GSTReturns() {
                   <td style={{ textAlign: 'right' }}>{formatCurrency(netTax.igst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(netTax.cgst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(netTax.sgst)}</td>
                   <td style={{ textAlign: 'right', color: 'var(--primary)', fontSize: '1.1rem' }}>{formatCurrency(netTax.igst + netTax.cgst + netTax.sgst)}</td>
                 </tr>
+                {rcmPayable > 0 && (
+                  <tr>
+                    <td>Reverse charge (3.1(d)), paid in cash</td>
+                    <td style={{ textAlign: 'right' }}>{formatCurrency(rcmCash.igst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(rcmCash.cgst)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(rcmCash.sgst)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatCurrency(rcmPayable)}</td>
+                  </tr>
+                )}
                 {hasCarry && (
                   <tr style={{ color: 'var(--text-muted)' }}>
                     <td>ITC carried forward</td>

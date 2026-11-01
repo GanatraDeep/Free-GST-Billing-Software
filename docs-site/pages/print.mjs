@@ -134,12 +134,14 @@ export default [
 
 <section id="copies">
 <h2>Multi-copy (GST rule 48)</h2>
-<p>GST rules expect three copies of an invoice for goods (for the buyer, the transporter and yourself) and two for services. Tick <b>Print multiple copies with labels</b> and choose the <b>Number of copies</b>: 2 (Original + Duplicate, for services) or 3 (Original + Duplicate + Triplicate, for goods; the default). The PDF then holds every page once for each copy, labelled in a small box at the top right:</p>
+<p>GST rules expect three copies of an invoice for goods (for the buyer, the transporter and yourself) and two for services. Tick <b>Print multiple copies with labels</b> and choose the <b>Number of copies</b>: 2 (Original + Duplicate, for services) or 3 (Original + Duplicate + Triplicate, for goods; the default). The PDF then holds every page once for each copy, labelled in a band at the top centre, clear of your business name:</p>
 <ul>
   <li>ORIGINAL FOR RECIPIENT</li>
   <li>DUPLICATE FOR TRANSPORTER</li>
   <li>TRIPLICATE FOR SUPPLIER</li>
+  <li>EXTRA COPY (a fourth copy)</li>
 </ul>
+<p><b>Copies for one print</b>: the <b>Copies</b> box next to ${ui('Print')} on the invoice changes the number (1 to 4) for that print only, without changing this setting. Choose 1 for a single page. Page numbers count within each copy ("Page 2 of 2"), not across all copies.</p>
 <p>Shown for the Wholesale and Manufacturing business types, or with none chosen.</p>
 </section>
 
@@ -156,6 +158,7 @@ export default [
 <section id="margins">
 <h2>Print margins (mm)</h2>
 <p><b>Top</b>, <b>Bottom</b>, <b>Left</b> and <b>Right</b>, in millimetres, from 0 to 100 (all 0 to start). Use them when printing on pre-printed letterhead paper, to move the invoice clear of the printed logo, or to leave room for binding. For example, a top margin of 40 starts the invoice 4 cm down the page.</p>
+<p>Left at 0, the PDF and print keep a <b>6 mm printer-safe margin</b> on every side, because most printers cannot print to the edge of the paper and would cut the border and the last column off. Enter your own margins to use them instead (any value, including a small one). Thermal receipts are not affected.</p>
 </section>
 
 <section id="verification-codes">

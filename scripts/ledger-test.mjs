@@ -234,6 +234,33 @@ eq(needsReceipt({ data: { details: { saleType: typeRef(st[0]) } } }), false, 'A 
 eq(needsReceipt({ data: { details: {} } }), false, 'Older invoices without a type work as before');
 eq(cleanType({ name: 'X', payment: 'weird' }, 'purchase').payment, 'credit', 'Unknown payment means credit');
 
+console.log('\n[Freight under reverse charge]');
+{
+  const { freightTax, freightRcmTotals, freightProblem, freightAccountName } = await import('../src/utils/freight.js');
+  const fr = [
+    { id: 'f1', date: '2026-11-03', goods: 'Groundnut oil', transporter: 'Krishna Roadlines', amount: 4000, rcmRate: 5, paymentMode: 'cash' },
+    { id: 'f2', date: '2026-11-04', goods: 'Cotton seed oil', transporter: 'Rajasthan Carriers', amount: 2000, rcmRate: 5, interstate: true, paymentMode: 'credit' },
+    { id: 'f3', date: '2026-11-05', goods: 'Groundnut oil', transporter: 'Local tempo', amount: 500, rcmRate: 0, paymentMode: 'cash' },
+  ];
+  eq(freightTax(fr[0]), { taxable: 4000, rate: 5, igst: 0, cgst: 100, sgst: 100, tax: 200 }, 'Freight 4,000 at 5%: CGST 100 + SGST 100 under RCM');
+  eq(freightRcmTotals(fr), { taxable: 6000, igst: 100, cgst: 100, sgst: 100, tax: 300, exempt: 500 }, 'RCM totals: inter-state freight is IGST, 0% is kept apart');
+  eq(freightAccountName('Groundnut oil'), 'Freight - Groundnut oil', 'One freight account per goods');
+  eq(!!freightProblem({ date: '2026-11-03', transporter: 'X', amount: 0 }), true, 'Freight needs an amount');
+  const fb = { ...books, freight: fr };
+  const all = postings(fb).filter((p) => p.view === 'freight');
+  const bal = (acc) => Math.round(all.filter((p) => p.account === acc).reduce((s, p) => s + p.dr - p.cr, 0) * 100) / 100;
+  eq([bal('expense:Freight - Groundnut oil'), bal('expense:Freight - Cotton seed oil')], [4500, 2000], 'Each goods has its own freight account');
+  eq(bal('rcm-payable'), -300, 'RCM payable: 300 owed to the government');
+  eq([bal('gst:cgst'), bal('gst:sgst'), bal('gst:igst')], [100, 100, 100], 'And the same 300 is input credit');
+  eq(bal('supplier:Rajasthan Carriers') < 0, true, 'Freight on credit is owed to the transporter');
+  eq(trialBalance(fb, { from: '2026-04-01', to: '2027-03-31' }).difference, 0, 'Trial balance agrees with freight');
+  eq(balanceSheet(fb, { from: '2026-04-01', to: '2027-03-31' }).difference, 0, 'Balance sheet agrees with freight');
+  const pl0 = profitAndLoss(books, { from: '2026-04-01', to: '2027-03-31' }), pl1 = profitAndLoss(fb, { from: '2026-04-01', to: '2027-03-31' });
+  eq(Math.round((pl0.grossProfit - pl1.grossProfit) * 100) / 100, 6500, 'Freight is a direct expense: gross profit falls by 6,500 (its GST is credit)');
+  const pay = gstPaymentLines({ moves: [], cash: {}, rcm: 300, from: 'bank' });
+  eq(pay, [{ account: 'rcm-payable', dr: 300, cr: 0 }, { account: 'bank', dr: 0, cr: 300 }], 'Paying the RCM clears RCM payable from the bank');
+}
+
 console.log('\n[Excel workbook]');
 eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
 {

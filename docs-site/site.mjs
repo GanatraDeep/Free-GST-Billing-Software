@@ -48,7 +48,7 @@ export const NAV = [
   { title: 'Start here', pages: ['index', 'install', 'install-mac', 'install-linux', 'update', 'first-run', 'first-invoice', 'gst-basics', 'security'] },
   { title: 'Invoicing', pages: ['invoices', 'invoice-options', 'thermal-printing', 'dashboard'] },
   { title: 'Clients, stock and payments', pages: ['clients', 'products', 'receipts', 'cash-book', 'ledgers', 'recurring'] },
-  { title: 'Buying', pages: ['purchases', 'expenses'] },
+  { title: 'Buying', pages: ['purchases', 'freight', 'expenses'] },
   { title: 'Tax and reports', pages: ['gst-returns', 'reports', 'income-tax'] },
   { title: 'Accounts and year end', pages: ['accounts', 'final-accounts'] },
   { title: 'Setting up', pages: ['settings', 'print-settings', 'backup', 'control-panel'] },
