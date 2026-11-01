@@ -261,6 +261,27 @@ console.log('\n[Freight under reverse charge]');
   eq(pay, [{ account: 'rcm-payable', dr: 300, cr: 0 }, { account: 'bank', dr: 0, cr: 300 }], 'Paying the RCM clears RCM payable from the bank');
 }
 
+console.log('\n[Cancelled invoice is undone, money too]');
+{
+  const { linkedMoneyLines } = await import('../src/utils/cashBook.js');
+  const cashSale = sale('C-1', '2026-11-20', 'Walk-in', 1, 2000, { status: 'paid', payments: [{ id: 'cash_C-1', amount: 2100, date: '2026-11-20', mode: 'cash', cashSale: true }] });
+  const debitSale = sale('D-1', '2026-11-21', 'Mehta Stores', 1, 1000, { status: 'paid', payments: [{ id: 'rc9', amount: 1050, date: '2026-11-22', mode: 'cash', receiptNo: 'RCP/9' }] });
+  const rcp = { id: 'rc9', receiptNo: 'RCP/9', date: '2026-11-22', clientName: 'Mehta Stores', amount: 1050, paymentMode: 'cash', againstInvoice: 'D-1' };
+  const base = { ...books, bills: [...books.bills, cashSale, debitSale], receipts: [...(books.receipts || []), rcp] };
+  const cancel = (b) => ({ ...b, status: 'cancelled' });
+  const after = { ...base, bills: [...books.bills, cancel(cashSale), cancel(debitSale)] };
+  const cashOf = (d) => ledgerView(moneyLedger('cash', d)).closing;
+  eq(Math.round((cashOf(base) - cashOf(after)) * 100) / 100, 3150, 'Cancelling the cash sale (2,100) and the paid invoice (1,050 receipt) takes 3,150 out of the cash ledger');
+  const lines = (d) => linkedMoneyLines({ bills: d.bills, receipts: d.receipts }, 'cash');
+  eq([lines(base).filter((l) => /C-1|D-1/.test(l.label)).length, lines(after).filter((l) => /C-1|D-1/.test(l.label)).length], [2, 0], 'and out of the Cash book (cash in hand)');
+  eq(buildLedger('client:Mehta Stores', after).entries.length, 0, 'The customer account shows nothing left: no sale, no receipt, no advance');
+  eq([trialBalance(after, { from: '2026-04-01', to: '2027-03-31' }).difference, balanceSheet(after, { from: '2026-04-01', to: '2027-03-31' }).difference], [0, 0], 'Trial balance and balance sheet agree');
+  const undo = { ...after, bills: [...books.bills, cashSale, debitSale] };
+  eq(cashOf(undo), cashOf(base), 'Undo cancel brings the money back');
+  const reused = { ...after, bills: [...after.bills, sale('D-1', '2027-04-02', 'Mehta Stores', 1, 1000)] };
+  eq(lines(reused).some((l) => /RCP\/9/.test(l.label)), true, 'A receipt is kept when another invoice in force has the same number');
+}
+
 console.log('\n[Excel workbook]');
 eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
 {

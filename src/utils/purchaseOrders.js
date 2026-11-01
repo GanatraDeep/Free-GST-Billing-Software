@@ -1,6 +1,6 @@
 // v1.10.83 (#112) - purchase orders: the pure parts (totals, status, numbering,
 // the bill a PO turns into), kept out of the components so they can be tested.
-import { calculateRoundOff, formatDocNumber, getFinancialYearLabel, parseLocalDate, roundQty } from '../utils.js';
+import { formatDocNumber, getFinancialYearLabel, parseLocalDate, roundQty } from '../utils.js';
 
 // Line and document totals for purchase bills and purchase orders alike.
 // Moved here from PurchaseBills.jsx unchanged, so both use the same sums.
@@ -24,8 +24,14 @@ export function purchaseTotals(items, applyRoundOff = false) {
   // Round-off is applied to the GRAND total (taxable + tax + cess). Stored
   // as a separate line so GSTR-3B input tax credit reflects the supplier's
   // actual tax amount, not a rounded version.
-  const roundOff = applyRoundOff ? calculateRoundOff(raw.total) : 0;
-  return { ...raw, roundOff, finalTotal: raw.total + roundOff };
+  // Divtech Hisaab - a total with more than two decimals (a rate in paise
+  // times a quantity, plus GST) once came out as 21,001.995 after a round-off
+  // of 0.42: the total is now the whole rupee, the round-off the difference.
+  if (applyRoundOff) {
+    const finalTotal = Math.round(raw.total);
+    return { ...raw, roundOff: Math.round((finalTotal - raw.total) * 100) / 100, finalTotal };
+  }
+  return { ...raw, roundOff: 0, finalTotal: raw.total };
 }
 
 export const PO_STATUS_LABELS = {

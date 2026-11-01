@@ -13,6 +13,9 @@ import {
   computeInvoiceTotals, stockEffect, toCsvLine, INVOICE_TYPES, getStateCode,
   stateNameForCode, resolveLineDiscount,
 } from '../utils.js';
+import { purchaseTotals } from './purchaseOrders.js';
+import { withPurchasePayments, purchasePaymentDue, newPurchasePaymentId, markPurchasePaid } from './purchasePayments.js';
+import { activeTypes, defaultType, typeRef, isCashType } from './docTypes.js';
 
 // ---------------------------------------------------------------- parsing --
 
@@ -315,6 +318,8 @@ export function billsToSalesCsv(bills) {
 export const PURCHASE_COLUMNS = [
   'Invoice Number', 'Invoice Date', 'Supplier Name', 'Supplier GSTIN', 'Supplier Address',
   'Item Name', 'HSN/SAC', 'Quantity', 'Rate', 'GST %', 'Cess %', 'Inter-state', 'Payment Status', 'Note',
+  // Divtech Hisaab - the bill's purchase type (Cash / Debit / URD...) and round off.
+  'Bill Type', 'Round Off',
 ];
 const PURCHASE_FIELDS = {
   invoiceNumber: ['Invoice Number', 'Invoice No', 'Bill No', 'Bill Number', 'Number', 'Supplier Invoice No'],
@@ -331,6 +336,8 @@ const PURCHASE_FIELDS = {
   interstate: ['Inter-state', 'Interstate', 'IGST', 'Inter State'],
   paymentStatus: ['Payment Status', 'Status', 'Paid'],
   note: ['Note', 'Notes', 'Remarks'],
+  billType: ['Bill Type', 'Purchase Type', 'Type', 'Voucher Type'],
+  roundOff: ['Round Off', 'Roundoff', 'Round-off', 'Apply Round Off', 'Rounding'],
 };
 const PAYMENT_STATUSES = ['Unpaid', 'Partial', 'Paid'];
 
@@ -340,7 +347,13 @@ const PAYMENT_STATUSES = ['Unpaid', 'Partial', 'Paid'];
  * supplier GSTIN or name, same invoice number) is skipped.
  * `inferInterstate(gstin)` (optional) fills Inter-state when the column is blank.
  */
-export function purchaseCsvToRecords(text, { profile = {}, existing = [], inferInterstate = null } = {}) {
+export function purchaseCsvToRecords(text, { profile = {}, existing = [], inferInterstate = null, purchaseTypes = [] } = {}) {
+  // Divtech Hisaab - Bill Type is one of the purchase types (Settings), by
+  // name; a blank one takes the default type, if one is marked.
+  const types = activeTypes(purchaseTypes);
+  const findType = (v) => types.find((t) => t.name.trim().toLowerCase() === String(v || '').trim().toLowerCase()
+    || t.id.toLowerCase() === String(v || '').trim().toLowerCase());
+  const noType = [];
   const { records } = rowsToRecords(text, PURCHASE_FIELDS);
   const errors = [];
   if (!records.length) return { purchases: [], errors: ['The file has no rows under the header.'], skipped: [], warnings: [] };
@@ -386,17 +399,23 @@ export function purchaseCsvToRecords(text, { profile = {}, existing = [], inferI
       items.push({ name: r.itemName, hsn: r.hsn || '', quantity, rate, taxPercent, cessPercent });
     }
     if (bad) continue;
+    let type = null;
+    if (String(head.billType || '').trim()) {
+      type = findType(head.billType);
+      if (!type) { fail(`bill type "${head.billType}" is not one of your purchase types (${types.map((x) => x.name).join(', ') || 'none set'}).`); continue; }
+    } else {
+      type = defaultType(types);
+      if (!type && types.length) noType.push(label);
+    }
+    const roundOffText = String(head.roundOff || '').trim();
+    if (roundOffText && !/^(yes|y|true|1|no|n|false|0)$/i.test(roundOffText)) { fail(`Round Off "${head.roundOff}" must be Yes or No.`); continue; }
+    const applyRoundOff = yes(roundOffText);
     // Same arithmetic as the purchase form (PurchaseBills calcPurchaseTotal).
-    const t = items.reduce((acc, it) => {
-      const amount = it.quantity * it.rate;
-      const tax = amount * it.taxPercent / 100;
-      const cess = amount * it.cessPercent / 100;
-      return { taxable: acc.taxable + amount, tax: acc.tax + tax, cess: acc.cess + cess, total: acc.total + amount + tax + cess };
-    }, { taxable: 0, tax: 0, cess: 0, total: 0 });
+    const t = purchaseTotals(items, applyRoundOff);
     const gstin = (head.supplierGstin || '').toUpperCase();
     const inferred = head.interstate === '' && inferInterstate ? inferInterstate(gstin) : null;
     const status = PAYMENT_STATUSES.find((s) => s.toLowerCase() === String(head.paymentStatus || '').trim().toLowerCase()) || 'Unpaid';
-    purchases.push({
+    let record = {
       date,
       supplierName: head.supplierName || gstin,
       supplierAddress: head.supplierAddress || '',
@@ -405,18 +424,35 @@ export function purchaseCsvToRecords(text, { profile = {}, existing = [], inferI
       ownerGstin: profile?.gstin || '',
       ownerName: profile?.businessName || '',
       items,
-      totalAmount: t.total,
+      totalAmount: t.finalTotal,
       totalTax: t.tax,
       taxableAmount: t.taxable,
-      applyRoundOff: false,
-      roundOff: 0,
+      applyRoundOff,
+      roundOff: t.roundOff,
       paymentStatus: status,
+      ...(type ? { purchaseType: typeRef(type, 'purchase') } : {}),
       interstate: typeof inferred === 'boolean' ? inferred : yes(head.interstate),
       note: head.note || '',
       importedAt: new Date().toISOString(),
-    });
+    };
+    // As the purchase form saves it: a Cash type is paid in cash on the bill
+    // date (it shows in the Cash book); Paid on another bill records the
+    // payment, Unpaid / Partial stay due until a payment is entered.
+    if (isCashType(type)) {
+      record = withPurchasePayments({ ...record, paymentStatus: 'Unpaid' }, [{
+        id: newPurchasePaymentId(), amount: purchasePaymentDue(record), date, mode: 'cash', reference: '',
+        note: `Cash purchase (${type.name})`, recordedAt: new Date().toISOString(), auto: true, cashPurchase: true,
+      }]);
+    } else if (status === 'Paid') {
+      record = markPurchasePaid({ ...record, paymentStatus: 'Unpaid' }, date);
+    } else if (type) {
+      record = { ...record, paymentStatus: 'Unpaid' };
+    }
+    purchases.push(record);
   }
-  return { purchases, errors, skipped, warnings: order.warning ? [order.warning] : [] };
+  const warnings = order.warning ? [order.warning] : [];
+  if (noType.length) warnings.push(`${noType.length} bill${noType.length === 1 ? ' has' : 's have'} no Bill Type (${noType.slice(0, 3).join(', ')}${noType.length > 3 ? '...' : ''}). Fill the Bill Type column (${types.map((x) => x.name).join(' / ')}) or mark a default type in Settings.`);
+  return { purchases, errors, skipped, warnings };
 }
 
 // Purchases -> CSV in the import's own columns (one row per item).
@@ -428,6 +464,7 @@ export function purchasesToCsv(purchases) {
         p.invoiceNumber || '', p.date || '', p.supplierName || '', p.supplierGstin || '', p.supplierAddress || '',
         it.name || '', it.hsn || '', Number(it.quantity) || 0, Number(it.rate) || 0, Number(it.taxPercent) || 0,
         Number(it.cessPercent) || 0, p.interstate ? 'Yes' : 'No', p.paymentStatus || 'Unpaid', p.note || '',
+        p.purchaseType?.name || '', p.applyRoundOff ? 'Yes' : 'No',
       ]));
     }
   }
@@ -442,5 +479,6 @@ export const SALES_TEMPLATE = [
 ].join('\n');
 export const PURCHASE_TEMPLATE = [
   toCsvLine(PURCHASE_COLUMNS),
-  toCsvLine(['SUP/552', '2026-10-03', 'Gupta Steel', '27AAACG1234K1Z2', 'Bhosari, Pune', 'Steel rod 8mm', '7214', 100, 60, 18, 0, 'No', 'Unpaid', '']),
+  toCsvLine(['SUP/552', '2026-10-03', 'Gupta Steel', '27AAACG1234K1Z2', 'Bhosari, Pune', 'Steel rod 8mm', '7214', 100, 60.15, 18, 0, 'No', 'Unpaid', '', 'Debit', 'Yes']),
+  toCsvLine(['C/118', '2026-10-04', 'Shree Oil Depot', '', 'Rajkot', 'Groundnut oil 15 kg tin', '1508', 2, 2100, 5, 0, 'No', '', '', 'Cash', 'No']),
 ].join('\n');

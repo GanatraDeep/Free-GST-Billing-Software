@@ -568,11 +568,15 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
     if (failed) toast(`${failed === 1 ? 'A saved PDF' : `${failed} saved PDFs`} could not be ${cancelled ? 'marked CANCELLED' : 'put back'}. Close the PDF if it is open, then ${cancelled ? 'cancel' : 'undo'} again.`, 'warning', 8000);
   };
 
+  // Money recorded on an invoice: its payment lines (kasar left out).
+  const receivedOn = (bill) => (bill.payments || bill.data?.payments || []).filter((p) => p.mode !== 'discount').reduce((t, p) => t + (Number(p.amount) || 0), 0)
+    || (bill.status === 'paid' ? Number(bill.totalAmount) || 0 : 0);
   const handleCancelInvoice = async (bill) => {
     if (isCancelledBill(bill)) return;
     const ok = await confirmAction({
       title: 'Cancel this invoice?',
-      message: `Invoice ${bill.invoiceNumber} for ${bill.clientName} keeps its number but stops counting in totals, reports and GST returns. Stock is restored for any products on it. To undo it, click the Undo cancel arrow among the row's actions.`,
+      // Divtech Hisaab - the money taken on it is undone too (given back).
+      message: `Invoice ${bill.invoiceNumber} for ${bill.clientName} keeps its number but stops counting in totals, reports and GST returns. Stock is restored for any products on it.${receivedOn(bill) > 0.005 ? ` The ${formatCurrency(receivedOn(bill), bill.currency)} received on it is treated as given back: it comes out of cash in hand (or the bank) and the customer's account.` : ''} To undo it, click the Undo cancel arrow among the row's actions.`,
       confirmLabel: 'Cancel invoice',
       tone: 'danger',
     });
@@ -581,7 +585,7 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
         const [res] = await saveWithStock([planStock(bill, 'cancelled')], (b) => ({ ...b, status: 'cancelled', cancelledAt: new Date().toISOString() }));
         if (res.status === 'rejected') throw res.reason;
         syncSavedPdfs([bill], true);
-        toast('Invoice cancelled & stock restored', 'success');
+        toast(receivedOn(bill) > 0.005 ? 'Invoice cancelled: stock restored and the money received taken out of the books' : 'Invoice cancelled & stock restored', 'success');
         loadBills();
       } catch { toast('Failed to cancel', 'error'); }
     }
@@ -2241,7 +2245,7 @@ function LowStockTicker({ products, onOpenProducts }) {
               <strong>{p.name}</strong>
               {p.hsn ? <span className="text-muted" style={{ marginLeft: 4, fontSize: '0.72rem' }}>({p.hsn})</span> : null}
               <span style={{ marginLeft: 6, fontWeight: 700 }}>
-                {trackedStock(p) <= 0 ? 'Out of Stock' : `Stock: ${trackedStock(p)}`}
+                {trackedStock(p) === 0 ? 'Out of Stock' : `Stock: ${trackedStock(p)}`}
               </span>
             </button>
           )))}

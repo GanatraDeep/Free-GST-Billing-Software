@@ -4,6 +4,43 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.14.1] - 2026-11-01
+
+### How to update
+
+**Current version:** 1.14.0  →  **New version:** 1.14.1
+
+1. Open the app and click **Update to v1.14.1** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **Purchase CSV import: Bill Type and Round Off columns.** Bill Type is one
+  of your purchase types (Cash, Debit, URD or your own): a Cash bill is paid
+  in cash on its date and shows in the Cash book, a URD bill gives no input
+  tax credit, a blank one takes your default type. Round Off Yes rounds the
+  bill total to the rupee. The export writes both columns, and the template
+  has an example of each. Files without them import as before.
+
+### Fixed
+- **Cancelling a cash invoice now takes the cash back out.** The money
+  received on a cancelled invoice (its cash payment, or a receipt against it)
+  is treated as given back: it leaves cash in hand, the Cash / Bank book, the
+  customer's account and the final accounts. The cancel message says how
+  much, the receipt is marked "Invoice cancelled: not counted", and Undo
+  cancel brings it all back.
+- **Negative stock shows as a negative number** (for example -3) in Products
+  and the low-stock list, instead of "Out of Stock". Out of Stock is only for
+  exactly 0.
+- **Purchase round-off now always gives a whole-rupee total.** A bill with a
+  rate in paise (10 × ₹2,000.15 + 5% GST) came out as ₹21,001.995 after
+  round-off; it is now ₹21,002, with ₹0.42 round-off.
+
+---
+
 ## [1.14.0] - 2026-11-01
 
 ### How to update

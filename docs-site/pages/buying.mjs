@@ -395,11 +395,13 @@ export default [
   <tr><td><b>Rate</b></td><td>Required. Per unit, before GST.</td></tr>
   <tr><td><b>GST %</b>, <b>Cess %</b></td><td>0 if blank. GST up to 100.</td></tr>
   <tr><td><b>Inter-state</b></td><td>Yes or No. If blank, it is worked out from the supplier's GSTIN and your state.</td></tr>
-  <tr><td><b>Payment Status</b></td><td>Unpaid, Partial or Paid. Unpaid if blank.</td></tr>
+  <tr><td><b>Payment Status</b></td><td>Unpaid, Partial or Paid. Unpaid if blank. Paid records one payment for the whole bill on its date. Not needed for a Cash bill.</td></tr>
   <tr><td><b>Note</b></td><td>Optional.</td></tr>
+  <tr><td><b>Bill Type</b></td><td>One of your <a href="#purchase-types">purchase types</a> by name: <b>Cash</b>, <b>Debit</b>, <b>URD</b> or one you added. A <b>Cash</b> bill is paid in cash on its date and shows in the Cash book; a <b>URD</b> bill gives no input tax credit. Blank takes the type marked as default; with none marked, the import warns you.</td></tr>
+  <tr><td><b>Round Off</b></td><td>Yes or No (No if blank). Yes rounds the bill total to the nearest rupee, as the Round off tick box on the bill does; the GST is not changed.</td></tr>
 </table></div>
-<p>Other common headings are understood too: <b>Bill No</b>, <b>Vendor</b>, <b>Party Name</b>, <b>GSTIN</b>, <b>Item</b>, <b>Particulars</b>, <b>HSN</b>, <b>Qty</b>, <b>Price</b>, <b>Tax %</b>, <b>Remarks</b> and so on, so a file from another program often works as it is.</p>
-<p>A bill already entered (same supplier and invoice number, matched by GSTIN or by name) is skipped, never changed. Imported bills have no round-off. Quantities are added to product stock and new items become products, as when you type a bill in (see <a href="#stock">What saving does to your products</a>).</p>
+<p>Other common headings are understood too: <b>Bill No</b>, <b>Purchase Type</b>, <b>Roundoff</b>, <b>Vendor</b>, <b>Party Name</b>, <b>GSTIN</b>, <b>Item</b>, <b>Particulars</b>, <b>HSN</b>, <b>Qty</b>, <b>Price</b>, <b>Tax %</b>, <b>Remarks</b> and so on, so a file from another program often works as it is.</p>
+<p>A bill already entered (same supplier and invoice number, matched by GSTIN or by name) is skipped, never changed. Quantities are added to product stock and new items become products, as when you type a bill in (see <a href="#stock">What saving does to your products</a>).</p>
 <div class="note tip"><strong>Something wrong?</strong>
 <p><b>"The dates are month first"</b>: your Excel wrote dates as MM/DD/YYYY. Change the date column to DD-MM-YYYY or YYYY-MM-DD. A yellow line saying <b>Dates are read day first</b> is a reminder to check one example date.</p>
 <p><b>"The file has no rows under the header"</b>, or nothing is read: the file is not a real CSV, or the headings are not in the first row. See <a href="troubleshooting.html#csv-import">A CSV import did not work</a>.</p>

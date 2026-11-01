@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Receipt, Plus, Trash2, Search, Printer, Pencil } from 'lucide-react';
 import { getAllReceipts, saveReceipt, deleteReceipt, getAllBills, getProfile, getNextInvoiceNumber, saveBill, getAllOpeningBalances, saveOpeningBalance } from '../store';
 import { OPENING_REF, openingDue, openingFor } from '../utils/openingBalances';
+import { onCancelledBill } from '../utils/cashBook';
 import { OPENING_EVENT } from './OpeningBalances';
 import { formatCurrency, numberToWords, belongsToProfile, isUnassignedToBusiness, countsAsSales, businessKeyOf, localToday, amountDue, paymentStatusFor, isCancelledBill } from '../utils';
 import UnassignedBanner from './UnassignedBanner';
@@ -357,6 +358,8 @@ export default function ReceiptVoucher() {
   // v1.10.66 (#64 item 2) — receipts saved before this release carry no
   // business. As with expenses they are never assigned automatically: only the
   // user knows which business took the money.
+  // Divtech Hisaab - a receipt against a cancelled invoice is undone with it.
+  const voided = onCancelledBill(bills);
   const unassignedReceipts = receipts.filter(isUnassignedToBusiness);
   const assignUnassignedReceipts = async () => {
     await Promise.all(unassignedReceipts.map(r => saveReceipt({
@@ -560,12 +563,12 @@ export default function ReceiptVoucher() {
               </thead>
               <tbody>
                 {filtered.map(rcp => (
-                  <tr key={rcp.id}>
+                  <tr key={rcp.id} style={voided(rcp) ? { opacity: 0.6 } : undefined}>
                     <td className="text-muted">{rcp.date ? new Date(rcp.date).toLocaleDateString('en-IN') : ''}</td>
                     <td><span className="invoice-badge">{rcp.receiptNo}</span></td>
                     <td className="font-medium">{rcp.clientName}</td>
-                    <td className="text-muted">{rcp.againstInvoice || '-'}</td>
-                    <td style={{ textAlign: 'right' }} className="font-bold">{formatCurrency(rcp.amount)}</td>
+                    <td className="text-muted">{rcp.againstInvoice || '-'}{voided(rcp) && <div style={{ color: '#dc2626', fontSize: '0.75rem', fontWeight: 600 }} title="The invoice is cancelled, so this money is treated as given back: it is not in cash in hand, the bank or the books. Undo the cancel to count it again.">Invoice cancelled: not counted</div>}</td>
+                    <td style={{ textAlign: 'right', ...(voided(rcp) ? { textDecoration: 'line-through' } : {}) }} className="font-bold">{formatCurrency(rcp.amount)}</td>
                     <td className="text-muted">{rcp.paymentMode}</td>
                     <td>
                       <div className="table-actions">

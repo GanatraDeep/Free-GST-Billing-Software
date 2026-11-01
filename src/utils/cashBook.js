@@ -18,7 +18,7 @@
  * Pure: no React, no storage, so the server validates with the same rules.
  * ponytail: rupees only; a foreign-currency invoice or receipt is left out.
  */
-import { belongsToProfile, getFinancialYearStart, toLocalIsoDate } from '../utils.js';
+import { belongsToProfile, getFinancialYearStart, toLocalIsoDate, isCancelledBill } from '../utils.js';
 
 // Divtech Hisaab - the Bank book (bank, UPI, cheque, card) uses the same
 // records and rules; its own entries carry book: 'bank'.
@@ -97,6 +97,18 @@ const weakMatch = (p, r, bill) => linkedTo(r, bill)
   && Math.abs((Number(p.amount) || 0) - (Number(r.amount) || 0)) < 0.005
   && p.date === r.date && modeKey(p.mode) === modeKey(r.paymentMode);
 
+// Divtech Hisaab - a cancelled invoice is undone completely: the money taken
+// on it is treated as given back, so it leaves cash in hand (or the bank) and
+// the books. Returns a test for receipts recorded against a cancelled invoice
+// (and against no invoice still in force with the same number). Undo cancel
+// brings them back.
+export function onCancelledBill(bills = []) {
+  const cancelled = bills.filter(isCancelledBill);
+  if (!cancelled.length) return () => false;
+  const active = bills.filter((b) => !isCancelledBill(b));
+  return (r) => cancelled.some((b) => linkedTo(r, b)) && !active.some((b) => linkedTo(r, b));
+}
+
 // Cash recorded elsewhere, as read-only lines. Pass this business's records.
 // `view` is the screen the line was made on (to open it from the cash book).
 // Invoice payments that have no receipt of their own, as [bill, payment]:
@@ -122,7 +134,9 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
   // Divtech Hisaab - money through another bank or a CC account is in that
   // account's ledger, not in the Bank book.
   const otherAccount = (rec) => book === 'bank' && String(rec?.account || '').startsWith('acc:');
-  const unpaired = unpairedBillPayments({ bills, receipts });
+  // Payments on a cancelled invoice, and receipts against one, are not counted.
+  const voided = onCancelledBill(bills);
+  const unpaired = unpairedBillPayments({ bills: bills.filter((b) => !isCancelledBill(b)), receipts });
   // A paired payment is shown once, as its receipt (cash or not, as the
   // receipt says). An unpaired cash payment is shown from the invoice.
   const lines = [];
@@ -140,6 +154,7 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
     });
   }
   for (const r of receipts) {
+    if (voided(r)) continue;
     if (!inBook(r.paymentMode) || otherAccount(r) || !inRupees(r.currency) || !(Number(r.amount) > 0)) continue;
     lines.push({
       key: `receipt:${r.id}`,
