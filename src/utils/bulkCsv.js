@@ -11,11 +11,11 @@
 // Pure functions only (no fetch / React), so scripts/csv-test.mjs can test them.
 import {
   computeInvoiceTotals, stockEffect, toCsvLine, INVOICE_TYPES, getStateCode,
-  stateNameForCode, resolveLineDiscount,
+  stateNameForCode, resolveLineDiscount, SALES_INVOICE_TYPES, amountDue,
 } from '../utils.js';
 import { purchaseTotals } from './purchaseOrders.js';
 import { withPurchasePayments, purchasePaymentDue, newPurchasePaymentId, markPurchasePaid } from './purchasePayments.js';
-import { activeTypes, defaultType, typeRef, isCashType } from './docTypes.js';
+import { activeTypes, defaultType, typeRef, isCashType, typesList } from './docTypes.js';
 
 // ---------------------------------------------------------------- parsing --
 
@@ -143,6 +143,8 @@ export const SALES_COLUMNS = [
   'Item Name', 'HSN/SAC', 'Quantity', 'Unit', 'Rate', 'Discount', 'GST %', 'Cess %', 'Prices Include Tax', 'Notes',
   // Per invoice (read from its first row), so an export re-imports to the same total.
   'Bill Discount', 'Round Off',
+  // Divtech Hisaab - the sale type (Cash / Retail Debit / Debit...) of a sale.
+  'Sale Type',
 ];
 const SALES_FIELDS = {
   invoiceNumber: ['Invoice Number', 'Invoice No', 'Inv No', 'Bill No', 'Number'],
@@ -167,6 +169,13 @@ const SALES_FIELDS = {
   notes: ['Notes', 'Note', 'Remarks'],
   billDiscount: ['Bill Discount', 'Invoice Discount'],
   roundOff: ['Round Off', 'Round-off', 'Rounding'],
+  saleType: ['Sale Type', 'Sales Type', 'Voucher Type'],
+};
+
+// A type from the list by name or id, any case (sale and purchase types).
+const typeByName = (types, v) => {
+  const k = String(v || '').trim().toLowerCase();
+  return k ? types.find((t) => t.name.trim().toLowerCase() === k || t.id.toLowerCase() === k) || null : null;
 };
 
 /**
@@ -175,7 +184,11 @@ const SALES_FIELDS = {
  * opts: { profile, products, adjustStock, existingIds:Set, makeId? }
  * Returns { bills, errors: [string], skipped: [invoiceNumber], newClients: [client] }.
  */
-export function salesCsvToBills(text, { profile = {}, products = [], adjustStock = false, existingIds = new Set(), clients = [] } = {}) {
+export function salesCsvToBills(text, { profile = {}, products = [], adjustStock = false, existingIds = new Set(), clients = [], saleTypes = [] } = {}) {
+  // Divtech Hisaab - Sale Type is one of the sale types (Settings), by name;
+  // a blank one takes the default type, if one is marked.
+  const types = activeTypes(typesList(saleTypes, 'sale')); // the app's defaults when none are saved
+  const noType = [];
   const { records } = rowsToRecords(text, SALES_FIELDS);
   const errors = [];
   if (!records.length) return { bills: [], errors: ['The file has no rows under the header.'], skipped: [], newClients: [], warnings: [] };
@@ -211,6 +224,16 @@ export function salesCsvToBills(text, { profile = {}, products = [], adjustStock
     if (clash) { fail(`row ${clash._line} has a different date or client than row ${head._line}. Two invoices can't share a number: give one of them its own number.`); continue; }
     const dueDate = head.dueDate ? toIsoDate(head.dueDate) : '';
     if (head.dueDate && !dueDate) { fail(`due date "${head.dueDate}" is not a date.`); continue; }
+    // Only sales (tax invoice, bill of supply...) have a sale type.
+    const isSale = SALES_INVOICE_TYPES.includes(invoiceType);
+    let saleType = null;
+    if (isSale && String(head.saleType || '').trim()) {
+      saleType = typeByName(types, head.saleType);
+      if (!saleType) { fail(`sale type "${head.saleType}" is not one of your sale types (${types.map((x) => x.name).join(', ') || 'none set'}).`); continue; }
+    } else if (isSale) {
+      saleType = defaultType(types);
+      if (!saleType && types.length) noType.push(invoiceNumber);
+    }
 
     const items = [];
     let bad = false;
@@ -257,7 +280,7 @@ export function salesCsvToBills(text, { profile = {}, products = [], adjustStock
       newClients.set(client.name.toLowerCase(), added);
       if (rowGstin) newClientByGstin.set(rowGstin, added);
     }
-    const details = { invoiceNumber, invoiceDate, dueDate, placeOfSupply: stateName(head.placeOfSupply) };
+    const details = { invoiceNumber, invoiceDate, dueDate, placeOfSupply: stateName(head.placeOfSupply), ...(saleType ? { saleType: typeRef(saleType, 'sale') } : {}) };
     const billDiscount = toNum(head.billDiscount, 0);
     if (!Number.isFinite(billDiscount) || billDiscount < 0) { fail('Bill Discount must be a number, 0 or more.'); continue; }
     const invoiceOptions = {
@@ -265,6 +288,12 @@ export function salesCsvToBills(text, { profile = {}, products = [], adjustStock
       ...(billDiscount > 0 ? { invoiceDiscountType: 'fixed', invoiceDiscountValue: billDiscount } : {}),
     };
     const totals = computeInvoiceTotals({ items, profile, client, details, showGST, taxInclusive, invoiceOptions });
+    // As the invoice screen saves it: a Cash sale is paid in cash on the
+    // invoice date (it shows in the Cash book); other types stay due until a
+    // receipt is recorded.
+    const cashDue = isCashType(saleType) ? Math.round(amountDue({ totalAmount: totals.total, data: { totals } }) * 100) / 100 : 0;
+    const payments = cashDue > 0.005 ? [{ id: `cash_${invoiceNumber}`, amount: cashDue, date: invoiceDate, mode: 'cash', note: `Cash sale (${saleType.name})`, recordedAt: new Date().toISOString(), auto: true, cashSale: true }] : [];
+    const status = payments.length ? 'paid' : 'unpaid';
     bills.push({
       id: invoiceNumber,
       clientName: client.name,
@@ -274,18 +303,20 @@ export function salesCsvToBills(text, { profile = {}, products = [], adjustStock
       currency: 'INR',
       totalAmount: totals.total,
       totalTaxAmount: totals.totalTaxAmount,
-      status: 'unpaid',
-      paidAmount: 0,
-      payments: [],
+      status,
+      paidAmount: cashDue,
+      payments,
       importedAt: new Date().toISOString(),
       data: {
         profile, client, details, items, totals, invoiceType,
         customTerms: '', customNotes: head.notes || '', extraSections: [], invoiceOptions, taxInclusive,
-        stockApplied: stockEffect(items, invoiceType, 'unpaid'),
+        stockApplied: stockEffect(items, invoiceType, status),
       },
     });
   }
-  return { bills, errors, skipped, newClients: [...newClients.values()], warnings: order.warning ? [order.warning] : [] };
+  const warnings = order.warning ? [order.warning] : [];
+  if (noType.length) warnings.push(`${noType.length} invoice${noType.length === 1 ? ' has' : 's have'} no Sale Type (${noType.slice(0, 3).join(', ')}${noType.length > 3 ? '...' : ''}). Fill the Sale Type column (${types.map((x) => x.name).join(' / ')}) or mark a default type in Settings.`);
+  return { bills, errors, skipped, newClients: [...newClients.values()], warnings };
 }
 
 // Bills -> CSV in the import's own columns (one row per item).
@@ -307,6 +338,7 @@ export function billsToSalesCsv(bills) {
         r2(resolveLineDiscount(it, !showGST || !!d.taxInclusive)),
         Number(it.taxPercent) || 0, Number(it.cessPercent) || 0, d.taxInclusive ? 'Yes' : 'No', d.customNotes || '',
         r2(d.totals?.invoiceDiscountAmount) || '', Number(d.totals?.roundOff) ? 'Yes' : 'No',
+        d.details?.saleType?.name || '',
       ]));
     }
   }
@@ -350,9 +382,8 @@ const PAYMENT_STATUSES = ['Unpaid', 'Partial', 'Paid'];
 export function purchaseCsvToRecords(text, { profile = {}, existing = [], inferInterstate = null, purchaseTypes = [] } = {}) {
   // Divtech Hisaab - Bill Type is one of the purchase types (Settings), by
   // name; a blank one takes the default type, if one is marked.
-  const types = activeTypes(purchaseTypes);
-  const findType = (v) => types.find((t) => t.name.trim().toLowerCase() === String(v || '').trim().toLowerCase()
-    || t.id.toLowerCase() === String(v || '').trim().toLowerCase());
+  const types = activeTypes(typesList(purchaseTypes, 'purchase'));
+  const findType = (v) => typeByName(types, v);
   const noType = [];
   const { records } = rowsToRecords(text, PURCHASE_FIELDS);
   const errors = [];
@@ -474,9 +505,11 @@ export function purchasesToCsv(purchases) {
 // Templates with one example bill, for the "Download template" buttons.
 export const SALES_TEMPLATE = [
   toCsvLine(SALES_COLUMNS),
-  toCsvLine(['INV/2026-27/0101', '2026-10-01', 'Tax Invoice', '2026-10-31', 'Sharma Traders', '27ABCDE1234F1Z5', 'Maharashtra', 'Shop 4, MG Road, Pune', 'India', '', 'Steel rod 8mm', '7214', 10, 'Kg', 72, 0, 18, 0, 'No', '', '', 'No']),
-  toCsvLine(['INV/2026-27/0101', '2026-10-01', 'Tax Invoice', '2026-10-31', 'Sharma Traders', '27ABCDE1234F1Z5', 'Maharashtra', 'Shop 4, MG Road, Pune', 'India', '', 'Cutting charges', '998898', 1, 'Nos', 150, 0, 18, 0, 'No', '', '', 'No']),
+  toCsvLine(['INV/2026-27/0101', '2026-10-01', 'Tax Invoice', '2026-10-31', 'Sharma Traders', '27ABCDE1234F1Z5', 'Maharashtra', 'Shop 4, MG Road, Pune', 'India', '', 'Steel rod 8mm', '7214', 10, 'Kg', 72, 0, 18, 0, 'No', '', '', 'No', 'Debit']),
+  toCsvLine(['INV/2026-27/0101', '2026-10-01', 'Tax Invoice', '2026-10-31', 'Sharma Traders', '27ABCDE1234F1Z5', 'Maharashtra', 'Shop 4, MG Road, Pune', 'India', '', 'Cutting charges', '998898', 1, 'Nos', 150, 0, 18, 0, 'No', '', '', 'No', 'Debit']),
 ].join('\n');
+// A Cash sale, for the template download only (tests read SALES_TEMPLATE).
+export const SALES_TEMPLATE_CASH_ROW = toCsvLine(['INV/2026-27/0102', '2026-10-02', 'Tax Invoice', '', 'Walk-in customer', '', 'Maharashtra', '', 'India', '', 'Steel rod 8mm', '7214', 2, 'Kg', 72, 0, 18, 0, 'No', '', '', 'Yes', 'Cash']);
 export const PURCHASE_TEMPLATE = [
   toCsvLine(PURCHASE_COLUMNS),
   toCsvLine(['SUP/552', '2026-10-03', 'Gupta Steel', '27AAACG1234K1Z2', 'Bhosari, Pune', 'Steel rod 8mm', '7214', 100, 60.15, 18, 0, 'No', 'Unpaid', '', 'Debit', 'Yes']),

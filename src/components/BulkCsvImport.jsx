@@ -10,7 +10,7 @@ import {
 } from '../store';
 import { belongsToProfile, isCancelledBill, isInterstateSupply, roundQty, localToday } from '../utils';
 import {
-  salesCsvToBills, billsToSalesCsv, purchaseCsvToRecords, purchasesToCsv, SALES_TEMPLATE, PURCHASE_TEMPLATE,
+  salesCsvToBills, billsToSalesCsv, purchaseCsvToRecords, purchasesToCsv, SALES_TEMPLATE, SALES_TEMPLATE_CASH_ROW, PURCHASE_TEMPLATE,
 } from '../utils/bulkCsv';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
@@ -37,8 +37,8 @@ export default function BulkCsvImport({ kind = 'sales', onDone }) {
   const preview = async (text, fileName, stock = adjustStock) => {
     const profile = await getProfile().catch(() => ({}));
     if (sales) {
-      const [bills, products, clients] = await Promise.all([getAllBills(), getAllProducts().catch(() => []), getAllClients().catch(() => [])]);
-      const result = salesCsvToBills(text, { profile, products, clients, adjustStock: stock, existingIds: new Set(bills.map((b) => b.id)) });
+      const [bills, products, clients, saleTypes] = await Promise.all([getAllBills(), getAllProducts().catch(() => []), getAllClients().catch(() => []), getDocTypes('sale').catch(() => [])]);
+      const result = salesCsvToBills(text, { profile, products, clients, saleTypes, adjustStock: stock, existingIds: new Set(bills.map((b) => b.id)) });
       setPlan({ fileName, result });
     } else {
       const [all, purchaseTypes] = await Promise.all([getAllPurchases(), getDocTypes('purchase').catch(() => [])]);
@@ -165,7 +165,7 @@ export default function BulkCsvImport({ kind = 'sales', onDone }) {
                 : 'A bill already entered (same supplier and invoice number) is skipped. Quantities are added to product stock, as when you type a bill in.'}
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => download(sales ? SALES_TEMPLATE : PURCHASE_TEMPLATE, sales ? 'Sales-import-template.csv' : 'Purchase-import-template.csv')}>
+              <button type="button" className="btn btn-secondary" onClick={() => download(sales ? `${SALES_TEMPLATE}\n${SALES_TEMPLATE_CASH_ROW}` : PURCHASE_TEMPLATE, sales ? 'Sales-import-template.csv' : 'Purchase-import-template.csv')}>
                 <Download size={15} /> Template
               </button>
               <button type="button" className="btn btn-secondary" onClick={exportAll}><Download size={15} /> Export all as CSV</button>
