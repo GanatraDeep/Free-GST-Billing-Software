@@ -158,6 +158,12 @@ copyFileSync(join(REPO_ROOT, 'src', 'utils', 'cashBook.js'), join(SYSTEM, 'src',
 // purchaseOrders.js, which imports ../utils.js only.
 // Divtech Hisaab - opening balances are checked on save (imports nothing).
 copyFileSync(join(REPO_ROOT, 'src', 'utils', 'openingBalances.js'), join(SYSTEM, 'src', 'utils', 'openingBalances.js'));
+// Divtech Hisaab - accounts and vouchers (v1.13.0) and freight entries
+// (v1.14.0) are checked on save with the screens' own rules (both import
+// nothing). Leaving them out failed the v1.13.0 and v1.14.0 release builds.
+for (const f of ['vouchers.js', 'freight.js']) {
+  copyFileSync(join(REPO_ROOT, 'src', 'utils', f), join(SYSTEM, 'src', 'utils', f));
+}
 for (const f of ['purchasePayments.js', 'purchaseOrders.js']) {
   copyFileSync(join(REPO_ROOT, 'src', 'utils', f), join(SYSTEM, 'src', 'utils', f));
 }
