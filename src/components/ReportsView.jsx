@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Wallet, BarChart3, Clock, Search, X, Users, Package, Boxes, Building2, Percent } from 'lucide-react';
-import { getAllBills, getAllExpenses, getAllPurchases, getAllProducts, getProfile } from '../store';
-import { costOfGoodsSold } from '../utils/ledgers';
+import { getAllBills, getAllExpenses, getAllPurchases, getAllProducts, getAllStockAdjustments, getProfile } from '../store';
+import { costOfGoodsSold, stockAdjustmentLoss } from '../utils/ledgers';
 import { formatCurrency, getFYOptions, belongsToProfile, isCancelledBill, salesSign, countsAsSales, calculateLineItemTax, roundQty, parseLocalDate, amountDue } from '../utils';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
@@ -47,6 +47,7 @@ export default function ReportsView() {
   const [expenses, setExpenses] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [products, setProducts] = useState([]);
+  const [adjustments, setAdjustments] = useState([]);
   const [activeTab, setActiveTab] = useState('pl');
   const [filterMode, setFilterMode] = useState('fy');
   const [fyFilter, setFyFilter] = useState('');
@@ -66,10 +67,11 @@ export default function ReportsView() {
 
   const loadData = async () => {
     try {
-      const [billData, expData, prof, purData, prodData] = await Promise.all([
+      const [billData, expData, prof, purData, prodData, adjData] = await Promise.all([
         getAllBills(), getAllExpenses(), getProfile().catch(() => null),
-        getAllPurchases().catch(() => []), getAllProducts().catch(() => []),
+        getAllPurchases().catch(() => []), getAllProducts().catch(() => []), getAllStockAdjustments().catch(() => []),
       ]);
+      setAdjustments((adjData || []).filter(a => belongsToProfile(a, prof)));
       // Divtech Hisaab - purchases and products, for the cost of goods sold.
       setPurchases((purData || []).filter(p => belongsToProfile(p, prof)));
       setProducts(prodData || []);
@@ -170,10 +172,12 @@ export default function ReportsView() {
   // invoices only, so it is left out when another currency is shown.
   const cogsOn = shownCurrency === 'INR';
   const cogs = cogsOn
-    ? costOfGoodsSold({ bills: allInInr ? bills : bills.filter(b => getBillCurrency(b) === 'INR'), purchases, products }, periodRange)
+    ? costOfGoodsSold({ bills: allInInr ? bills : bills.filter(b => getBillCurrency(b) === 'INR'), purchases, products, stockAdjustments: adjustments }, periodRange)
     : { cost: 0, noCost: 0, byMonth: {} };
   const grossProfit = revenueExTax - cogs.cost;
-  const netProfit = grossProfit - expenseExGST;
+  // Divtech Hisaab - stock shortage / wastage less excess found, at average cost.
+  const stockLoss = cogsOn ? stockAdjustmentLoss({ bills, purchases, products, stockAdjustments: adjustments }, periodRange) : 0;
+  const netProfit = grossProfit - expenseExGST - stockLoss;
 
   // Monthly breakdown — per selected currency
   const monthlyPL = {};
@@ -438,6 +442,12 @@ export default function ReportsView() {
                     <td style={{ padding: '0.6rem 0', fontWeight: 700 }}>Net Expenses</td>
                     <td style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: 700 }}>{formatCurrency(expenseExGST, shownCurrency)}</td>
                   </tr>
+                  {Math.abs(stockLoss) >= 0.005 && (
+                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                      <td style={{ padding: '0.6rem 0', fontWeight: 500, color: 'var(--text-secondary)' }}>Less: Stock shortage / wastage (net of excess)</td>
+                      <td style={{ padding: '0.6rem 0', textAlign: 'right', color: stockLoss > 0 ? '#dc2626' : '#059669' }}>{stockLoss > 0 ? '-' : '+'}{formatCurrency(Math.abs(stockLoss), shownCurrency)}</td>
+                    </tr>
+                  )}
                   <tr>
                     <td style={{ padding: '1rem 0', fontWeight: 800, fontSize: '1.1rem' }}>
                       Net {netProfit >= 0 ? 'Profit' : 'Loss'}
@@ -464,7 +474,7 @@ export default function ReportsView() {
                       const [y, mo] = key.split('-');
                       return [`${MONTHS[parseInt(mo) - 1]} ${y}`, r2(m.revenue - m.tax), r2(m.cogs || 0), r2(m.expense - m.expGst), r2((m.revenue - m.tax) - (m.cogs || 0) - (m.expense - m.expGst))];
                     }),
-                    ['Total', r2(revenueExTax), r2(cogs.cost), r2(expenseExGST), r2(netProfit)],
+                    ['Total', r2(revenueExTax), r2(cogs.cost), r2(expenseExGST), r2(netProfit + stockLoss)],
                   ]} />
               </div>
               <div className="table-scroll">

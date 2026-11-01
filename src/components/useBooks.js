@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   getAllBills, getAllReceipts, getAllExpenses, getAllPurchases, getAllClients, getAllSuppliers,
-  getAllProducts, getAllOpeningBalances, getAllCashEntries, getAllAccounts, getAllVouchers, getProfile,
+  getAllProducts, getAllOpeningBalances, getAllCashEntries, getAllAccounts, getAllVouchers, getAllStockAdjustments, getProfile,
 } from '../store';
 import { belongsToProfile } from '../utils';
 
 export async function loadBooks() {
-  const [bills, receipts, expenses, purchases, clients, suppliers, products, openings, cashEntries, accounts, vouchers, profile] = await Promise.all([
+  const [bills, receipts, expenses, purchases, clients, suppliers, products, openings, cashEntries, accounts, vouchers, profile, stockAdjustments] = await Promise.all([
     getAllBills(), getAllReceipts(), getAllExpenses(), getAllPurchases().catch(() => []), getAllClients().catch(() => []),
     getAllSuppliers().catch(() => []), getAllProducts().catch(() => []), getAllOpeningBalances().catch(() => []),
     getAllCashEntries().catch(() => []), getAllAccounts().catch(() => []), getAllVouchers().catch(() => []), getProfile().catch(() => null),
+    getAllStockAdjustments().catch(() => []),
   ]);
   const mine = (rows) => (rows || []).filter((r) => belongsToProfile(r, profile));
   return {
@@ -19,6 +20,7 @@ export async function loadBooks() {
     data: {
       bills: mine(bills), receipts: mine(receipts), expenses: mine(expenses), purchases: mine(purchases),
       openings: mine(openings), cashEntries: mine(cashEntries), accounts: mine(accounts), vouchers: mine(vouchers),
+      stockAdjustments: mine(stockAdjustments),
       clients: clients || [], suppliers: suppliers || [], products: products || [],
     },
   };

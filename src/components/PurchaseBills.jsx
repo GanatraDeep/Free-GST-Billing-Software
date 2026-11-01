@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { ShoppingCart, Plus, Edit3, Trash2, Search, X, Save, Download, Wand2, Eye, ClipboardList, IndianRupee, Wallet } from 'lucide-react';
+import { ShoppingCart, Plus, Edit3, Trash2, Search, X, Save, Download, Wand2, Eye, ClipboardList, IndianRupee, Wallet, Undo2 } from 'lucide-react';
 import HelpButton from './HelpButton';
 import { getAllSuppliers, saveSupplier, getDocTypes } from '../store';
 import { getAllPurchases, savePurchase, deletePurchase, getAllProducts, saveProduct, getProfile, getEnabledModules, getAllPurchaseOrders, savePurchaseOrder, getNextPoNumber } from '../store';
@@ -76,6 +76,10 @@ const emptyForm = {
   paymentStatus: 'Unpaid',
   // Divtech Hisaab - Cash / Debit / URD (utils/docTypes.js).
   purchaseType: null,
+  // Divtech Hisaab - a purchase return (debit note): goods sent back to the
+  // supplier. returnOf is the bill they came on.
+  isReturn: false,
+  returnOf: '',
   interstate: false, // true ⇒ supplier charged IGST; false ⇒ CGST + SGST. Routes ITC correctly in GSTR-3B.
   applyRoundOff: false, // off by default — purchase bill totals are usually pre-rounded by the supplier. Users with suppliers that don't pre-round can opt in here.
   note: '',
@@ -284,11 +288,23 @@ export default function PurchaseBills() {
   const totalStats = filtered.reduce((acc, p) => {
     const t = calcPurchaseTotal(p.items, !!p.applyRoundOff);
     // Divtech Hisaab - URD bills give no input tax credit.
-    return { taxable: acc.taxable + t.taxable, tax: acc.tax + (p.purchaseType?.urd ? 0 : t.tax), total: acc.total + t.finalTotal, owed: acc.owed + purchaseBalance(p) };
+    const sg = p.isReturn ? -1 : 1; // a purchase return takes away
+    return { taxable: acc.taxable + sg * t.taxable, tax: acc.tax + (p.purchaseType?.urd ? 0 : sg * t.tax), total: acc.total + sg * t.finalTotal, owed: acc.owed + sg * purchaseBalance(p) };
   }, { taxable: 0, tax: 0, total: 0, owed: 0 });
 
   const openAdd = () => {
     setForm({ ...emptyForm, date: localToday(), items: [{ ...emptyItem }], purchaseType: typeRef(defaultType(purchaseTypes), 'purchase') });
+    setEditingId(null);
+    setShowForm(true);
+  };
+  // Divtech Hisaab - a purchase return (debit note), from scratch or from a bill.
+  const openReturn = (from = null) => {
+    setForm({
+      ...emptyForm, date: localToday(), isReturn: true, purchaseType: null,
+      supplierName: from?.supplierName || '', supplierAddress: from?.supplierAddress || '', supplierGstin: from?.supplierGstin || '',
+      interstate: !!from?.interstate, returnOf: from?.invoiceNumber || '',
+      items: from?.items?.length ? from.items.map((i) => ({ ...i })) : [{ ...emptyItem }],
+    });
     setEditingId(null);
     setShowForm(true);
   };
@@ -303,6 +319,8 @@ export default function PurchaseBills() {
       items: purchase.items && purchase.items.length > 0 ? purchase.items.map(i => ({ ...i })) : [{ ...emptyItem }],
       paymentStatus: purchase.paymentStatus || 'Unpaid',
       purchaseType: purchase.purchaseType || null,
+      isReturn: !!purchase.isReturn,
+      returnOf: purchase.returnOf || '',
       interstate: !!purchase.interstate,
       // Detect round-off from older entries: if roundOff field exists and is
       // non-zero, treat applyRoundOff as on. Older entries without the field
@@ -627,8 +645,8 @@ export default function PurchaseBills() {
       toast('Add at least one item with a quantity and rate', 'warning');
       return;
     }
-    // Divtech Hisaab - a bill is Cash, Debit or URD.
-    if (activePurchaseTypes.length > 0 && !form.purchaseType) {
+    // Divtech Hisaab - a bill is Cash, Debit or URD (a return keeps its bill's terms).
+    if (activePurchaseTypes.length > 0 && !form.purchaseType && !form.isReturn) {
       toast(`Pick the purchase type (${activePurchaseTypes.map((t) => t.name).join(' / ')})`, 'warning');
       return;
     }
@@ -668,7 +686,8 @@ export default function PurchaseBills() {
         applyRoundOff: !!form.applyRoundOff,
         roundOff: totals.roundOff,
         paymentStatus: form.paymentStatus,
-        ...(form.purchaseType ? { purchaseType: form.purchaseType } : {}),
+        ...(form.purchaseType && !form.isReturn ? { purchaseType: form.purchaseType } : {}),
+        ...(form.isReturn ? { isReturn: true, returnOf: (form.returnOf || '').trim() } : {}),
         interstate: !!form.interstate,
         note: form.note.trim(),
         ...centreFields(form.costCentre, form.costCentreName),
@@ -694,7 +713,7 @@ export default function PurchaseBills() {
       {
         const kept = (purchase.payments || []).filter((x) => !x?.cashPurchase);
         if ((purchase.payments || []).length !== kept.length) purchase = withPurchasePayments(purchase, kept);
-        if (isCashType(form.purchaseType)) {
+        if (isCashType(form.purchaseType) && !form.isReturn) {
           const due = purchasePaymentDue(purchase);
           if (due > 0.005) {
             purchase = withPurchasePayments(purchase, [...kept, {
@@ -739,13 +758,15 @@ export default function PurchaseBills() {
         const byId = new Map(existingProducts.map(p => [p.id, p]));
 
         // Pre-edit snapshot: on edit, compute deltas per productId/name.
-        const priorLines = editingId
-          ? (purchases.find(p => p.id === editingId)?.items || [])
-          : [];
+        // A purchase return takes stock out: its quantities count negative.
+        const priorBill = editingId ? purchases.find(p => p.id === editingId) : null;
+        const priorSign = priorBill?.isReturn ? -1 : 1;
+        const sign = purchase.isReturn ? -1 : 1;
+        const priorLines = priorBill?.items || [];
         const priorQtyByKey = new Map();
         for (const p of priorLines) {
           const key = p.productId || `name:${(p.name || '').trim().toLowerCase()}`;
-          priorQtyByKey.set(key, (priorQtyByKey.get(key) || 0) + (Number(p.quantity) || 0));
+          priorQtyByKey.set(key, (priorQtyByKey.get(key) || 0) + priorSign * (Number(p.quantity) || 0));
         }
 
         // Batch stock adjustments per product so we don't race on parallel saves.
@@ -754,7 +775,7 @@ export default function PurchaseBills() {
         const seenPriorKeys = new Set();
 
         for (const it of purchase.items.filter(x => x.name)) {
-          const qty = Number(it.quantity) || 0;
+          const qty = sign * (Number(it.quantity) || 0);
           // Match order: productId (persisted below) → name (case-insensitive).
           let existing = it.productId ? byId.get(it.productId) : null;
           if (!existing) {
@@ -772,13 +793,16 @@ export default function PurchaseBills() {
             stockDeltaById.set(existing.id, (stockDeltaById.get(existing.id) || 0) + delta);
             productsToUpsert.set(existing.id, {
               ...existing,
-              purchasePrice: it.rate,
+              purchasePrice: purchase.isReturn ? existing.purchasePrice : it.rate,
               hsn: existing.hsn || it.hsn,
               taxPercent: existing.taxPercent || it.taxPercent,
               cessPercent: existing.cessPercent || it.cessPercent || 0,
               // stock filled after we sum all deltas for this product.
               _placeholderId: existing.id,
             });
+          } else if (purchase.isReturn) {
+            // Returning an item that is not in Products: nothing to take out.
+            continue;
           } else {
             // New product — seed stock with the line qty (all its lines: two
             // lines of the same new item used to keep only the last one's).
@@ -825,7 +849,7 @@ export default function PurchaseBills() {
           }
         }
         await Promise.all(upserts);
-        toast(editingId ? 'Purchase updated' : 'Purchase added — items synced to Products', 'success');
+        toast(purchase.isReturn ? (editingId ? 'Purchase return updated' : 'Purchase return saved: stock taken out') : editingId ? 'Purchase updated' : 'Purchase added — items synced to Products', 'success');
       } catch (e) {
         console.warn('Products auto-sync from purchase failed (non-fatal):', e);
         toast('Purchase saved, but updating stock in Products failed - check them there', 'warning');
@@ -882,7 +906,8 @@ export default function PurchaseBills() {
     const minus = new Map();
     for (const it of lines) {
       const prod = (it.productId && byId.get(it.productId)) || byName.get(it.name.trim().toLowerCase());
-      if (prod) minus.set(prod.id, (minus.get(prod.id) || 0) + Number(it.quantity));
+      // Deleting a return puts its goods back.
+      if (prod) minus.set(prod.id, (minus.get(prod.id) || 0) + (bill.isReturn ? -1 : 1) * Number(it.quantity));
     }
     await Promise.all([...minus].map(([pid, qty]) => {
       const prod = byId.get(pid);
@@ -1185,6 +1210,7 @@ export default function PurchaseBills() {
           <button className="btn btn-secondary" onClick={() => setShowOpenings(true)} title="What you owed each supplier when you started using this app">
             <Wallet size={16} /> Opening balances
           </button>
+          <button className="btn btn-secondary" onClick={() => openReturn()} title="Goods sent back to a supplier (debit note)"><Undo2 size={16} /> Purchase return</button>
           <button className="btn btn-primary" onClick={openAdd}><Plus size={18} /> Add Purchase</button>
         </div>
         )}
@@ -1407,7 +1433,12 @@ export default function PurchaseBills() {
       {showForm && (
         <div className="modal-overlay" onClick={closeForm}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '720px' }}>
-            <h3 className="section-title">{isPo ? (editingId ? 'Edit purchase order' : 'New purchase order') : (editingId ? 'Edit Purchase Bill' : 'Add Purchase Bill')} <HelpButton title="Purchases" doc={isPo ? 'purchases#new-po' : (fromPoNumber && !editingId) ? 'purchases#convert-po' : 'purchases#add-purchase'} size={16} style={{ marginLeft: 6 }} /></h3>
+            <h3 className="section-title">{isPo ? (editingId ? 'Edit purchase order' : 'New purchase order') : form.isReturn ? (editingId ? 'Edit purchase return (debit note)' : 'Purchase return (debit note)') : (editingId ? 'Edit Purchase Bill' : 'Add Purchase Bill')} <HelpButton title="Purchases" doc={isPo ? 'purchases#new-po' : form.isReturn ? 'purchases#purchase-returns' : (fromPoNumber && !editingId) ? 'purchases#convert-po' : 'purchases#add-purchase'} size={16} style={{ marginLeft: 6 }} /></h3>
+            {form.isReturn && (
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
+                Goods sent back to the supplier. Saving takes them out of stock, reduces what you owe the supplier, and reverses the GST credit taken on them. Keep only the lines and quantities going back.
+              </p>
+            )}
             {/* v1.10.83 (#112) - a bill made from a purchase order. */}
             {!isPo && fromPoNumber && (
               <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
@@ -1446,7 +1477,7 @@ export default function PurchaseBills() {
                 )}
               </div>
               )}
-              {!isPo && activePurchaseTypes.length > 0 && (
+              {!isPo && !form.isReturn && activePurchaseTypes.length > 0 && (
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label" style={{ color: form.purchaseType ? undefined : 'var(--danger)' }}>Purchase type * <HelpButton title="Purchase types" doc="purchases#purchase-types" size={13} /></label>
                   <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} role="group" aria-label="Purchase type">
@@ -1510,10 +1541,18 @@ export default function PurchaseBills() {
                 </div>
               </>) : (<>
               <div className="form-group">
-                <label className="form-label">Invoice Number *</label>
+                <label className="form-label">{form.isReturn ? 'Debit note number *' : 'Invoice Number *'}</label>
                 <input type="text" className="form-input" value={form.invoiceNumber}
-                  onChange={e => updateField('invoiceNumber', e.target.value)} placeholder="Supplier invoice no." />
+                  onChange={e => updateField('invoiceNumber', e.target.value)} placeholder={form.isReturn ? 'DN/26-27/001' : 'Supplier invoice no.'} />
               </div>
+              {form.isReturn && (
+                <div className="form-group">
+                  <label className="form-label">Against bill (optional)</label>
+                  <input type="text" className="form-input" value={form.returnOf} list="fgsb-return-of"
+                    onChange={e => updateField('returnOf', e.target.value)} placeholder="Supplier's bill number" />
+                  <datalist id="fgsb-return-of">{purchases.filter((x) => !x.isReturn && (!form.supplierName || x.supplierName === form.supplierName)).slice(0, 50).map((x) => <option key={x.id} value={x.invoiceNumber} />)}</datalist>
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">Note (optional)</label>
                 <input type="text" className="form-input" value={form.note}
@@ -1767,11 +1806,13 @@ export default function PurchaseBills() {
                       <td className="text-muted">{p.date ? new Date(p.date).toLocaleDateString('en-IN') : ''}</td>
                       <td className="font-medium">{p.supplierName}</td>
                       <td className="text-muted" style={{ fontSize: '0.78rem' }}>{p.supplierGstin || '-'}</td>
-                      <td><span className="invoice-badge">{p.invoiceNumber}</span>{p.purchaseType?.name && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>{p.purchaseType.name}{p.purchaseType.urd ? ' · no ITC' : ''}</div>}</td>
-                      <td style={{ textAlign: 'right' }}>{formatCurrency(t.taxable)}</td>
-                      <td style={{ textAlign: 'right' }} className="text-muted">{formatCurrency(t.tax)}</td>
-                      <td style={{ textAlign: 'right' }} className="font-bold">{formatCurrency(t.finalTotal)}</td>
-                      <td style={{ textAlign: 'right', color: bal > 0.005 ? 'var(--danger)' : 'var(--text-muted)' }}>{bal > 0.005 ? formatCurrency(bal) : '-'}</td>
+                      <td><span className="invoice-badge">{p.invoiceNumber}</span>
+                        {p.isReturn && <div style={{ fontSize: '0.72rem', color: 'var(--warn-text, #b45309)', marginTop: 2, fontWeight: 600 }}>Purchase return{p.returnOf ? ` · on ${p.returnOf}` : ''}</div>}
+                        {p.purchaseType?.name && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>{p.purchaseType.name}{p.purchaseType.urd ? ' · no ITC' : ''}</div>}</td>
+                      <td style={{ textAlign: 'right' }}>{p.isReturn ? '-' : ''}{formatCurrency(t.taxable)}</td>
+                      <td style={{ textAlign: 'right' }} className="text-muted">{p.isReturn ? '-' : ''}{formatCurrency(t.tax)}</td>
+                      <td style={{ textAlign: 'right' }} className="font-bold">{p.isReturn ? '-' : ''}{formatCurrency(t.finalTotal)}</td>
+                      <td style={{ textAlign: 'right', color: bal > 0.005 ? (p.isReturn ? 'var(--success)' : 'var(--danger)') : 'var(--text-muted)' }} title={p.isReturn ? 'Refund the supplier still has to give (or adjust against the next bill)' : undefined}>{bal > 0.005 ? `${formatCurrency(bal)}${p.isReturn ? ' refund' : ''}` : '-'}</td>
                       {/* v1.10.69 - requested (#71 item 3, @sangwanmail-eng):
                           "the Status column should have a drop-down option,
                           similar to the Status drop-down available on the
@@ -1794,6 +1835,7 @@ export default function PurchaseBills() {
                           {/* v1.10.83 (#123) - record / see payments to the supplier. */}
                           <button className="icon-btn icon-btn-green" onClick={() => setPayPurchase(p)} title={st === 'Paid' ? 'Payment history' : 'Record payment to supplier'} aria-label="Payments to supplier"><IndianRupee size={15} /></button>
                           <button className="icon-btn icon-btn-blue" onClick={() => openEdit(p)} title="Edit"><Edit3 size={15} /></button>
+                          {!p.isReturn && <button className="icon-btn" onClick={() => openReturn(p)} title="Return goods from this bill (debit note)" aria-label={`Purchase return on ${p.invoiceNumber}`}><Undo2 size={15} /></button>}
                           <button className="icon-btn icon-btn-red" onClick={() => handleDelete(p.id)} title="Delete"><Trash2 size={15} /></button>
                         </div>
                       </td>

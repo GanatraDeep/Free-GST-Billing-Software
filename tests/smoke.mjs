@@ -21,6 +21,9 @@
  *   APP_URL=... npm test  # run against an already-running instance
  */
 import { firefox, chromium } from 'playwright';
+
+// Today in the local time zone, as the app dates records (not UTC).
+const localDay = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 import { spawn } from 'child_process';
 import { readFileSync } from 'fs';
 import { PDFDocument } from 'pdf-lib';
@@ -146,7 +149,11 @@ const profileAtStart = await fetch(`${APP}/api/profile`)
 const browser = await (process.env.SMOKE_BROWSER === 'chromium' ? chromium : firefox).launch({ headless: true });
 // 1366x768 is the resolution the preview-clipping bug needed (ERR-005).
 // It is also the most common laptop size among this app's users.
-const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, acceptDownloads: true });
+// The app dates everything by the local day. The test's own dates (localDay)
+// and the browser use the same time zone, so a run that crosses midnight in
+// India (18:30 UTC) does not put test records in yesterday's month.
+const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, acceptDownloads: true, timezoneId: TIME_ZONE });
 // Playwright gives a page 30 s to load. On a busy machine - another dev
 // server pinning three cores was enough - a reload under the release gate ran
 // past that and aborted the whole suite, twice in a row, with code that had
@@ -156,8 +163,10 @@ ctx.setDefaultNavigationTimeout(120000);
 ctx.setDefaultTimeout(60000);
 // Divtech Hisaab: the daily subscription reminder would pop up mid-test and
 // cover the screen; mark it as already seen today. It is checked on its own below.
+// Some checks build records inside the page: give it the same localDay().
+await ctx.addInitScript(() => { window.localDay = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }; });
 await ctx.addInitScript(() => {
-  try { localStorage.setItem('divtech_subscriptionReminderDay', new Date().toISOString().slice(0, 10)); } catch { /* private mode */ }
+  try { const d = new Date(); localStorage.setItem('divtech_subscriptionReminderDay', new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)); } catch { /* private mode */ }
 });
 const page = await ctx.newPage();
 
@@ -516,7 +525,7 @@ try {
     // Legacy: no seller recorded at all.
     // Dated in the current FY so the dashboard's year filter cannot be what
     // hides it — this test is about company scoping, nothing else.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDay();
     await post({ id: 'smoketest-legacy', invoiceNumber: 'SMOKE-LEGACY/1', clientName: 'Smoke Test Client',
       status: 'unpaid', totalAmount: 3000, payments: [], items: [], invoiceDate: today,
       data: { details: { invoiceNumber: 'SMOKE-LEGACY/1' }, totals: { total: 3000 } } });
@@ -557,7 +566,7 @@ try {
     await post('/api/profiles', { id: 'smoketest-pb', businessName: 'Smoke Beta', gstin: b });
     await post('/api/bills', {
       id: 'smoketest-beta-bill', invoiceNumber: 'SMOKE-BETA/1', clientName: 'Smoke Test Client',
-      status: 'unpaid', totalAmount: 4000, invoiceDate: new Date().toISOString().slice(0, 10),
+      status: 'unpaid', totalAmount: 4000, invoiceDate: localDay(),
       payments: [], items: [],
       data: { profile: { gstin: b, businessName: 'Smoke Beta' }, details: {}, totals: { total: 4000 } },
     });
@@ -597,7 +606,7 @@ try {
   // Every "ignores another company" check below is paired with a sanity check
   // that the same number DOES move for this company. Without the pair, a card
   // that never updates at all would pass the first check.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
   const THIRD_GSTIN = '27CCCCC3333C3Z3';
   const api = (url, body) => page.evaluate(async ({ url, body }) => (await fetch(url, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -922,7 +931,7 @@ try {
   check('#59 desktop keeps the fixed sidebar and shows no phone menu bar',
     desk.bar === 'none' && desk.left === 0 && desk.width > 200, JSON.stringify(desk));
 
-  const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, timezoneId: TIME_ZONE });
   const mob = await phone.newPage();
   try {
     await mob.goto(APP, { waitUntil: 'networkidle' });
@@ -1625,7 +1634,7 @@ try {
     // terms template exists (it used to be replaced by the first template).
     await post77('/api/templates', { id: 'smoketest-tpl77', name: 'Smoke template', content: '<p>SMOKE-TEMPLATE-TERMS</p>' });
     const prof77 = (await get77('/api/profile')).json;
-    const today77 = new Date().toISOString().slice(0, 10);
+    const today77 = localDay();
     const bill77 = {
       id: 'smoketest-terms77', invoiceNumber: 'smoketest-terms77', clientName: 'Smoke Test Client', invoiceDate: today77, invoiceType: 'tax-invoice',
       status: 'unpaid', totalAmount: 1180, paidAmount: 0, payments: [],
@@ -1704,7 +1713,7 @@ try {
     const draft78 = (type) => ({
       invoiceType: type,
       client: { name: 'Smoke Test Client', address: '', city: '', pin: '', state: 'Punjab', gstin: '', country: 'India', email: '', phone: '', isSEZ: false },
-      details: { invoiceDate: new Date().toISOString().slice(0, 10), placeOfSupply: 'Punjab' },
+      details: { invoiceDate: localDay(), placeOfSupply: 'Punjab' },
       items: draftItems, taxInclusive: false,
     });
     await openDraft(draft78('quotation'));
@@ -1725,7 +1734,7 @@ try {
 
     // #92 Undo is a button in the Actions column and asks first
     const prof78 = await get78('/api/profile');
-    const today78 = new Date().toISOString().slice(0, 10);
+    const today78 = localDay();
     await post78('/api/bills', {
       id: 'smoketest-undo78', invoiceNumber: 'smoketest-undo78', clientName: 'Smoke Test Client', invoiceDate: today78, invoiceType: 'tax-invoice',
       status: 'cancelled', cancelledAt: new Date().toISOString(), totalAmount: 1180, paidAmount: 0, payments: [],
@@ -1784,7 +1793,7 @@ try {
     await post79('/api/meta/invoiceNumberSettings', { value: { ...(shared79 || {}), brandPrefix: 'SMKA' } });
     await page.evaluate(() => {
       sessionStorage.setItem('gst_invoiceDraft', JSON.stringify({ invoiceType: 'quotation', client: { name: 'Smoke Test Client', state: 'Punjab', country: 'India' },
-        details: { invoiceDate: new Date().toISOString().slice(0, 10), placeOfSupply: 'Punjab' },
+        details: { invoiceDate: localDay(), placeOfSupply: 'Punjab' },
         items: [{ id: 'l1', name: 'Smoke item', hsn: '9983', quantity: 1, rate: 1000, taxPercent: 18, discount: 0, unit: 'Nos' }] }));
       sessionStorage.setItem('gst_currentView', 'new'); sessionStorage.removeItem('gst_editingBill');
     });
@@ -1828,9 +1837,9 @@ try {
     // Converting two quotations in a row makes two invoices (the second used
     // to overwrite the first: a conversion saved under a number it only peeked).
     const quoteOf79 = (id) => ({
-      id, invoiceNumber: id, clientName: 'Smoke Test Client', invoiceDate: new Date().toISOString().slice(0, 10), invoiceType: 'quotation',
+      id, invoiceNumber: id, clientName: 'Smoke Test Client', invoiceDate: localDay(), invoiceType: 'quotation',
       status: 'unpaid', totalAmount: 1180, paidAmount: 0, payments: [],
-      data: { profile: profile79, client: { name: 'Smoke Test Client', state: profile79.state, country: 'India' }, details: { invoiceNumber: id, invoiceDate: new Date().toISOString().slice(0, 10) },
+      data: { profile: profile79, client: { name: 'Smoke Test Client', state: profile79.state, country: 'India' }, details: { invoiceNumber: id, invoiceDate: localDay() },
         invoiceType: 'quotation', invoiceOptions: {}, totals: { total: 1180 }, stockApplied: {},
         items: [{ id: 'l1', name: 'Smoke item', hsn: '9983', quantity: 1, rate: 1000, taxPercent: 18, discount: 0, unit: 'Nos' }] },
     });

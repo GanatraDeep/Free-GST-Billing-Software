@@ -291,6 +291,9 @@ export const deleteAccount = (id) => apiFetch(`${API}/accounts/${encodeURICompon
 export const getAllVouchers = async () => apiFetch(`${API}/vouchers`);
 export const saveVoucher = async (v) => (await apiFetch(`${API}/vouchers`, { method: 'POST', body: JSON.stringify(v) })).voucher;
 export const deleteVoucher = (id) => apiFetch(`${API}/vouchers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+export const getAllStockAdjustments = async () => apiFetch(`${API}/stock-adjustments`);
+export const saveStockAdjustment = async (a) => (await apiFetch(`${API}/stock-adjustments`, { method: 'POST', body: JSON.stringify(a) })).adjustment;
+export const deleteStockAdjustment = (id) => apiFetch(`${API}/stock-adjustments/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
 // ---- Sale and purchase types (Divtech Hisaab) ----
 // Cash / Retail Debit / Debit and Cash / Debit / URD by default; the user's
@@ -681,6 +684,7 @@ export const exportAllData = async (selection) => {
   if (sel.products)       data.products = all.products;
   // v1.10.83 (#115) - production entries travel with products: stock is the result of both.
   if (sel.products && all.productions) data.productions = all.productions;
+  if (sel.products && all.stockAdjustments) data.stockAdjustments = all.stockAdjustments; // Divtech Hisaab
   if (sel.expenses)       data.expenses = all.expenses;
   if (sel.expenses)       data.cashBook = all.cashBook; // v1.10.83 - the cash book travels with expenses
   if (sel.expenses)       { data.accounts = all.accounts; data.vouchers = all.vouchers; } // Divtech Hisaab - accounts and vouchers too
@@ -740,6 +744,7 @@ export const importData = async (jsonString, selection) => {
   if (sel.termsTemplates && data.termsTemplates) payload.termsTemplates = data.termsTemplates;
   if (sel.products && data.products)             payload.products = data.products;
   if (sel.products && data.productions)          payload.productions = data.productions;
+  if (sel.products && data.stockAdjustments)     payload.stockAdjustments = data.stockAdjustments;
   if (sel.expenses && data.expenses)             payload.expenses = data.expenses;
   if (sel.expenses && data.cashBook)             payload.cashBook = data.cashBook;
   if (sel.expenses && data.accounts)             payload.accounts = data.accounts;

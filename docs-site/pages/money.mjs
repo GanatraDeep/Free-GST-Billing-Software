@@ -364,6 +364,12 @@ export default [
 <p>${ui('3B JSON')} says "No data to export for this period" when the period has no invoices and no expenses, even if it has purchase bills. In that case use ${ui('3B CSV')}, or type the credit in on the portal.</p>
 </section>
 
+<section id="gst-paid">
+<h2>Record GST paid</h2>
+<p>After filing GSTR-3B and paying the challan, click ${ui('Record GST paid')} on the GSTR-3B tab. The window shows the IGST, CGST, SGST and cess to pay in cash for the period (after your input tax credit), with any credit used across heads (IGST credit paying CGST, say). Change them to what you actually paid, add <b>interest</b> and <b>late fee</b> if any, pick the date and the account it was paid from (Bank, Cash, or another bank / CC account), type the challan number, and ${ui('Save entry')}.</p>
+<p>It is saved as one <a href="accounts.html#vouchers">payment voucher</a>, numbered like the others. The GST ledgers then show only the credit carried forward, and the balance sheet only what is really owed. Interest and late fee are expenses. If an entry is already saved for the period, the window says so.</p>
+</section>
+
 <section id="excel-workbook">
 <h2>Excel for the whole period</h2>
 <p>To send a month (or quarter, or year) to your CA in one go, choose the period at the top and click ${ui('Whole period (Excel)')} beside the tabs. You get one Excel file, <code>GST_<i>GSTIN</i>_<i>MMYYYY</i>_all.xlsx</code>, with a sheet for every table. Sheets starting <b>R1</b> are GSTR-1 and sheets starting <b>3B</b> are GSTR-3B. For one return only, use ${ui('Excel (all tables)')} on its tab.</p>

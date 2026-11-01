@@ -4,6 +4,47 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.14.0] - 2026-11-01
+
+### How to update
+
+**Current version:** 1.13.0  →  **New version:** 1.14.0
+
+1. Open the app and click **Update to v1.14.0** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **Which bank / CC account**: add other bank accounts and CC / OD accounts in
+  Accounts, then pick **Received in** / **Paid from** on receipts, Record
+  payment, supplier payments and expenses paid by bank, UPI, cheque or card.
+  The money goes straight to that account's ledger (CC used / available
+  follows it).
+- **Purchase returns (debit notes)**: goods sent back to a supplier, from
+  scratch or from a bill. Stock comes out, the supplier's balance and the
+  input tax credit (GSTR-3B, GST ledgers) go down, refunds can be recorded.
+- **Stock adjustments**: shortage, leakage, wastage or excess found on
+  counting, dated with a reason, from the new button on each product. Valued
+  at average cost: a shortage is an expense (Stock shortage and wastage) in
+  the final accounts and in Reports' profit and loss. Changing stock in a
+  product asks to record the difference as an adjustment.
+- **Kasar / discount**: write off a small balance when recording a customer
+  payment or receipt (Discount allowed), or a supplier payment (Discount
+  received). The invoice or bill is settled.
+- **Record GST paid** on GSTR-3B: one voucher for the period's GST, with
+  credit used across heads, tax paid in cash, interest and late fee, from the
+  bank, cash or CC.
+
+### Fixed
+- The automatic browser tests no longer fail when they run just after
+  midnight in India (they used UTC dates). The daily subscription reminder
+  also follows the local day now.
+
+---
+
 ## [1.13.0] - 2026-11-01
 
 ### How to update

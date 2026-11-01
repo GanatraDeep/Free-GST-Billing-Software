@@ -8,6 +8,7 @@ import { openingDue } from '../utils/openingBalances';
 import { getAllBills, saveBill, getAllProducts, applyStockChanges, getProfile, getAllClients, getStockAlertSettings, saveReceipt, deleteReceipt, getAllReceipts, markSavedPdfCancelled, getEnabledModules } from '../store';
 import { businessKeyOf, formatCurrency, INVOICE_TYPES, getFYOptions, numberToWords, belongsToProfile, salesSign, isCancelledBill, markPaidPatch, markUnpaidPatch, stockEffect, appliedStock, stockDelta, SALES_INVOICE_TYPES, localToday, amountDue, paymentStatusFor, isModuleEnabled, TDS_SECTIONS, findLowStock, trackedStock } from '../utils';
 import { needsReceipt } from '../utils/docTypes';
+import MoneyAccountSelect, { showsBankChoice } from './MoneyAccountSelect';
 import { billInInr, billCurrency as fxBillCurrency, baseCurrencyOf } from '../utils/fx';
 import { withClientTds } from '../utils/tdsTcs';
 import { prepareEInvoices, parseIrpResponse, matchIrnEntries, downloadJson, einvoiceFileName } from '../utils/einvoice';
@@ -89,7 +90,7 @@ const PAYMENT_MODES = [
   ['bank-transfer', 'Bank Transfer'], ['upi', 'UPI'], ['cash', 'Cash'],
   ['cheque', 'Cheque'], ['card', 'Card'], ['other', 'Other'],
 ];
-const paymentModeName = (mode) => (PAYMENT_MODES.find(([v]) => v === mode) || [])[1] || mode;
+const paymentModeName = (mode) => (mode === 'discount' ? 'Discount / kasar' : (PAYMENT_MODES.find(([v]) => v === mode) || [])[1] || mode);
 
 // v1.10.6 — audit L4: was a local copy of getFYOptions. Now imported
 // from ../utils so a bugfix touches one file, not five.
@@ -648,7 +649,7 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
 
   const openPaymentModal = (bill) => {
     setPaymentModal(bill);
-    setPaymentInput({ amount: '', date: localToday(), mode: 'bank-transfer', note: '', tdsOn: false, tdsSection: '194J', tdsRate: 10 });
+    setPaymentInput({ amount: '', date: localToday(), mode: 'bank-transfer', account: '', discount: '', note: '', tdsOn: false, tdsSection: '194J', tdsRate: 10 });
   };
   // TDS can be added while recording a payment on an Indian sales invoice that
   // does not already show TDS (one that does is owed its Net Receivable).
@@ -670,6 +671,21 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
     // did not show: the TDS goes on the invoice, so it is owed only the Net
     // Receivable. A TDS-only entry (no amount) is allowed.
     const tdsNow = tdsEntryAllowed(paymentModal) && !!paymentInput.tdsOn;
+    // Divtech Hisaab - kasar: the part of the balance written off (Discount allowed).
+    const discount = Math.round((parseFloat(paymentInput.discount) || 0) * 100) / 100;
+    if (discount < 0) { toast('The discount cannot be below zero', 'warning'); return; }
+    if (!hasAmount && discount > 0 && !tdsNow) {
+      const bill = paymentModal;
+      const already = Number(bill.paidAmount) || 0;
+      if (discount > Math.max(0, amountDue(bill) - already) + 0.01) { toast('The discount is more than the balance', 'warning'); return; }
+      const payments = [...(bill.payments || []), { id: 'pay_' + Date.now().toString(36) + 'd', amount: discount, date: paymentInput.date, mode: 'discount', note: paymentInput.note || 'Discount / kasar', recordedAt: new Date().toISOString() }];
+      const totalPaid = payments.reduce((t, p) => t + (Number(p.amount) || 0), 0);
+      await saveBill({ ...bill, payments, paidAmount: totalPaid, status: paymentStatusFor(bill, totalPaid) }, { overwrite: true });
+      toast(`Discount of ${formatCurrency(discount, bill.currency)} written off on ${bill.invoiceNumber}`, 'success');
+      setPaymentModal(null);
+      loadBills();
+      return;
+    }
     if (!hasAmount && !(tdsNow && !String(paymentInput.amount || '').trim())) {
       toast('Enter a positive payment amount', 'warning'); return;
     }
@@ -687,7 +703,8 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
     }
     // What is left to receive: the total less TDS the client deducts.
     const outstanding = Math.max(0, amountDue(bill) - alreadyPaid);
-    if (amount > outstanding + 0.01) {
+    if (amount + discount > outstanding + 0.01) {
+      if (discount > 0) { toast('Amount and discount together are more than the balance. Reduce the discount.', 'warning'); return; }
       const proceed = await confirmAction({
         title: 'Record as overpayment?',
         message: `This payment (${formatCurrency(amount, bill.currency)}) is more than the outstanding balance (${formatCurrency(outstanding, bill.currency)}).\n\nThe extra will be saved as client credit and can be applied to future invoices.`,
@@ -699,10 +716,12 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
     const paymentEntry = {
       id: 'pay_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       amount, date: paymentInput.date, mode: paymentInput.mode,
+      ...(showsBankChoice(paymentInput.mode) && paymentInput.account ? { account: paymentInput.account } : {}),
       note: paymentInput.note, recordedAt: new Date().toISOString(),
       ...foreignReceiptFields(paymentInput),
     };
-    const payments = [...(bill.payments || []), paymentEntry];
+    const discountEntry = discount > 0 ? { id: `${paymentEntry.id}:disc`, amount: discount, date: paymentInput.date, mode: 'discount', note: 'Discount / kasar', recordedAt: paymentEntry.recordedAt, discountFor: paymentEntry.id } : null;
+    const payments = [...(bill.payments || []), paymentEntry, ...(discountEntry ? [discountEntry] : [])];
     const totalPaid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
     const updatedBill = {
       ...bill, payments, paidAmount: totalPaid,
@@ -723,6 +742,8 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
         clientAddress: bill.data?.client?.address || '',
         amount: paymentEntry.amount,
         paymentMode: paymentEntry.mode,
+        ...(paymentEntry.account ? { account: paymentEntry.account } : {}),
+        ...(discount > 0 ? { discount } : {}),
         referenceNo: paymentEntry.note || '',
         againstInvoice: bill.invoiceNumber || bill.id || '',
         note: paymentEntry.note || '',
@@ -1991,6 +2012,18 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
                   onChange={e => setPaymentInput(prev => ({ ...prev, mode: e.target.value }))}>
                   {PAYMENT_MODES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
                 </select>
+              </div>
+              <MoneyAccountSelect id="pay-account" mode={paymentInput.mode} value={paymentInput.account} label="Received in"
+                onChange={(v) => setPaymentInput(prev => ({ ...prev, account: v }))} />
+              <div className="form-group">
+                <label className="form-label" title="Part of the balance the customer will not pay (rate difference, rounding): written off to Discount allowed.">Discount / kasar</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input type="number" className="form-input" value={paymentInput.discount} min="0" placeholder="0"
+                    onChange={e => setPaymentInput(prev => ({ ...prev, discount: e.target.value }))} />
+                  <button type="button" className="btn btn-secondary" style={{ whiteSpace: 'nowrap', fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                    title="Write off whatever is left after this amount"
+                    onClick={() => setPaymentInput(prev => ({ ...prev, discount: String(Math.max(0, Math.round((amountDue(paymentModal) - (paymentModal.paidAmount || 0) - (parseFloat(prev.amount) || 0)) * 100) / 100)) }))}>Rest</button>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Note (optional)</label>

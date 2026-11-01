@@ -116,6 +116,19 @@ export default [
 <p>The type shows under the invoice number in the purchase list.</p>
 </section>
 
+<section id="purchase-returns">
+<h2>Purchase returns (debit notes)</h2>
+<p>When you send goods back to a supplier (leaking tins, wrong quality, excess supply), click ${ui('Purchase return')} at the top, or the return arrow on the bill's row to start from that bill with its supplier and items filled in. Enter your <b>Debit note number</b>, the bill it is <b>against</b>, and keep only the lines and quantities going back. ${ui('Save')}.</p>
+<ul>
+  <li>The quantities come <b>out of stock</b>, at the bill's rate.</li>
+  <li>What you owe the supplier goes <b>down</b> by the return's total (with GST).</li>
+  <li>The <b>input tax credit</b> on it is reversed: GSTR-3B's credit and the GST ledgers are lower by its GST.</li>
+  <li>In the list it shows as <b>Purchase return</b> with minus amounts; totals take it away.</li>
+  <li>If the supplier refunds money instead of adjusting the next bill, record it with the ${ui('₹')} button on the return: <b>Refund received</b>.</li>
+</ul>
+<p>Editing or deleting a return puts the stock back as needed.</p>
+</section>
+
 <section id="suppliers">
 <h2>Suppliers (the purchase master)</h2>
 <p>${ui('Suppliers')} in the sidebar is your supplier list: name, GSTIN, registration (Regular, Composition or Unregistered), phone, email, address and a note. Each supplier shows what you bought from them, what you paid and what you still owe, including their <a href="clients.html#opening-balances">opening balance</a>.</p>
@@ -207,6 +220,11 @@ export default [
 <p>The status does not change the GST credit: credit depends on the bill, not on whether you have paid it yet. (By law you must pay the supplier within 180 days to keep the credit.)</p>
 <div class="note info"><strong>Bills from before payments could be recorded</strong>
 <p>A bill you marked <b>Paid</b> in an older version has no payments on it. It stays <b>Paid</b> and owes nothing; you do not need to do anything. A bill marked <b>Partial</b> stays Partly paid, but the app does not know how much was paid, so its Balance due shows the whole amount until you record the payments you made.</p></div>
+</section>
+
+<section id="payment-bank-kasar">
+<h3>Paid from which account, and kasar</h3>
+<p>When you have another bank or a CC / OD account in <a href="accounts.html#bank-accounts">Accounts</a>, the payment window has <b>Paid from</b> (for any mode but cash): the payment then goes to that account's ledger instead of the Bank book. <b>Discount received / kasar</b> is what the supplier lets go (rate difference, a small balance): it is written off to <b>Discount received</b> and settles the bill with the payment. With only a discount, nothing is paid and the bill is settled.</p>
 </section>
 
 <section id="record-payment">

@@ -67,4 +67,4 @@ export function partyOutstanding(bills, months, currency = 'INR', opening = []) 
 // v1.10.83 (#123) - what you owe suppliers: the balance of each purchase bill
 // (total less TDS less payments), in the month of the bill. Rupees only.
 export const supplierOutstanding = (purchases, months, opening = []) =>
-  byParty([...opening, ...purchases.map((p) => ({ name: p.supplierName, date: p.date, due: purchaseBalance(p) })).filter((e) => e.due > 0)], months);
+  byParty([...opening, ...purchases.filter((p) => !p.isReturn).map((p) => ({ name: p.supplierName, date: p.date, due: purchaseBalance(p) })).filter((e) => e.due > 0)], months);

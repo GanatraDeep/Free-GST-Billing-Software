@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, ChevronRight, AlertTriangle, BookOpen, BarChart3, FileSpreadsheet } from 'lucide-react';
+import { FileText, Download, Upload, ExternalLink, CheckCircle, ChevronDown, ChevronRight, AlertTriangle, BookOpen, BarChart3, FileSpreadsheet, IndianRupee } from 'lucide-react';
 import { buildWorkbook } from '../utils/xlsx';
+import GstPaidModal from './GstPaidModal';
 import { getAllBills, getAllExpenses, getAllPurchases, getProfile, getEnabledModules } from '../store';
 import { hsnTable, stripEmpty } from '../utils/gstr1Json';
 import { formatCurrency, INVOICE_TYPES, getStateCode, formatDateGST, getFilingPeriod, hsnUqc, getFYOptions, belongsToProfile, toCsvLine, isCancelledBill, b2clThreshold, GST_PORTAL_RATES, setOffITC, splitLineTax, roundQty, placeOfSupplyLabel, countsAsSales, parseLocalDate, isModuleEnabled } from '../utils';
-import { isUrdPurchase } from '../utils/ledgers';
+import { isUrdPurchase, purchaseSign } from '../utils/ledgers';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
 import { billInInr } from '../utils/fx';
@@ -520,6 +521,7 @@ export default function GSTReturns() {
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [quarterFilter, setQuarterFilter] = useState('Q1');
+  const [showGstPaid, setShowGstPaid] = useState(false); // Divtech Hisaab - Record GST paid
   const [activeTab, setActiveTab] = useState('gstr1');
   const [gstr2bData, setGstr2bData] = useState(null); // imported 2B JSON
   const [gstr2bFilter, setGstr2bFilter] = useState('all'); // all | matched | mismatch | bookOnly | twoBOnly
@@ -877,8 +879,9 @@ export default function GSTReturns() {
   // to CGST+SGST in the GSTR-3B Table 4(A).
   // Divtech Hisaab - a URD purchase (unregistered dealer) gives no input tax credit.
   const itcPurchases = filteredPurchases.filter(p => !isUrdPurchase(p));
+  // Divtech Hisaab - a purchase return (debit note) reverses its credit.
   const itcFromPurchases = itcPurchases.reduce((acc, p) => {
-    const tax = p.totalTax || purchaseBookTotals(p).tax;
+    const tax = purchaseSign(p) * (p.totalTax || purchaseBookTotals(p).tax);
     if (p.interstate) {
       return { cgst: acc.cgst, sgst: acc.sgst, igst: acc.igst + tax };
     }
@@ -887,7 +890,7 @@ export default function GSTReturns() {
   }, { cgst: 0, sgst: 0, igst: 0 });
   // Compensation cess paid on purchases is input tax credit too (GSTR-3B
   // Table 4(A) csamt); it was always reported as 0.
-  const itcCessFromPurchases = itcPurchases.reduce((s, p) => s + purchaseBookTotals(p).cess, 0);
+  const itcCessFromPurchases = itcPurchases.reduce((s, p) => s + purchaseSign(p) * purchaseBookTotals(p).cess, 0);
   // Combined ITC
   const itcFromExpenses = {
     cgst: itcFromExpensesOnly.cgst + itcFromPurchases.cgst,
@@ -1041,7 +1044,7 @@ export default function GSTReturns() {
 
   // Reverse-charge purchases of the period (GSTR-3B 3.1(d)).
   const rcmTotals = (() => {
-    const rcmPurchases = filteredPurchases.filter(p => !!p.reverseCharge);
+    const rcmPurchases = filteredPurchases.filter(p => !!p.reverseCharge && !p.isReturn);
     const t = rcmPurchases.reduce((acc, p) => ({
       txval: acc.txval + (Number(p.taxableAmount) || 0),
       iamt: acc.iamt + (p.interstate ? (Number(p.totalTax) || 0) : 0),
@@ -1262,7 +1265,7 @@ export default function GSTReturns() {
   const gstr3bSheets = () => {
     const sum = (o) => round2((o.igst || 0) + (o.cgst || 0) + (o.sgst || 0));
     const urd = filteredPurchases.filter(isUrdPurchase).reduce((acc, p) => {
-      const tax = Number(p.totalTax) || purchaseBookTotals(p).tax;
+      const tax = purchaseSign(p) * (Number(p.totalTax) || purchaseBookTotals(p).tax);
       if (p.interstate) return { ...acc, igst: acc.igst + tax };
       return { ...acc, cgst: acc.cgst + tax / 2, sgst: acc.sgst + tax / 2 };
     }, { igst: 0, cgst: 0, sgst: 0 });
@@ -1289,11 +1292,12 @@ export default function GSTReturns() {
     ];
     const purchaseRegister = [...filteredPurchases].sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).map(p => {
       const bt = purchaseBookTotals(p);
-      const tax = Number(p.totalTax) || bt.tax;
-      const taxable = Number(p.taxableAmount) || bt.taxable;
-      return [formatDateGST(p.date), p.supplierName || '', p.supplierGstin || '', p.invoiceNumber || '', p.purchaseType?.name || '',
+      const sg = purchaseSign(p); // a purchase return shows as minus
+      const tax = sg * (Number(p.totalTax) || bt.tax);
+      const taxable = sg * (Number(p.taxableAmount) || bt.taxable);
+      return [formatDateGST(p.date), p.supplierName || '', p.supplierGstin || '', p.invoiceNumber || '', p.isReturn ? 'Purchase return (debit note)' : p.purchaseType?.name || '',
         p.interstate ? 'Inter-state' : 'Intra-state', round2(taxable), p.interstate ? round2(tax) : 0, p.interstate ? 0 : round2(tax / 2), p.interstate ? 0 : round2(tax / 2),
-        round2(bt.cess), round2(Number(p.totalAmount) || taxable + tax + bt.cess),
+        round2(sg * bt.cess), round2(sg * (Number(p.totalAmount) || Math.abs(taxable + tax) + bt.cess)),
         isUrdPurchase(p) ? 'No (URD)' : p.reverseCharge ? 'Yes (reverse charge)' : 'Yes'];
     });
     const expenseRegister = filteredExpenses.filter(e => (Number(e.gstAmount) || 0) > 0).map(e => [
@@ -2123,12 +2127,19 @@ export default function GSTReturns() {
       )}
 
       {/* ===================== GSTR-3B TAB ===================== */}
+      {showGstPaid && (
+        <GstPaidModal periodLabel={periodText} returnPeriod={getReturnPeriod()} profile={profile}
+          liability={outputTax} credit={itcFromExpenses}
+          cessDue={Math.max(0, Math.round(((outward31a.cess || 0) + (exportTotals.cess || 0) - itcCessFromPurchases) * 100) / 100)}
+          onClose={() => setShowGstPaid(false)} onOpenVouchers={() => window.dispatchEvent(new CustomEvent('divtech-open-view', { detail: 'vouchers' }))} />
+      )}
       {activeTab === 'gstr3b' && (
         <>
           {/* Actions */}
           <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.75rem', alignItems: 'center' }}>
             <button className="btn btn-secondary" onClick={exportGSTR3B} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Download size={13} /> 3B CSV</button>
             <button className="btn btn-primary" onClick={exportGSTR3BJSON} style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><Upload size={13} /> 3B JSON</button>
+            <button className="btn btn-secondary" onClick={() => setShowGstPaid(true)} title="The accounting entry for this period's GST: credit used across heads and the tax paid, as one voucher" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem', color: '#047857', borderColor: '#a7f3d0' }}><IndianRupee size={13} /> Record GST paid</button>
             <button className="btn btn-secondary" onClick={exportGSTR3BExcel} title="Every GSTR-3B table, the purchase register and expenses with GST, one sheet each" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}><FileSpreadsheet size={13} /> Excel (all tables)</button>
             <HelpButton title="GSTR-3B downloads" doc="gst-returns#gstr-3b-files" size={16} />
             {!periodFiling.gstr3b && (
@@ -2238,7 +2249,8 @@ export default function GSTReturns() {
 
       {/* ===================== GSTR-2B RECONCILIATION TAB ===================== */}
       {activeTab === 'gstr2b' && (() => {
-        const reconRows = buildReconciliation(gstr2bData, purchases, filteredPurchases);
+        // A purchase return is not in the supplier's GSTR-1 as an invoice.
+        const reconRows = buildReconciliation(gstr2bData, purchases.filter(p => !p.isReturn), filteredPurchases.filter(p => !p.isReturn));
         const stats = reconRows.reduce((acc, r) => {
           acc.total += 1;
           acc[r.status] = (acc[r.status] || 0) + 1;

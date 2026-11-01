@@ -59,9 +59,11 @@ export default function SuppliersView() {
     return [...map.values()].map((r) => {
       const ob = openingFor(openings, 'supplier', r.name);
       const obDue = ob ? openingDue(ob) : 0;
-      const total = r.bills.reduce((s, p) => s + purchaseTotal(p), 0);
-      const paid = r.bills.reduce((s, p) => s + purchasePaid(p), 0);
-      const owed = r.bills.reduce((s, p) => s + purchaseBalance(p), 0) + obDue;
+      // A purchase return (debit note) counts against the supplier.
+      const sg = (p) => (p.isReturn ? -1 : 1);
+      const total = r.bills.reduce((s, p) => s + sg(p) * purchaseTotal(p), 0);
+      const paid = r.bills.reduce((s, p) => s + sg(p) * purchasePaid(p), 0);
+      const owed = r.bills.reduce((s, p) => s + sg(p) * purchaseBalance(p), 0) + obDue;
       return { ...r, total, paid, owed, opening: ob };
     }).sort((a, b) => b.owed - a.owed || a.name.localeCompare(b.name));
   }, [suppliers, purchases, openings]);

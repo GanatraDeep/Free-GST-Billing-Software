@@ -2,10 +2,11 @@
 import {
   ledgerView, clientLedger, supplierLedger, gstLedger, salesLedger, purchasesLedger, moneyLedger,
   itemLedger, costOfGoodsSold, buildLedger, ledgerCatalog, side, isUrdPurchase,
-  postings, trialBalance, profitAndLoss, balanceSheet, stockValue,
+  postings, trialBalance, profitAndLoss, balanceSheet, stockValue, stockAdjustmentLoss,
 } from '../src/utils/ledgers.js';
 import { sheetNames, buildWorkbook } from '../src/utils/xlsx.js';
 import { caPackSheets } from '../src/utils/caPack.js';
+import { gstSetOffMoves, gstPaymentLines } from '../src/utils/gstPayment.js';
 import { voucherProblem, nextVoucherNumber, depreciation, accountProblem } from '../src/utils/vouchers.js';
 import { unzipSync, strFromU8 } from 'fflate';
 import { typesList, typeProblem, defaultType, needsReceipt, typeRef, cleanType } from '../src/utils/docTypes.js';
@@ -170,6 +171,55 @@ console.log('\n[CA pack and vouchers]');
   eq(nextVoucherNumber([{ number: 'JV/26-27/0007' }, { number: 'PV/26-27/0009' }], 'journal', '2026-27'), 'JV/26-27/0008', 'Voucher numbers run per type and year');
   eq(depreciation({ openingWdv: 50000, additions: [{ date: '2026-12-01', amount: 20000 }], rate: 10, fyEnd: '2027-03-31' }), 6000, 'Depreciation: 10% on 50,000 + half rate on an addition used under 180 days');
   eq(accountProblem({ name: 'CC', group: 'cc', opening: 100, asOn: '' }), 'Enter the date of the opening balance.', 'An opening balance needs its date');
+}
+
+console.log('\n[Bank / CC account and kasar]');
+{
+  const extra = {
+    ...books,
+    receipts: [...books.receipts, { id: 'r2', receiptNo: 'RCP/2', date: '2026-11-09', clientName: 'Patel Kirana', amount: 990, discount: 10, paymentMode: 'UPI', account: 'acc:cc' }],
+    purchases: [...books.purchases.map((p) => (p.id === 'pu1' ? { ...p, payments: [...p.payments, { id: 'x3', date: '2026-11-12', amount: 10950, mode: 'bank-transfer', account: 'acc:cc' }, { id: 'x4', date: '2026-11-12', amount: 50, mode: 'discount' }] } : p))],
+  };
+  const bal = (id) => ledgerView(buildLedger(id, extra).entries).closing;
+  eq(bal('acc:cc'), -201500 + 990 - 10950, 'UPI receipt into the CC and a supplier paid from it go to the CC account');
+  eq(ledgerView(moneyLedger('bank', extra)).closing, ledgerView(moneyLedger('bank', books)).closing, 'and not to the Bank book');
+  eq(bal('expense:Discount allowed'), 10, 'Kasar on a receipt: Discount allowed');
+  eq(bal('discount-received'), -50, 'Kasar on a supplier payment: Discount received');
+  eq(ledgerView(supplierLedger('Saurashtra Oil Mills', extra)).closing, -61000 + 11000, 'The supplier is cleared by payment + discount');
+  eq(trialBalance(extra, { from: '2026-04-01', to: '2027-03-31' }).difference, 0, 'Trial balance still agrees');
+}
+
+console.log('\n[Purchase return and stock adjustment]');
+{
+  const ret = { id: 'dn1', isReturn: true, returnOf: 'SOM/101', date: '2026-11-10', supplierName: 'Saurashtra Oil Mills', invoiceNumber: 'DN/1', interstate: false,
+    items: [{ name: 'Groundnut oil 15 kg tin', productId: 'p1', quantity: 1, rate: 2000, taxPercent: 5 }], payments: [] };
+  const adj = { id: 'a1', productId: 'p1', date: '2026-11-11', qty: -0.5, reason: 'Leakage' };
+  // Products' stock follows both: 7.5 - 1 returned - 0.5 leaked = 6.
+  const d2 = { ...books, purchases: [...books.purchases, ret], stockAdjustments: [adj], products: [{ ...oil, stock: 6 }] };
+  eq(ledgerView(supplierLedger('Saurashtra Oil Mills', d2)).closing, -61000 + 2100, 'A return of 1 tin (2,000 + 5% GST) reduces what you owe the supplier');
+  eq(ledgerView(gstLedger('all', d2)).totals.cr, 365 + 100, 'and reverses the input tax on it');
+  const L = itemLedger({ ...oil, stock: 6 }, d2);
+  eq(L.rows.map((r) => r.kind).filter((k) => k === 'preturn' || k === 'adjust-out'), ['preturn', 'adjust-out'], 'The item ledger shows the return and the leakage');
+  eq([L.rows[0].qtyIn, L.closingQty], [0, 6], 'and does not mistake them for opening stock');
+  eq(stockAdjustmentLoss(d2, { from: '2026-04-01', to: '2027-03-31' }), 1000, 'Leakage of half a tin at 2,000 average cost: 1,000 loss');
+  const pl = profitAndLoss(d2, { from: '2026-04-01', to: '2027-03-31' });
+  eq(pl.closingStock, 12000, 'Closing stock: 6 tins at 2,000');
+  eq(pl.indirectExpenses.find((r) => r.name === 'Stock shortage and wastage')?.net, 1000, 'The shortage is an expense in profit and loss');
+  eq(pl.netProfit, 525 - 1500 - 1000 - 1000, 'Net profit falls by the shortage only (the return is at cost)');
+  eq(trialBalance(d2, { from: '2026-04-01', to: '2027-03-31' }).difference, 0, 'Trial balance agrees');
+  eq(balanceSheet(d2, { from: '2026-04-01', to: '2027-03-31' }).difference, 0, 'Balance sheet agrees');
+}
+
+console.log('\n[GST paid]');
+{
+  // Output CGST 1,000 / SGST 1,000; input IGST 1,500, CGST 200, SGST 200.
+  const { moves, payable } = gstSetOffMoves({ igst: 0, cgst: 1000, sgst: 1000 }, { igst: 1500, cgst: 200, sgst: 200 });
+  eq(payable, { igst: 0, cgst: 0, sgst: 100 }, 'Credit used in the same order as GSTR-3B: 100 SGST left to pay in cash');
+  const lines = gstPaymentLines({ moves, cash: payable, interest: 12, from: 'bank' });
+  const tot = (k) => Math.round(lines.reduce((s, l) => s + l[k], 0) * 100) / 100;
+  eq(tot('dr'), tot('cr'), 'The GST payment voucher balances');
+  eq(lines.find((l) => l.account === 'gst:igst')?.cr, 1500, 'IGST credit moved to CGST and SGST');
+  eq(lines.find((l) => l.account === 'bank')?.cr, 112, 'Bank pays 100 + 12 interest');
 }
 
 console.log('\n[Sale and purchase types]');

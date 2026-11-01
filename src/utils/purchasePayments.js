@@ -22,7 +22,7 @@ export const PURCHASE_PAYMENT_MODES = [
   ['cash', 'Cash'], ['upi', 'UPI'], ['bank-transfer', 'Bank transfer'],
   ['cheque', 'Cheque'], ['card', 'Card'], ['other', 'Other'],
 ];
-export const purchasePaymentModeName = (mode) => (PURCHASE_PAYMENT_MODES.find(([v]) => v === mode) || [])[1] || mode || '';
+export const purchasePaymentModeName = (mode) => (mode === 'discount' ? 'Discount / kasar' : (PURCHASE_PAYMENT_MODES.find(([v]) => v === mode) || [])[1] || mode || '');
 export const PURCHASE_STATUS_LABEL = { Paid: 'Paid', Partial: 'Partly paid', Unpaid: 'Unpaid' };
 
 const MAX_AMOUNT = 1e11;

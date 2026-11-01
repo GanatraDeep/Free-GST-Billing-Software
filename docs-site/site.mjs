@@ -8,7 +8,7 @@ export const SITE = {
   folder: 'help',
   url: '/help/',
   publisher: { name: 'Divtech', url: 'https://divtech.in' },
-  version: '1.13.0',
+  version: '1.14.0',
   repo: 'https://github.com/GanatraDeep/free-gst-billing-software',
   // Always the newest release: GitHub resolves this to the latest release's
   // file of exactly this name (see docs/RELEASE_CHECKLIST.md, step 4b).
