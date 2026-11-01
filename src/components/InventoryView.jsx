@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Package, Search, Plus, Edit3, Trash2, X, Save, Upload, Table2, Factory, BookOpen } from 'lucide-react';
+import { Package, Search, Plus, Edit3, Trash2, X, Save, Upload, Table2, Factory, BookOpen, Scale } from 'lucide-react';
+import StockAdjustModal, { recordStockAdjustment } from './StockAdjustModal';
 import { openLedger } from '../utils/openLedger';
 import { getAllProducts, saveProduct, deleteProduct, getProfile, getStockAlertSettings, getEnabledModules } from '../store';
-import { getAllUnits, addCustomUnit, getCountryConfig, formatCurrency, isModuleEnabled, isServiceProduct, trackedStock, filterUnitsByMode, getDefaultUnitForMode } from '../utils';
+import { getAllUnits, addCustomUnit, roundQty, localToday, getCountryConfig, formatCurrency, isModuleEnabled, isServiceProduct, trackedStock, filterUnitsByMode, getDefaultUnitForMode } from '../utils';
 import { productsCsvToList, PRODUCTS_SAMPLE } from '../utils/listCsv';
 import CsvListImport from './CsvListImport';
 import { bomError, unitCost } from '../utils/manufacturing';
@@ -34,6 +35,7 @@ export default function InventoryView() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [units, setUnits] = useState(getAllUnits());
+  const [adjusting, setAdjusting] = useState(null); // Divtech Hisaab - stock adjustment window
   const [profileCountry, setProfileCountry] = useState('India');
   const profileCurrency = getCountryConfig(profileCountry).currency;
   // The colour-coded stock badge in the table respects the user's threshold
@@ -149,7 +151,21 @@ export default function InventoryView() {
         // already has are kept as they are (spread above).
         ...(mfgOn ? (form.madeHere && !service ? { madeHere: true, bom } : { madeHere: false }) : {}),
       };
-      await saveProduct(product);
+      // Divtech Hisaab - a changed stock on an existing item is a shortage or
+      // an excess: record it as a dated adjustment so the accounts show it.
+      const before = editingId ? products.find((p) => p.id === editingId) : null;
+      const diff = before && !service && product.stock !== undefined && before.stock !== undefined && before.stock !== '' ? roundQty(product.stock - (Number(before.stock) || 0)) : 0;
+      if (diff && await confirmAction({
+        title: `Stock ${diff > 0 ? 'up' : 'down'} by ${Math.abs(diff)} ${product.unit || ''}`,
+        message: `Record the difference as a stock adjustment today (${diff < 0 ? 'shortage: a loss at average cost' : 'excess found: an income'})? Choose "Just change it" only to correct a typing mistake.`,
+        confirmLabel: 'Record adjustment', cancelLabel: 'Just change it',
+      })) {
+        await saveProduct({ ...product, stock: before.stock });
+        const prof = await getProfile().catch(() => null);
+        await recordStockAdjustment({ ...product, stock: before.stock }, { qty: diff, date: localToday(), reason: diff < 0 ? 'Shortage' : 'Excess found', note: 'Changed in Products' }, prof);
+      } else {
+        await saveProduct(product);
+      }
       toast(editingId ? 'Product updated' : 'Product added', 'success');
       closeForm();
       loadProducts();
@@ -191,6 +207,7 @@ export default function InventoryView() {
 
   return (
     <div className="dashboard-container">
+      {adjusting && <StockAdjustModal product={adjusting} onClose={() => setAdjusting(null)} onDone={loadProducts} />}
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div>
@@ -398,6 +415,11 @@ export default function InventoryView() {
                     </td>
                     <td>
                       <div className="table-actions">
+                        {!isServiceProduct(product) && (
+                          <button className="icon-btn" onClick={() => setAdjusting(product)} title="Adjust stock: shortage, leakage, excess" aria-label={`Adjust stock of ${product.name}`}>
+                            <Scale size={15} />
+                          </button>
+                        )}
                         {!isServiceProduct(product) && (
                           <button className="icon-btn icon-btn-blue" onClick={() => openLedger(`item:${product.id}`)} title="Item ledger: stock in and out, value without GST" aria-label={`Ledger of ${product.name}`}>
                             <BookOpen size={15} />

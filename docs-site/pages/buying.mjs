@@ -116,6 +116,19 @@ export default [
 <p>The type shows under the invoice number in the purchase list.</p>
 </section>
 
+<section id="purchase-returns">
+<h2>Purchase returns (debit notes)</h2>
+<p>When you send goods back to a supplier (leaking tins, wrong quality, excess supply), click ${ui('Purchase return')} at the top, or the return arrow on the bill's row to start from that bill with its supplier and items filled in. Enter your <b>Debit note number</b>, the bill it is <b>against</b>, and keep only the lines and quantities going back. ${ui('Save')}.</p>
+<ul>
+  <li>The quantities come <b>out of stock</b>, at the bill's rate.</li>
+  <li>What you owe the supplier goes <b>down</b> by the return's total (with GST).</li>
+  <li>The <b>input tax credit</b> on it is reversed: GSTR-3B's credit and the GST ledgers are lower by its GST.</li>
+  <li>In the list it shows as <b>Purchase return</b> with minus amounts; totals take it away.</li>
+  <li>If the supplier refunds money instead of adjusting the next bill, record it with the ${ui('₹')} button on the return: <b>Refund received</b>.</li>
+</ul>
+<p>Editing or deleting a return puts the stock back as needed.</p>
+</section>
+
 <section id="suppliers">
 <h2>Suppliers (the purchase master)</h2>
 <p>${ui('Suppliers')} in the sidebar is your supplier list: name, GSTIN, registration (Regular, Composition or Unregistered), phone, email, address and a note. Each supplier shows what you bought from them, what you paid and what you still owe, including their <a href="clients.html#opening-balances">opening balance</a>.</p>
@@ -207,6 +220,11 @@ export default [
 <p>The status does not change the GST credit: credit depends on the bill, not on whether you have paid it yet. (By law you must pay the supplier within 180 days to keep the credit.)</p>
 <div class="note info"><strong>Bills from before payments could be recorded</strong>
 <p>A bill you marked <b>Paid</b> in an older version has no payments on it. It stays <b>Paid</b> and owes nothing; you do not need to do anything. A bill marked <b>Partial</b> stays Partly paid, but the app does not know how much was paid, so its Balance due shows the whole amount until you record the payments you made.</p></div>
+</section>
+
+<section id="payment-bank-kasar">
+<h3>Paid from which account, and kasar</h3>
+<p>When you have another bank or a CC / OD account in <a href="accounts.html#bank-accounts">Accounts</a>, the payment window has <b>Paid from</b> (for any mode but cash): the payment then goes to that account's ledger instead of the Bank book. <b>Discount received / kasar</b> is what the supplier lets go (rate difference, a small balance): it is written off to <b>Discount received</b> and settles the bill with the payment. With only a discount, nothing is paid and the bill is settled.</p>
 </section>
 
 <section id="record-payment">
@@ -591,6 +609,56 @@ export default [
 </ol>
 <div class="note tip"><strong>Something wrong?</strong>
 <p><b>Print / PDF does nothing</b>, or says <b>"Allow pop-ups for this page to print the report"</b>: allow pop-ups for the app in your browser and click again. See <a href="troubleshooting.html#print-blocked">Print does nothing</a>.</p></div>
+</section>
+`,
+},
+
+// =============================================================================
+{
+  slug: 'freight',
+  title: 'Freight (jakat) and RCM',
+  lead: 'What you pay transporters to bring goods in, booked to a freight account for each goods, with the GST on it under reverse charge (RCM) for GSTR-3B.',
+  body: `
+<section id="why">
+<h2>Why freight has its own screen</h2>
+<p>A goods transport agency (GTA) usually does not charge you GST on its bilty. Instead <b>you</b> pay that GST to the government under <b>reverse charge</b> (RCM), and then claim it back as input tax credit in the same return. Your GST filer needs the month's freight list for this. Enter each freight here and the app keeps the freight account for each goods, the RCM in GSTR-3B and the register to hand over.</p>
+</section>
+
+<section id="add-freight">
+<h2>Entering freight</h2>
+<p>Open <b>Freight (RCM)</b> from the menu and fill in:</p>
+<div class="table-wrap"><table>
+  <tr><th>Field</th><th>What to enter</th></tr>
+  <tr><td>Goods (freight account)</td><td>The goods the freight was for, such as <i>Groundnut oil</i>. Each goods gets its own account, <b>Freight - Groundnut oil</b>, in Accounts and the P&amp;L. Pick from your products or type a name. Left empty, it goes to <b>Freight inward</b>.</td></tr>
+  <tr><td>Transporter, GSTIN</td><td>Who carried the goods. A GSTIN from another state ticks <b>Transporter in another state</b>, so the RCM is IGST.</td></tr>
+  <tr><td>LR / bilty no., vehicle, from, to</td><td>From the bilty. They go into the register for the GST filer.</td></tr>
+  <tr><td>Purchase bill</td><td>Optional: the supplier bill these goods came on.</td></tr>
+  <tr><td>Freight amount</td><td>The bilty amount.</td></tr>
+  <tr><td>GST (reverse charge)</td><td>5% (the usual GTA rate, no credit to the transporter), 12%, 18%, or 0% when no GST applies (a small tempo, an exempt GTA).</td></tr>
+  <tr><td>Paid</td><td>Cash, bank, UPI, cheque (then the bank or CC account it went from), or <b>On credit</b> when you will pay the transporter later: it is then owed to them like a supplier.</td></tr>
+</table></div>
+<p>The line under the form shows the RCM on this freight before you save.</p>
+</section>
+
+<section id="freight-accounts">
+<h2>Freight accounts</h2>
+<p>Freight is a <b>direct expense</b>: it is in the Trading account, above gross profit. Each goods' freight account is listed in <b>Accounts</b> and its ledger opens from the book icon on a row. The box at the top of the Freight screen shows the totals per goods for the dates picked.</p>
+</section>
+
+<section id="rcm-gstr3b">
+<h2>RCM in GSTR-3B</h2>
+<ul>
+  <li><b>3.1(d)</b> Inward supplies liable to reverse charge: the freight and its GST.</li>
+  <li><b>4(A)(3)</b> the same GST as input tax credit (ISRC in the JSON).</li>
+  <li><b>Table 6</b>: RCM is paid <b>in cash</b>; credit cannot pay it. It is shown on its own line and added to the Net GST Payable.</li>
+  <li>The GSTR-3B Excel has a <b>RCM freight register</b> sheet.</li>
+</ul>
+<p>When you pay, use <a href="gst-returns.html#gst-paid">Record GST paid</a>: its <b>Reverse charge (freight)</b> box is filled in, and saving clears <b>GST payable under reverse charge (RCM)</b>.</p>
+</section>
+
+<section id="register">
+<h2>The month's register for the GST filer</h2>
+<p>Pick <b>Last month</b> (or This month) above the list, then ${ui('Excel')} or ${ui('Print')} on the <b>Freight / RCM register</b>. It lists date, transporter and GSTIN, LR, vehicle, from and to, goods, bill, freight, rate and IGST / CGST / SGST, with totals. Send it with the other GST files.</p>
 </section>
 `,
 },

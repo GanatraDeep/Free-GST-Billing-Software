@@ -9,7 +9,7 @@ import { getClosedYears, closedYearsOf } from './useClosedYears';
 import { seriesForBusiness, defaultSeries, seriesOfBill } from '../utils/invoiceSeries';
 import { saveBill, deleteBill, applyStockChanges, getNextInvoiceNumber, getTermsTemplates, getAllClients, saveClient, getProfile, getAllProducts, getInvoiceDisplayOptions, saveInvoiceDisplayOptions, getAllProfiles, getRegionMode, saveRecurring, getAllRecurring, getAllBills, getEnabledModules, getBusinessType } from '../store';
 import { INVOICE_TYPES, isModuleEnabled, businessKeyOf, GST_DOC_NUMBER, COUNTRIES, printedSubtotal, deliveryChargeLine, stockEffect, appliedStock, stockDelta, generateEWayBillJSON, formatCurrency, getCountryConfig, getStatesForCountry, getAllUnits, addCustomUnit, removeCustomUnit, getCountriesForRegion, TDS_SECTIONS, TCS_SECTIONS, REMOVED_TCS_SECTIONS, TERMS_PRESETS, getActiveAccounts, getDefaultAccount, getAccountById, getDefaultUnitForMode, filterUnitsByMode, PAPER_SIZES, getPaperSize, computeInvoiceTotals, clientYearToDate, htmlHasText, ORDER_DETAIL_FIELDS, invoiceOptionOn, DEFAULT_DECLARATION, decodeGstin, safePageBoundaries, localToday, toLocalIsoDate, parseLocalDate, paymentStatusFor, getStateCode, countsAsSales, amountDue, getFinancialYearLabel } from '../utils';
-import { getPrintSettings, savePrintSettings } from '../utils/printSettings';
+import { getPrintSettings, savePrintSettings, withSafeMargins, defaultCopies } from '../utils/printSettings';
 import { openWhatsAppShare } from '../utils/share';
 import { confirmAction, promptAction } from './ConfirmModal';
 import { useCostCentres } from './useCostCentres';
@@ -841,6 +841,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   const saleTypePicked = useRef(!!(draft?.details?.saleType || editingBill?.data?.details?.saleType));
   const isSaleDoc = countsAsSales({ invoiceType });
   const pickSaleType = (t) => setDetails((prev) => ({ ...prev, saleType: typeRef(t, 'sale') }));
+  // Divtech Hisaab - copies per print (Original / Duplicate / Triplicate...),
+  // from Settings → Print, changeable here for this session.
+  const [copies, setCopies] = useState(() => {
+    try { const saved = Number(sessionStorage.getItem('divtech_printCopies')); if (saved >= 1) return saved; } catch { /* storage off */ }
+    return defaultCopies(getPrintSettings());
+  });
+  const copiesRef = useRef(copies);
   // Divtech Hisaab - financial years closed on Final accounts → Year end.
   const [closedYears, setClosedYears] = useState({});
   useEffect(() => { getClosedYears().then(setClosedYears).catch(() => {}); }, []);
@@ -2353,7 +2360,15 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
   // on the success path — an exception left the on-screen preview
   // stuck at scale 1.0 until the user navigated away.
   const buildPDF = async ({ archive = false, forPrint = false } = {}) => {
-    const printSettings = getPrintSettings();
+    // Divtech Hisaab - printer-safe margins until the user sets their own, and
+    // the number of copies picked beside Print (archive copies are single).
+    const thermalNow = getPaperSize(invoiceOptions.paperSize, invoiceOptions).kind === 'thermal';
+    const basePs = withSafeMargins(getPrintSettings(), thermalNow);
+    const copies = archive ? 1 : Math.max(1, Number(copiesRef.current) || defaultCopies(basePs));
+    // With copies, the ORIGINAL / DUPLICATE label gets its own 6 mm band at
+    // the top, so it never covers the header.
+    const band = copies > 1 && !thermalNow ? 6 : 0;
+    const printSettings = { ...basePs, multiCopyEnabled: copies > 1, multiCopyCount: copies, marginTop: (Number(basePs.marginTop) || 0) + band, copyLabelY: (Number(basePs.marginTop) || 0) + 0.5 };
     const scalerEl = printRef.current.closest('.preview-scaler');
     const spacerFit = {};
     if (scalerEl) scalerEl.style.transform = 'none';
@@ -2828,7 +2843,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     // v1.10.3 — Rebuilt to correctly duplicate multi-page invoices. See
     // pageRecipes comment above for background.
     if (ps.multiCopyEnabled && ps.multiCopyCount > 1) {
-      const labels = ps.multiCopyLabels || ['ORIGINAL', 'DUPLICATE', 'TRIPLICATE'];
+      const labels = [...(ps.multiCopyLabels || ['ORIGINAL', 'DUPLICATE', 'TRIPLICATE']), 'EXTRA COPY'];
       const originalPageCount = pageRecipes.length;   // correct: 1 recipe per original page
       // Replay every original page for each additional copy.
       for (let copyIdx = 1; copyIdx < ps.multiCopyCount; copyIdx++) {
@@ -2856,8 +2871,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           const labelWidth = pdf.getTextWidth(label) + 6;
           pdf.setDrawColor(80, 80, 80);
           pdf.setLineWidth(0.3);
-          pdf.rect(pdfWidth - labelWidth - 4, 4, labelWidth, 6, 'S');
-          pdf.text(label, pdfWidth - labelWidth - 1, 8);
+          // Divtech Hisaab - centred at the very top, in the margin: it used to
+          // sit top-right, on top of the business name.
+          const lx = (pdfWidth - labelWidth) / 2;
+          const ly = Math.max(0.8, Number(ps.copyLabelY) || 0.8);
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(lx, ly, labelWidth, 5, 'FD');
+          pdf.text(label, lx + 3, ly + 3.6);
           pdf.setTextColor(0);
         }
       }
@@ -3005,7 +3025,13 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
     // ----- Page numbers + business header on subsequent pages -----
     if (!isThermalPdf && (ps.pageNumbersEnabled || ps.pageHeaderEnabled) && pdf.getNumberOfPages() > 1) {
       const finalPages = pdf.getNumberOfPages();
+      // Divtech Hisaab - numbered within each copy (Page 2 of 2 on the
+      // duplicate too), not across all copies (it said Page 4 of 6).
+      const copyCount = ps.multiCopyEnabled && ps.multiCopyCount > 1 ? ps.multiCopyCount : 1;
+      const perCopy = Math.max(1, Math.round(finalPages / copyCount));
       for (let p = 2; p <= finalPages; p++) {
+        const local = ((p - 1) % perCopy) + 1;
+        if (local === 1) continue;
         pdf.setPage(p);
         if (ps.pageHeaderEnabled && profile?.businessName) {
           pdf.setFont('helvetica', 'bold');
@@ -3020,7 +3046,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(8);
           pdf.setTextColor(120);
-          pdf.text(`Page ${p} of ${finalPages}`, pdfWidth - 8, pdfPageHeight - 4, { align: 'right' });
+          pdf.text(`Page ${local} of ${perCopy}`, pdfWidth - 8, pdfPageHeight - 4, { align: 'right' });
           pdf.setTextColor(0);
         }
       }
@@ -3682,6 +3708,15 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
             }>
             <Printer size={18} /> Print
           </button>
+          {!isThermalPaper() && (
+            <label className="btn btn-secondary" style={{ gap: 6, cursor: 'default' }} title="How many copies Print and Save & Download make: Original, Duplicate (transporter), Triplicate (supplier)...">
+              Copies
+              <select aria-label="Copies" value={copies} onChange={(e) => { const n = Number(e.target.value); setCopies(n); copiesRef.current = n; try { sessionStorage.setItem('divtech_printCopies', String(n)); } catch { /* storage off */ } }}
+                style={{ border: 'none', background: 'transparent', font: 'inherit', fontWeight: 600, cursor: 'pointer' }}>
+                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
           <button className="btn btn-secondary" onClick={shareWhatsApp} disabled={saving} style={{ background: '#25d366', color: '#fff', borderColor: '#25d366' }}>
             <MessageCircle size={18} /> WhatsApp
           </button>

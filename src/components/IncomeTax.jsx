@@ -52,7 +52,8 @@ const billTurnover = (orig) => {
   const b = billInInr(orig);
   return b ? salesSign(b) * ((Number(b.totalAmount) || 0) - (Number(b.totalTaxAmount) || 0) - (Number(b.data?.totals?.tcsAmount) || 0)) : 0;
 };
-const purchaseCost = (p) => (p.taxableAmount != null ? Number(p.taxableAmount) || 0
+// Divtech Hisaab - a purchase return (debit note) takes its cost back off.
+const purchaseCost = (p) => (p.isReturn ? -1 : 1) * (p.taxableAmount != null ? Number(p.taxableAmount) || 0
   : (Number(p.totalAmount) || 0) - (Number(p.totalTax) || 0));
 const expenseCost = (e) => (Number(e.amount) || 0) - (Number(e.gstAmount) || 0);
 import { toast } from './Toast';

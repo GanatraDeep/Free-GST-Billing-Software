@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url';
 import { redact } from './src/utils/errorReport.js';
 import { validateCashEntry, cleanCashEntry } from './src/utils/cashBook.js';
 import { accountProblem, cleanAccount, voucherProblem, cleanVoucher } from './src/utils/vouchers.js';
+import { freightProblem, cleanFreight } from './src/utils/freight.js';
 import { validatePurchasePayments } from './src/utils/purchasePayments.js';
 // Divtech Hisaab - opening balances carried over from the previous software.
 import { validateOpening, cleanOpening } from './src/utils/openingBalances.js';
@@ -99,7 +100,7 @@ app.use((req, res, next) => {
 });
 
 // Ensure data directory and sub-directories exist
-const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book', 'opening-balances', 'suppliers', 'accounts', 'vouchers'];
+const DIRS = ['bills', 'clients', 'templates', 'products', 'expenses', 'recurring', 'receipts', 'profiles', 'purchases', 'productions', 'purchase-orders', 'cash-book', 'opening-balances', 'suppliers', 'accounts', 'vouchers', 'stock-adjustments', 'freight'];
 // v1.10.83 - a data folder the app may not write to (inside Program Files, a
 // read-only drive, antivirus "controlled folder access") or a full disk used
 // to crash here with a raw stack trace the launcher never showed. Say it in
@@ -487,6 +488,43 @@ app.post('/api/vouchers', (req, res) => {
   if (problem) return res.status(400).json({ error: problem, code: 'bad-request' });
   saveRecord('vouchers', cleanVoucher(req.body), res, 'voucher');
 });
+// Freight (jakat) paid to transporters, with GST under reverse charge.
+app.get('/api/freight', (req, res) => {
+  res.json(readAllFromDir('freight').sort((a, b) => String(b.date).localeCompare(String(a.date))));
+});
+app.post('/api/freight', (req, res) => {
+  const problem = freightProblem(req.body || {});
+  if (problem) return res.status(400).json({ error: problem, code: 'bad-request' });
+  saveRecord('freight', cleanFreight(req.body), res, 'freight');
+});
+app.delete('/api/freight/:id', (req, res) => {
+  deleteFile(path.join(DATA_DIR, 'freight', safeFileName(req.params.id) + '.json'));
+  res.json({ success: true });
+});
+
+// Stock adjustments: shortage, leakage, wastage, excess found on counting.
+// The product's stock is changed by the screen that saves one (as invoices do).
+app.get('/api/stock-adjustments', (req, res) => {
+  res.json(readAllFromDir('stock-adjustments').sort((a, b) => String(b.date).localeCompare(String(a.date))));
+});
+app.post('/api/stock-adjustments', (req, res) => {
+  const a = req.body || {};
+  const qty = Math.round((Number(a.qty) || 0) * 1000) / 1000;
+  if (!a.productId || !qty || !/^\d{4}-\d{2}-\d{2}$/.test(String(a.date || ''))) return res.status(400).json({ error: 'Pick the item, the date and a quantity other than 0.', code: 'bad-request' });
+  const text = (v, max) => String(v || '').trim().slice(0, max);
+  saveRecord('stock-adjustments', {
+    id: text(a.id, 60) || 'adj_' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex'),
+    date: a.date, productId: text(a.productId, 80), productName: text(a.productName, 200), qty,
+    reason: text(a.reason, 60), note: text(a.note, 300),
+    ownerGstin: text(a.ownerGstin, 20), ownerName: text(a.ownerName, 200),
+    createdAt: text(a.createdAt, 40) || new Date().toISOString(),
+  }, res, 'adjustment');
+});
+app.delete('/api/stock-adjustments/:id', (req, res) => {
+  deleteFile(path.join(DATA_DIR, 'stock-adjustments', safeFileName(req.params.id) + '.json'));
+  res.json({ success: true });
+});
+
 app.delete('/api/vouchers/:id', (req, res) => {
   deleteFile(path.join(DATA_DIR, 'vouchers', safeFileName(req.params.id) + '.json'));
   res.json({ success: true });
@@ -1008,6 +1046,8 @@ app.get('/api/export', (req, res) => {
     suppliers: readAllFromDir('suppliers'),
     accounts: readAllFromDir('accounts'),
     vouchers: readAllFromDir('vouchers'),
+    stockAdjustments: readAllFromDir('stock-adjustments'),
+    freight: readAllFromDir('freight'),
     // v1.10.77 - never the PIN hash: a backup file can travel (email, Drive).
     meta: withoutLock(readJSON(META_PATH, {})),
     exportedAt: new Date().toISOString(),
@@ -1044,7 +1084,7 @@ app.post('/api/import', (req, res) => {
     cashBookCount: 0, cashBookSkipped: 0,
     openingCount: 0, openingSkipped: 0,
     supplierCount: 0, supplierSkipped: 0,
-    accountCount: 0, accountSkipped: 0, voucherCount: 0, voucherSkipped: 0,
+    accountCount: 0, accountSkipped: 0, voucherCount: 0, voucherSkipped: 0, adjustmentCount: 0, adjustmentSkipped: 0, freightCount: 0, freightSkipped: 0,
   };
 
   // Helper: upsert one entity to a directory, honouring the overwrite flag.
@@ -1065,6 +1105,8 @@ app.post('/api/import', (req, res) => {
   (data.bills || []).forEach(b => upsertOne('bills', b, 'billCount', 'billSkipped'));
   (data.clients || []).forEach(c => upsertOne('clients', c, 'clientCount', 'clientSkipped'));
   (data.suppliers || []).forEach(s => { if (s?.name) upsertOne('suppliers', s, 'supplierCount', 'supplierSkipped'); });
+  (data.freight || []).forEach(f => { if (f?.id && !freightProblem(f)) upsertOne('freight', f, 'freightCount', 'freightSkipped'); else counts.freightSkipped++; });
+  (data.stockAdjustments || []).forEach(a => { if (a?.id && a?.productId) upsertOne('stock-adjustments', a, 'adjustmentCount', 'adjustmentSkipped'); });
   (data.accounts || []).forEach(a => { if (a?.id && a?.name) upsertOne('accounts', a, 'accountCount', 'accountSkipped'); });
   (data.vouchers || []).forEach(v => { if (v?.id && !voucherProblem(v)) upsertOne('vouchers', v, 'voucherCount', 'voucherSkipped'); else counts.voucherSkipped++; });
   (data.termsTemplates || []).forEach(t => upsertOne('templates', t, 'templateCount', 'templateSkipped'));

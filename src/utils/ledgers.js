@@ -18,6 +18,7 @@ import { purchaseTotals } from './purchaseOrders.js';
 import { purchaseOwed, purchaseTotal, hasPurchasePayments, purchaseStatus } from './purchasePayments.js';
 import { partyKey, OPENING_REF } from './openingBalances.js';
 import { unpairedBillPayments, bookOfEntry, isBankMode, DEPOSIT_TO_BANK, CASH_WITHDRAWAL } from './cashBook.js';
+import { freightTax, freightAccountName } from './freight.js';
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const r3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
@@ -46,6 +47,9 @@ export function billTaxable(bill) {
 }
 // A purchase from an unregistered dealer (URD) gives no input tax credit.
 export const isUrdPurchase = (p) => !!p?.purchaseType?.urd;
+// A purchase return (debit note): goods sent back to the supplier.
+export const isPurchaseReturn = (p) => !!p?.isReturn;
+export const purchaseSign = (p) => (p?.isReturn ? -1 : 1);
 export function purchaseGst(p) {
   const t = purchaseTotals(p?.items || [], !!p?.applyRoundOff);
   const tax = r2(t.tax);
@@ -113,7 +117,7 @@ export const ACCOUNT_GROUPS = {
   suspense: { name: 'Suspense', side: 'liability' },
 };
 // Groups you can put your own accounts in (Accounts screen).
-export const USER_GROUPS = ['capital', 'secured-loans', 'unsecured-loans', 'cc', 'fixed-assets', 'investments', 'loans-advances', 'deposits', 'current-assets', 'current-liabilities', 'indirect-incomes', 'indirect-expenses', 'direct-expenses', 'direct-incomes'];
+export const USER_GROUPS = ['capital', 'secured-loans', 'unsecured-loans', 'cc', 'bank-accounts', 'fixed-assets', 'investments', 'loans-advances', 'deposits', 'current-assets', 'current-liabilities', 'indirect-incomes', 'indirect-expenses', 'direct-expenses', 'direct-incomes'];
 export const isPnlGroup = (g) => ['income', 'expense'].includes(ACCOUNT_GROUPS[g]?.side);
 
 const SYSTEM = {
@@ -121,7 +125,9 @@ const SYSTEM = {
   'gst:cgst': ['CGST', 'duties-taxes'], 'gst:sgst': ['SGST / UTGST', 'duties-taxes'], 'gst:igst': ['IGST', 'duties-taxes'], 'gst:cess': ['GST cess', 'duties-taxes'],
   'tds-receivable': ['TDS deducted by customers', 'current-assets'], 'tds-payable': ['TDS deducted from suppliers (payable)', 'duties-taxes'],
   'tcs-payable': ['TCS collected (payable)', 'duties-taxes'], 'round-off': ['Round off', 'indirect-expenses'],
-  interest: ['Bank interest', 'indirect-expenses'], advances: ['Advances (cash / bank book)', 'loans-advances'], drawings: ['Drawings', 'capital'],
+  interest: ['Bank interest', 'indirect-expenses'], 'discount-received': ['Discount received', 'indirect-incomes'],
+  'stock-adjust': ['Stock adjustments (shortage / excess)', 'purchases'],
+  'rcm-payable': ['GST payable under reverse charge (RCM)', 'duties-taxes'], 'stock-excess': ['Stock found in excess', 'indirect-incomes'], advances: ['Advances (cash / bank book)', 'loans-advances'], drawings: ['Drawings', 'capital'],
   stock: ['Opening stock', 'stock'], 'opening-diff': ['Difference in opening balances', 'capital'], suspense: ['Suspense (money in other modes)', 'suspense'],
 };
 // Expense categories that are part of buying goods (trading account).
@@ -134,7 +140,7 @@ export function accountInfo(id, accounts = []) {
   const arg = rest.join(':');
   if (type === 'client') return { id, name: arg, group: 'sundry-debtors', party: 'client' };
   if (type === 'supplier') return { id, name: arg, group: 'sundry-creditors', party: 'supplier' };
-  if (type === 'expense') return { id, name: arg || 'General expenses', group: DIRECT_EXPENSES.includes(arg.toLowerCase()) ? 'direct-expenses' : 'indirect-expenses' };
+  if (type === 'expense') return { id, name: arg || 'General expenses', group: DIRECT_EXPENSES.includes(arg.toLowerCase()) || /^freight\b/i.test(arg) ? 'direct-expenses' : 'indirect-expenses' };
   if (type === 'cashcat') return { id, name: `${arg} (cash / bank book)`, group: 'indirect-expenses' };
   if (type === 'acc') {
     const a = accounts.find((x) => x.id === arg);
@@ -146,10 +152,15 @@ export function accountInfo(id, accounts = []) {
 // Where money of a payment mode goes. A CC / OD or other account picked as the
 // mode ('acc:<id>') goes there; bank, UPI, cheque and card to the bank; others
 // (Other, adjustments) to suspense.
-export const modeAccount = (mode) => {
+// `account` ('acc:<id>') is the bank or CC account picked for a non-cash
+// payment. A discount (kasar) goes to Discount allowed on money received and
+// to Discount received on money paid.
+export const modeAccount = (mode, account = '', direction = 'in') => {
   const m = String(mode || '').trim();
   if (m.startsWith('acc:')) return m;
   if (m.toLowerCase() === 'cash') return 'cash';
+  if (m.toLowerCase() === 'discount') return direction === 'in' ? 'expense:Discount allowed' : 'discount-received';
+  if (String(account || '').startsWith('acc:')) return account;
   if (isBankMode(m)) return 'bank';
   return 'suspense';
 };
@@ -161,7 +172,7 @@ const CATEGORY_ACCOUNT = {
 
 // All postings of this business's records: [{ key, doc, account, date,
 // particulars, ref, dr, cr, view }]. Rupee documents only.
-export function postings({ bills = [], receipts = [], purchases = [], expenses = [], openings = [], cashEntries = [], vouchers = [], accounts = [], products = [] } = {}) {
+export function postings({ bills = [], receipts = [], purchases = [], expenses = [], openings = [], cashEntries = [], vouchers = [], accounts = [], products = [], stockAdjustments = [], freight = [] } = {}) {
   const out = [];
   // amount > 0 debits the account, < 0 credits it.
   const post = (doc, account, amount, date, particulars, ref = '', view = '', key = '') => {
@@ -182,7 +193,7 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
       for (const x of o.payments || []) {
         if (x.receiptNo) continue; // the receipt is posted below
         post(`obp:${o.id}:${x.id}`, clientAcc(o.name), -x.amount, x.date, `Received against opening balance (${x.mode || 'payment'})`, x.note || '', 'clients', `obp:${o.id}:${x.id}`);
-        post(`obp:${o.id}:${x.id}`, modeAccount(x.mode), x.amount, x.date, `Received against opening balance - ${o.name}`, x.note || '', 'clients');
+        post(`obp:${o.id}:${x.id}`, modeAccount(x.mode, x.account, 'in'), x.amount, x.date, `Received against opening balance - ${o.name}`, x.note || '', 'clients');
       }
     } else if (o.party === 'supplier') {
       const s = o.direction === 'advance' ? 1 : -1;
@@ -190,7 +201,7 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
       post(`ob:${o.id}`, 'opening-diff', -s * amt, o.asOn, `Opening balance - ${o.name}`, '', 'suppliers');
       for (const x of o.payments || []) {
         post(`obp:${o.id}:${x.id}`, supplierAcc(o.name), x.amount, x.date, `Paid against opening balance (${x.mode || 'payment'})`, x.note || '', 'suppliers', `obp:${o.id}:${x.id}`);
-        post(`obp:${o.id}:${x.id}`, modeAccount(x.mode), -x.amount, x.date, `Paid against opening balance - ${o.name}`, x.note || '', 'suppliers');
+        post(`obp:${o.id}:${x.id}`, modeAccount(x.mode, x.account, 'out'), -x.amount, x.date, `Paid against opening balance - ${o.name}`, x.note || '', 'suppliers');
       }
     }
   }
@@ -231,7 +242,7 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
     const doc = `pay:${b.id}:${p.id || p.date}`;
     const name = b.clientName || b.data?.client?.name;
     post(doc, clientAcc(name), refund ? amt : -amt, p.date || b.invoiceDate, `${refund ? 'Refund paid' : 'Received'} (${p.mode || 'payment'})`, b.invoiceNumber, 'dashboard', doc);
-    post(doc, modeAccount(p.mode), refund ? -amt : amt, p.date || b.invoiceDate, `Invoice ${b.invoiceNumber || b.id} ${refund ? 'refund' : 'payment'} - ${name || ''}`, p.note || '', 'dashboard');
+    post(doc, modeAccount(p.mode, p.account, refund ? 'out' : 'in'), refund ? -amt : amt, p.date || b.invoiceDate, `Invoice ${b.invoiceNumber || b.id} ${refund ? 'refund' : 'payment'} - ${name || ''}`, p.note || '', 'dashboard');
   }
   // Receipts.
   for (const r of receipts) {
@@ -241,7 +252,14 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
     const doc = `rcp:${r.id}`;
     const ref = [r.receiptNo, onOpening ? '' : r.againstInvoice].filter(Boolean).join(' · ');
     post(doc, clientAcc(r.clientName), -amt, r.date, `Receipt (${r.paymentMode || 'payment'})${onOpening ? ' against opening balance' : ''}`, ref, 'receipts', doc);
-    post(doc, modeAccount(r.paymentMode), amt, r.date, `Receipt ${r.receiptNo || ''} - ${r.clientName || ''}`.replace(/\s+-\s*$/, ''), r.note || '', 'receipts');
+    post(doc, modeAccount(r.paymentMode, r.account, 'in'), amt, r.date, `Receipt ${r.receiptNo || ''} - ${r.clientName || ''}`.replace(/\s+-\s*$/, ''), r.note || '', 'receipts');
+    // Kasar settled with the receipt. Against an invoice it is the invoice's
+    // own 'discount' payment line (posted above); otherwise it is posted here.
+    const disc = Number(r.discount) || 0;
+    if (disc > 0.005 && !salesBills.some((b) => (b.payments || []).some((p) => p.discountFor === r.id))) {
+      post(`rcpd:${r.id}`, clientAcc(r.clientName), -disc, r.date, 'Discount / kasar allowed', r.receiptNo || '', 'receipts', `rcpd:${r.id}`);
+      post(`rcpd:${r.id}`, 'expense:Discount allowed', disc, r.date, `Discount / kasar - ${r.clientName || ''}`, r.receiptNo || '', 'receipts');
+    }
   }
 
   // Purchase bills and payments to suppliers.
@@ -252,26 +270,30 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
     const g = purchaseGst(p);
     const gsum = HEADS.reduce((t, h) => t + g[h], 0);
     const urd = isUrdPurchase(p);
-    const type = p.purchaseType?.name ? `Purchase (${p.purchaseType.name})` : 'Purchase';
-    post(doc, supplierAcc(p.supplierName), -total, p.date, type, p.invoiceNumber, 'purchases', doc);
+    // A purchase return (debit note) runs the other way: the supplier owes
+    // you, purchases and input tax come down, and money comes back.
+    const s = isPurchaseReturn(p) ? -1 : 1;
+    const type = s < 0 ? `Purchase return (debit note)${p.returnOf ? ` on ${p.returnOf}` : ''}` : p.purchaseType?.name ? `Purchase (${p.purchaseType.name})` : 'Purchase';
+    post(doc, supplierAcc(p.supplierName), -s * total, p.date, type, p.invoiceNumber, 'purchases', doc);
     // GST on a URD bill is not claimed: it is part of the cost.
-    post(doc, 'purchases', g.taxable + (urd ? gsum : 0), p.date, `Purchase - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
-    if (!urd) for (const h of HEADS) post(doc, `gst:${h}`, g[h], p.date, `Input tax on purchase - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
-    post(doc, 'round-off', total - g.taxable - gsum, p.date, `Round off - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
+    post(doc, 'purchases', s * (g.taxable + (urd ? gsum : 0)), p.date, `${s < 0 ? 'Purchase return' : 'Purchase'} - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
+    if (!urd) for (const h of HEADS) post(doc, `gst:${h}`, s * g[h], p.date, `${s < 0 ? 'Input tax reversed (purchase return)' : 'Input tax on purchase'} - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
+    post(doc, 'round-off', s * (total - g.taxable - gsum), p.date, `Round off - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
     const tds = r2(total - purchaseOwed(p));
-    if (tds > 0.005) {
+    if (tds > 0.005 && s > 0) {
       post(`ptds:${p.id}`, supplierAcc(p.supplierName), tds, p.date, 'TDS deducted by you', p.invoiceNumber, 'purchases', `ptds:${p.id}`);
       post(`ptds:${p.id}`, 'tds-payable', -tds, p.date, `TDS deducted from ${p.supplierName || 'the supplier'}`, p.invoiceNumber, 'purchases');
     }
     if (hasPurchasePayments(p)) {
       for (const x of p.payments) {
         const pdoc = `ppay:${p.id}:${x.id}`;
-        post(pdoc, supplierAcc(p.supplierName), x.amount, x.date || p.date, `Paid (${x.mode || 'payment'})`, [p.invoiceNumber, x.reference].filter(Boolean).join(' · '), 'purchases', pdoc);
-        post(pdoc, modeAccount(x.mode), -x.amount, x.date || p.date, `Purchase bill ${p.invoiceNumber || p.id} payment - ${p.supplierName || ''}`, x.reference || '', 'purchases');
+        const label = x.mode === 'discount' ? (s < 0 ? 'Discount allowed on return' : 'Discount received') : `${s < 0 ? 'Refund received' : 'Paid'} (${x.mode || 'payment'})`;
+        post(pdoc, supplierAcc(p.supplierName), s * x.amount, x.date || p.date, label, [p.invoiceNumber, x.reference].filter(Boolean).join(' · '), 'purchases', pdoc);
+        post(pdoc, modeAccount(x.mode, x.account, s < 0 ? 'in' : 'out'), -s * x.amount, x.date || p.date, `Purchase ${s < 0 ? 'return' : 'bill'} ${p.invoiceNumber || p.id} ${s < 0 ? 'refund' : 'payment'} - ${p.supplierName || ''}`, x.reference || '', 'purchases');
       }
     } else if (purchaseStatus(p) === 'Paid') {
-      post(`pmark:${p.id}`, supplierAcc(p.supplierName), purchaseOwed(p), p.date, 'Marked paid', p.invoiceNumber, 'purchases', `pmark:${p.id}`);
-      post(`pmark:${p.id}`, 'suspense', -purchaseOwed(p), p.date, `Marked paid - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
+      post(`pmark:${p.id}`, supplierAcc(p.supplierName), s * purchaseOwed(p), p.date, 'Marked paid', p.invoiceNumber, 'purchases', `pmark:${p.id}`);
+      post(`pmark:${p.id}`, 'suspense', -s * purchaseOwed(p), p.date, `Marked paid - ${p.supplierName || ''}`, p.invoiceNumber, 'purchases');
     }
   }
 
@@ -285,7 +307,24 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
     const who = e.vendorName || e.description || '';
     post(doc, `expense:${e.category || 'General expenses'}`, (Number(e.amount) || 0) - gst, e.date, [e.category, who].filter(Boolean).join(' - ') || 'Expense', e.invoiceNumber || '', 'expenses', doc);
     for (const h of HEADS) post(doc, `gst:${h}`, split[h], e.date, `Input tax on expense - ${e.vendorName || e.category || ''}`, e.invoiceNumber || '', 'expenses');
-    post(doc, modeAccount(e.paymentMode), -(Number(e.amount) || 0), e.date, `Expense - ${who}`.replace(/\s+-\s*$/, ''), [e.category, e.note].filter(Boolean).join(' · '), 'expenses');
+    post(doc, modeAccount(e.paymentMode, e.account, 'out'), -(Number(e.amount) || 0), e.date, `Expense - ${who}`.replace(/\s+-\s*$/, ''), [e.category, e.note].filter(Boolean).join(' · '), 'expenses');
+  }
+
+  // Freight (jakat) for goods brought in, on that goods' freight account. The
+  // GST under reverse charge is your own liability (paid in cash with the
+  // GSTR-3B) and comes back as input tax credit.
+  for (const f of freight) {
+    const doc = `frt:${f.id}`;
+    const x = freightTax(f);
+    const label = `Freight${f.goods ? ` on ${f.goods}` : ''} - ${f.transporter || ''}`;
+    const ref = [f.lrNo ? `LR ${f.lrNo}` : '', f.againstBill].filter(Boolean).join(' · ');
+    post(doc, `expense:${freightAccountName(f.goods)}`, x.taxable, f.date, `${f.transporter || 'Freight'}${f.lrNo ? ` (LR ${f.lrNo})` : ''}`, f.againstBill || '', 'freight', doc);
+    const payTo = f.paymentMode === 'credit' ? supplierAcc(f.transporter) : modeAccount(f.paymentMode, f.account, 'out');
+    post(doc, payTo, -x.taxable, f.date, f.paymentMode === 'credit' ? `Freight${f.goods ? ` on ${f.goods}` : ''}${f.lrNo ? ` (LR ${f.lrNo})` : ''}` : label, ref, 'freight');
+    if (x.tax > 0.005) {
+      for (const h of ['igst', 'cgst', 'sgst']) post(doc, `gst:${h}`, x[h], f.date, `Input tax on freight (RCM) - ${f.transporter || ''}`, ref, 'freight');
+      post(doc, 'rcm-payable', -x.tax, f.date, `GST on freight under reverse charge - ${f.transporter || ''}`, ref, 'freight');
+    }
   }
 
   // Your own Cash book and Bank book entries.
@@ -321,7 +360,21 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
   // Opening stock: what was in stock before its first purchase or sale here.
   for (const pr of products) {
     if (pr?.kind === 'service') continue;
-    const first = itemLedger(pr, { bills, purchases }).rows[0];
+    const L = itemLedger(pr, { bills, purchases, stockAdjustments });
+    // Adjustments: a shortage is an expense, an excess an income, both at
+    // average cost; the closing stock already counts them.
+    for (const r of L.rows.filter((x) => x.kind === 'adjust-out' || x.kind === 'adjust-in')) {
+      const v = r.value || 0;
+      const doc = `adj:${r.adjustmentId}`;
+      if (r.kind === 'adjust-out') {
+        post(doc, 'expense:Stock shortage and wastage', v, r.date, `${r.particulars} - ${pr.name} (${r.qtyOut} ${pr.unit || ''})`.trim(), r.ref, 'inventory', doc);
+        post(doc, 'stock-adjust', -v, r.date, `${r.particulars} - ${pr.name}`, r.ref, 'inventory');
+      } else {
+        post(doc, 'stock-adjust', v, r.date, `${r.particulars} - ${pr.name}`, r.ref, 'inventory', doc);
+        post(doc, 'stock-excess', -v, r.date, `${r.particulars} - ${pr.name} (${r.qtyIn} ${pr.unit || ''})`.trim(), r.ref, 'inventory');
+      }
+    }
+    const first = L.rows[0];
     if (!first || Math.abs(first.value) < 0.005) continue;
     post(`os:${pr.id}`, 'stock', first.value, first.date, `Opening stock - ${pr.name}`, '', 'inventory', `os:${pr.id}`);
     post(`os:${pr.id}`, 'opening-diff', -first.value, first.date, `Opening stock - ${pr.name}`, '', 'inventory');
@@ -366,7 +419,7 @@ const productKeys = (product) => new Set([`id:${product.id}`, `name:${partyKey(p
 // Every stock movement of one product, oldest first, with the running quantity,
 // average cost (weighted, from purchases) and stock value. The first row is the
 // opening stock that makes the movements end at the product's current stock.
-export function itemLedger(product, { bills = [], purchases = [] } = {}) {
+export function itemLedger(product, { bills = [], purchases = [], stockAdjustments = [] } = {}) {
   const keys = productKeys(product);
   const moves = [];
   for (const p of purchases) {
@@ -376,6 +429,10 @@ export function itemLedger(product, { bills = [], purchases = [] } = {}) {
       const qty = Number(it.quantity) || 0;
       if (!qty) continue;
       // Saving a purchase bill adds its lines to Products' stock by name.
+      if (isPurchaseReturn(p)) {
+        moves.push({ key: `pur:${p.id}:${i}`, date: p.date, kind: 'preturn', particulars: `Returned to ${p.supplierName || 'supplier'} (debit note)`, ref: p.invoiceNumber, qtyIn: 0, qtyOut: qty, rate: r2(it.rate), view: 'purchases', moved: true });
+        continue;
+      }
       moves.push({ key: `pur:${p.id}:${i}`, date: p.date, kind: 'purchase', particulars: `Purchase - ${p.supplierName || ''}`, ref: p.invoiceNumber, qtyIn: qty, qtyOut: 0, rate: r2(it.rate), view: 'purchases', moved: true });
     }
   }
@@ -396,6 +453,13 @@ export function itemLedger(product, { bills = [], purchases = [] } = {}) {
         moved: it.productId === product.id, ...(it.productId === product.id ? {} : { unlinked: true }) });
     }
   }
+  // Divtech Hisaab - stock adjustments: shortage, leakage, wastage (out) or
+  // stock found in excess (in), counted at average cost.
+  for (const a of stockAdjustments) {
+    if (a.productId !== product.id || !(Number(a.qty))) continue;
+    const q = Number(a.qty);
+    moves.push({ key: `adj:${a.id}`, date: a.date, kind: q < 0 ? 'adjust-out' : 'adjust-in', particulars: `Stock adjustment: ${a.reason || (q < 0 ? 'shortage' : 'excess')}`, ref: a.note || '', qtyIn: q > 0 ? q : 0, qtyOut: q < 0 ? -q : 0, rate: 0, view: 'inventory', moved: true, adjustmentId: a.id });
+  }
   moves.sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.qtyIn ? -1 : 1));
   const net = moves.filter((m) => m.moved).reduce((s, m) => s + m.qtyIn - m.qtyOut, 0);
   const current = Number(product.stock);
@@ -413,11 +477,22 @@ export function itemLedger(product, { bills = [], purchases = [] } = {}) {
     } else if (m.kind === 'sale' || m.kind === 'challan') {
       cost = r2(m.qtyOut * avg);
       qty = r3(qty - m.qtyOut);
+    } else if (m.kind === 'preturn' || m.kind === 'adjust-out') {
+      // Back to the supplier at its rate, or written off at average cost.
+      const outValue = m.kind === 'preturn' ? m.qtyOut * m.rate : m.qtyOut * avg;
+      const left = qty - m.qtyOut;
+      avg = left > 0 ? Math.max(0, (qty * avg - outValue) / left) : avg;
+      if (m.kind === 'adjust-out') m.value = r2(outValue);
+      qty = r3(left);
+    } else if (m.kind === 'adjust-in') {
+      m.value = r2(m.qtyIn * avg);
+      qty = r3(qty + m.qtyIn);
     } else {
       cost = -r2(m.qtyIn * avg); // goods back: the cost comes back too
       qty = r3(qty + m.qtyIn);
     }
-    rows.push({ ...m, value: m.kind === 'purchase' ? r2(m.qtyIn * m.rate) : (m.saleValue || 0), cost, balanceQty: qty, avgCost: r2(avg), balanceValue: r2(qty * avg) });
+    const value = m.kind === 'purchase' || m.kind === 'preturn' ? r2((m.qtyIn || m.qtyOut) * m.rate) : m.kind.startsWith('adjust') ? m.value : (m.saleValue || 0);
+    rows.push({ ...m, value, cost, balanceQty: qty, avgCost: r2(avg), balanceValue: r2(qty * avg) });
   }
   return { product, unit: product.unit || '', rows, closingQty: qty, avgCost: r2(avg), closingValue: r2(qty * avg) };
 }
@@ -426,14 +501,14 @@ export function itemLedger(product, { bills = [], purchases = [] } = {}) {
 // cost at that time (returns on credit notes take it back). Lines for products
 // that are not in the product list, or have no cost at all, are counted in
 // `noCost` and add nothing. Rupee invoices only.
-export function costOfGoodsSold({ bills = [], purchases = [], products = [] } = {}, { from = '', to = '' } = {}) {
+export function costOfGoodsSold({ bills = [], purchases = [], products = [], stockAdjustments = [] } = {}, { from = '', to = '' } = {}) {
   let cost = 0;
   let noCost = 0;
   const byMonth = {};
   const inPeriod = (d) => (!from || d >= from) && (!to || d <= to);
   for (const product of products) {
     if (product?.kind === 'service') continue;
-    const { rows } = itemLedger(product, { bills, purchases });
+    const { rows } = itemLedger(product, { bills, purchases, stockAdjustments });
     for (const r of rows) {
       // A delivery challan moves goods but is not a sale.
       if ((r.kind !== 'sale' && r.kind !== 'return') || !inPeriod(r.date) || r.inr === false) continue;
@@ -456,9 +531,9 @@ export function ledgerCatalog(data = {}) {
   const supplierNames = uniq([...suppliers.map((s) => s.name), ...used('supplier:')]);
   const mine = (groups) => accounts.filter((a) => groups.includes(a.group)).sort((a, b) => a.name.localeCompare(b.name)).map((a) => ({ id: `acc:${a.id}`, name: a.name }));
   const expenseNames = [...new Set(used('expense:'))].sort();
-  const other = [...new Set(all.map((p) => p.account))].filter((id) => ['tds-receivable', 'tds-payable', 'tcs-payable', 'round-off', 'interest', 'advances', 'drawings', 'stock', 'opening-diff', 'suspense'].includes(id) || id.startsWith('cashcat:'));
+  const other = [...new Set(all.map((p) => p.account))].filter((id) => ['tds-receivable', 'tds-payable', 'tcs-payable', 'round-off', 'interest', 'advances', 'drawings', 'stock', 'opening-diff', 'suspense', 'discount-received', 'stock-adjust', 'stock-excess', 'rcm-payable'].includes(id) || id.startsWith('cashcat:'));
   return [
-    { group: 'Cash and bank', items: [{ id: 'cash', name: 'Cash' }, { id: 'bank', name: 'Bank' }, ...mine(['cc'])] },
+    { group: 'Cash and bank', items: [{ id: 'cash', name: 'Cash' }, { id: 'bank', name: 'Bank' }, ...mine(['bank-accounts', 'cc'])] },
     { group: 'Customers', items: clientNames.map((n) => ({ id: `client:${n}`, name: n })) },
     { group: 'Suppliers', items: supplierNames.map((n) => ({ id: `supplier:${n}`, name: n })) },
     { group: 'Items', items: products.filter((p) => p?.kind !== 'service').sort((a, b) => String(a.name).localeCompare(String(b.name))).map((p) => ({ id: `item:${p.id}`, name: p.name })) },
@@ -492,12 +567,12 @@ export function buildLedger(id, data = {}) {
 
 // ---- final accounts ------------------------------------------------------------
 // Stock value (without GST, at average cost) as on a date: '' = before anything.
-export function stockValue({ products = [], bills = [], purchases = [] } = {}, onDate) {
+export function stockValue({ products = [], bills = [], purchases = [], stockAdjustments = [] } = {}, onDate) {
   let total = 0;
   const lines = [];
   for (const pr of products) {
     if (pr?.kind === 'service') continue;
-    const { rows, unit } = itemLedger(pr, { bills, purchases });
+    const { rows, unit } = itemLedger(pr, { bills, purchases, stockAdjustments });
     let last = null;
     for (const r of rows) if (onDate === undefined || String(r.date) <= onDate) last = r;
     if (!last) continue;
@@ -630,7 +705,7 @@ export function postableAccounts(data = {}) {
   const sys = (ids) => ids.map((id) => ({ id, name: accountInfo(id, accounts).name }));
   const expenseNames = [...new Set([...COMMON_EXPENSES, ...expenses.map((e) => e.category).filter(Boolean), ...used('expense:')])].sort((a, b) => a.localeCompare(b));
   return [
-    { group: 'Cash, bank and CC', items: [...sys(['cash', 'bank']), ...mine(['cc'])] },
+    { group: 'Cash, bank and CC', items: [...sys(['cash', 'bank']), ...mine(['bank-accounts', 'cc'])] },
     { group: 'Capital and loans taken', items: [...mine(['capital', 'secured-loans', 'unsecured-loans']), ...sys(['drawings'])] },
     { group: 'Assets, loans and deposits given', items: mine(['fixed-assets', 'investments', 'loans-advances', 'deposits', 'current-assets']) },
     { group: 'Other liabilities', items: mine(['current-liabilities']) },
@@ -638,7 +713,7 @@ export function postableAccounts(data = {}) {
     { group: 'Income', items: [...mine(['indirect-incomes', 'direct-incomes']), ...sys(['sales'])] },
     { group: 'Customers', items: uniq([...clients.map((c) => c.name), ...used('client:')]).map((n) => ({ id: `client:${n}`, name: n })) },
     { group: 'Suppliers', items: uniq([...suppliers.map((s) => s.name), ...used('supplier:')]).map((n) => ({ id: `supplier:${n}`, name: n })) },
-    { group: 'GST, TDS and TCS', items: sys(['gst:cgst', 'gst:sgst', 'gst:igst', 'gst:cess', 'tds-payable', 'tds-receivable', 'tcs-payable']) },
+    { group: 'GST, TDS and TCS', items: sys(['gst:cgst', 'gst:sgst', 'gst:igst', 'gst:cess', 'rcm-payable', 'tds-payable', 'tds-receivable', 'tcs-payable']) },
     { group: 'Other', items: sys(['purchases', 'advances', 'round-off', 'suspense', 'opening-diff']) },
   ].filter((g) => g.items.length);
 }
@@ -651,4 +726,19 @@ export function accountBalances(data = {}, to = '') {
     map[p.account] = r2((map[p.account] || 0) + p.dr - p.cr);
   }
   return map;
+}
+
+// Net loss from stock adjustments in a period (shortage minus excess), at
+// average cost. Reports' quick profit and loss shows it as its own line.
+export function stockAdjustmentLoss({ bills = [], purchases = [], products = [], stockAdjustments = [] } = {}, { from = '', to = '' } = {}) {
+  if (!stockAdjustments.length) return 0;
+  let loss = 0;
+  for (const pr of products) {
+    if (pr?.kind === 'service' || !stockAdjustments.some((a) => a.productId === pr.id)) continue;
+    for (const r of itemLedger(pr, { bills, purchases, stockAdjustments }).rows) {
+      if (!r.kind?.startsWith('adjust') || (from && r.date < from) || (to && r.date > to)) continue;
+      loss += r.kind === 'adjust-out' ? r.value : -r.value;
+    }
+  }
+  return r2(loss);
 }

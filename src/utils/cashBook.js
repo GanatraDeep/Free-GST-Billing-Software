@@ -119,12 +119,15 @@ export function linkedBankLines(src = {}) { return linkedMoneyLines(src, 'bank')
 // Money recorded elsewhere for one book ('cash' or 'bank'), as read-only lines.
 export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], purchases = [], openings = [] } = {}, book = 'cash') {
   const inBook = book === 'bank' ? isBankMode : isCash;
+  // Divtech Hisaab - money through another bank or a CC account is in that
+  // account's ledger, not in the Bank book.
+  const otherAccount = (rec) => book === 'bank' && String(rec?.account || '').startsWith('acc:');
   const unpaired = unpairedBillPayments({ bills, receipts });
   // A paired payment is shown once, as its receipt (cash or not, as the
   // receipt says). An unpaired cash payment is shown from the invoice.
   const lines = [];
   for (const [bill, p] of unpaired) {
-    if (!inBook(p.mode) || !inRupees(billCurrency(bill)) || !(Number(p.amount) > 0)) continue;
+    if (!inBook(p.mode) || otherAccount(p) || !inRupees(billCurrency(bill)) || !(Number(p.amount) > 0)) continue;
     const no = bill.invoiceNumber || bill.id;
     lines.push({
       key: `payment:${bill.id}:${p.id || `${p.date}:${p.amount}`}`,
@@ -137,7 +140,7 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
     });
   }
   for (const r of receipts) {
-    if (!inBook(r.paymentMode) || !inRupees(r.currency) || !(Number(r.amount) > 0)) continue;
+    if (!inBook(r.paymentMode) || otherAccount(r) || !inRupees(r.currency) || !(Number(r.amount) > 0)) continue;
     lines.push({
       key: `receipt:${r.id}`,
       source: 'receipt', view: 'receipts',
@@ -147,7 +150,7 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
     });
   }
   for (const e of expenses) {
-    if (!inBook(e.paymentMode) || !inRupees(e.currency) || !(Number(e.amount) > 0)) continue;
+    if (!inBook(e.paymentMode) || otherAccount(e) || !inRupees(e.currency) || !(Number(e.amount) > 0)) continue;
     lines.push({
       key: `expense:${e.id}`,
       source: 'expense', view: 'expenses', label: 'Expense',
@@ -159,7 +162,7 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
   }
   for (const p of purchases) {
     for (const x of (Array.isArray(p?.payments) ? p.payments : [])) {
-      if (!inBook(x?.mode) || !(Number(x.amount) > 0)) continue;
+      if (!inBook(x?.mode) || otherAccount(x) || !(Number(x.amount) > 0)) continue;
       lines.push({
         key: `purchase:${p.id}:${x.id || `${x.date}:${x.amount}`}`,
         source: 'purchase', view: 'purchases', label: `Purchase bill ${p.invoiceNumber || p.id} payment`,
@@ -173,7 +176,7 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
   // one is already listed above as a receipt).
   for (const o of openings) {
     for (const x of (Array.isArray(o?.payments) ? o.payments : [])) {
-      if (x?.receiptNo || !inBook(x?.mode) || !(Number(x.amount) > 0)) continue;
+      if (x?.receiptNo || !inBook(x?.mode) || otherAccount(x) || !(Number(x.amount) > 0)) continue;
       lines.push({
         key: `opening:${o.id}:${x.id || `${x.date}:${x.amount}`}`,
         source: 'opening', view: o.party === 'client' ? 'clients' : 'suppliers',

@@ -8,7 +8,8 @@ import SubscriptionPanel, { useLicense, describeLicense, EXPIRING_SOON_DAYS } fr
 import { BRAND } from '../brand';
 
 const SEEN_KEY = 'divtech_subscriptionReminderDay';
-const today = () => new Date().toISOString().slice(0, 10);
+// The local day (toISOString is UTC: in India the day changed at 5:30 am).
+const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
 const needsReminder = (s) => !!s && (s.state === 'none' || s.state === 'invalid' || s.state === 'expired'
   || (s.state === 'active' && s.daysLeft <= EXPIRING_SOON_DAYS));

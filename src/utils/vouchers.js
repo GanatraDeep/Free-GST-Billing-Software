@@ -8,6 +8,7 @@ export const ACCOUNT_GROUP_CHOICES = [
   ['secured-loans', 'Loan taken: secured (bank term loan, vehicle loan)'],
   ['unsecured-loans', 'Loan taken: unsecured (from family, friends)'],
   ['cc', 'Bank CC / OD account'],
+  ['bank-accounts', 'Another bank account (current / savings)'],
   ['fixed-assets', 'Fixed asset (furniture, vehicle, machine, computer)'],
   ['investments', 'Investment (FD, shares, mutual fund)'],
   ['loans-advances', 'Loan or advance given'],
@@ -83,6 +84,8 @@ export function cleanVoucher(v) {
     number: text(v.number, 40),
     date: v.date,
     narration: text(v.narration, 500),
+    // What made it (gst:<MMYYYY> for a GSTR-3B payment), to find it again.
+    ...(v.tag ? { tag: text(v.tag, 60) } : {}),
     lines: (v.lines || []).filter((l) => Number(l.dr) > 0 || Number(l.cr) > 0)
       .map((l) => ({ account: text(l.account, 300), dr: r2(l.dr), cr: r2(l.cr) })),
     ownerGstin: text(v.ownerGstin, 20), ownerName: text(v.ownerName, 200),

@@ -53,6 +53,8 @@ export default [
   <tr><td><b>Received From (Client Name) *</b></td><td>Required. Who paid you. Filled in when you pick an invoice.</td></tr>
   <tr><td><b>Amount *</b></td><td>Required, more than 0. The money received, in rupees.</td></tr>
   <tr><td><b>Payment Mode</b></td><td>Bank Transfer (the default), UPI, Cash, Cheque, Card or Other. Receipts in <b>Cash</b> also show in the <a href="cash-book.html#from-elsewhere">Cash book</a>.</td></tr>
+  <tr><td><b>Received in</b></td><td>Shown only when you have another bank or a CC / OD account in <a href="accounts.html#bank-accounts">Accounts</a> and the mode is not cash. Which account the money went into; <b>Bank (Bank book)</b> to start.</td></tr>
+  <tr><td><b>Discount / kasar</b></td><td>Optional. A small balance the customer will not pay (rate difference, rounding). It settles the invoice together with the amount and is written off to <b>Discount allowed</b>. On a receipt without an invoice it reduces the customer's balance.</td></tr>
   <tr><td><b>Reference / Transaction No</b></td><td>Optional. UPI reference, cheque number, NEFT/IMPS UTR and so on. It prints on the receipt.</td></tr>
   <tr><td><b>Against Invoice</b></td><td>Optional. The invoice number this money is for, typed exactly as on the invoice, for example INV/2026-27/0012. Leave it empty for an advance or other money. See <a href="#against-invoice">below</a>.</td></tr>
   <tr><td><b>Note (optional)</b></td><td>Anything else, such as "Advance for March order". It prints on the receipt.</td></tr>

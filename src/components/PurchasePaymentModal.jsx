@@ -10,11 +10,12 @@ import {
   purchasePaymentDue, purchaseStatus, hasPurchasePayments, validatePurchasePayment, withPurchasePayments, newPurchasePaymentId,
 } from '../utils/purchasePayments';
 import HelpButton from './HelpButton';
+import MoneyAccountSelect, { showsBankChoice } from './MoneyAccountSelect';
 import { toast } from './Toast';
 import { confirmAction } from './ConfirmModal';
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-const blankFor = (bill) => ({ amount: String(purchasePaymentDue(bill) || ''), date: localToday(), mode: 'bank-transfer', reference: '', note: '' });
+const blankFor = (bill) => ({ amount: String(purchasePaymentDue(bill) || ''), date: localToday(), mode: 'bank-transfer', account: '', discount: '', reference: '', note: '' });
 
 export default function PurchasePaymentModal({ purchase, onClose, onChanged }) {
   const [bill, setBill] = useState(purchase);
@@ -49,14 +50,21 @@ export default function PurchasePaymentModal({ purchase, onClose, onChanged }) {
     const base = editIdx !== null ? payments[editIdx] : { id: newPurchasePaymentId(), recordedAt: new Date().toISOString() };
     // Edited by you, so no longer the automatic Mark as paid payment.
     const entry = { ...base, amount: r2(form.amount), date: form.date, mode: form.mode, reference: form.reference.trim(), note: form.note.trim(), ...(editIdx !== null ? { auto: false } : {}) };
-    const problem = validatePurchasePayment({ ...entry, amount: Number(form.amount) });
+    // Divtech Hisaab - the bank or CC account it was paid from.
+    if (showsBankChoice(form.mode) && form.account) entry.account = form.account; else delete entry.account;
+    // Kasar: what the supplier lets go, as its own line (Discount received).
+    const discount = editIdx === null ? r2(form.discount) : 0;
+    const onlyDiscount = discount > 0 && !(Number(form.amount) > 0);
+    const problem = onlyDiscount ? '' : validatePurchasePayment({ ...entry, amount: Number(form.amount) });
     if (problem) { toast(problem, 'warning'); return; }
     const others = r2(paid - (editIdx !== null ? Number(payments[editIdx].amount) || 0 : 0));
-    if (others + entry.amount > owed + OVERPAY_SLACK) {
+    if (others + (onlyDiscount ? 0 : entry.amount) + discount > owed + OVERPAY_SLACK) {
       toast(`That is more than the ${formatCurrency(Math.max(0, owed - others))} still to pay on this bill`, 'warning');
       return;
     }
-    const next = editIdx !== null ? payments.map((x, i) => (i === editIdx ? entry : x)) : [...payments, entry];
+    const discountEntry = discount > 0 ? { id: newPurchasePaymentId(), amount: discount, date: form.date, mode: 'discount', reference: '', note: 'Discount received / kasar', recordedAt: new Date().toISOString() } : null;
+    const next = editIdx !== null ? payments.map((x, i) => (i === editIdx ? entry : x))
+      : [...payments, ...(onlyDiscount ? [] : [entry]), ...(discountEntry ? [discountEntry] : [])];
     const updated = await persist(next);
     if (!updated) return;
     const left = purchasePaymentDue(updated);
@@ -73,7 +81,7 @@ export default function PurchasePaymentModal({ purchase, onClose, onChanged }) {
   const startEdit = (i) => {
     const x = payments[i];
     setEditIdx(i);
-    setForm({ amount: String(x.amount ?? ''), date: x.date || localToday(), mode: x.mode || 'other', reference: x.reference || '', note: x.note || '' });
+    setForm({ amount: String(x.amount ?? ''), date: x.date || localToday(), mode: x.mode || 'other', account: x.account || '', discount: '', reference: x.reference || '', note: x.note || '' });
   };
   const cancelEdit = () => { setEditIdx(null); setForm(blankFor(bill)); };
 
@@ -97,7 +105,7 @@ export default function PurchasePaymentModal({ purchase, onClose, onChanged }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 620 }}>
-        <h3 className="section-title">{editIdx !== null ? 'Edit payment' : 'Record payment to supplier'} <HelpButton title="Paying a supplier" doc="purchases#record-payment" size={16} style={{ marginLeft: 6 }} /></h3>
+        <h3 className="section-title">{editIdx !== null ? 'Edit payment' : bill.isReturn ? 'Refund received from supplier' : 'Record payment to supplier'} <HelpButton title="Paying a supplier" doc="purchases#record-payment" size={16} style={{ marginLeft: 6 }} /></h3>
         <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.85rem', lineHeight: 1.6 }}>
           Bill: <strong>{bill.invoiceNumber || '-'}</strong> · {bill.supplierName || '-'}<br />
           Total: <strong>{formatCurrency(total)}</strong>
@@ -112,7 +120,7 @@ export default function PurchasePaymentModal({ purchase, onClose, onChanged }) {
         )}
         <div className="grid grid-cols-2 gap-4">
           <div className="form-group">
-            <label className="form-label" htmlFor="ppay-amount">Amount paid *</label>
+            <label className="form-label" htmlFor="ppay-amount">{bill.isReturn ? 'Amount received *' : 'Amount paid *'}</label>
             <input id="ppay-amount" type="number" min="0" step="any" className="form-input" value={form.amount}
               onFocus={(e) => e.target.select()} onChange={set('amount')} placeholder={String(Math.max(0, balance))} />
           </div>
@@ -126,6 +134,13 @@ export default function PurchasePaymentModal({ purchase, onClose, onChanged }) {
               {PURCHASE_PAYMENT_MODES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
             </select>
           </div>
+          <MoneyAccountSelect id="ppay-account" mode={form.mode} value={form.account} label={bill.isReturn ? 'Received in' : 'Paid from'} onChange={(v) => setForm((prev) => ({ ...prev, account: v }))} />
+          {editIdx === null && (
+            <div className="form-group">
+              <label className="form-label" htmlFor="ppay-disc" title="What the supplier lets go (rate difference, rounding): written off to Discount received.">Discount received / kasar</label>
+              <input id="ppay-disc" type="number" min="0" step="any" className="form-input" value={form.discount} onChange={set('discount')} placeholder="0" />
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label" htmlFor="ppay-ref">Reference / cheque no.</label>
             <input id="ppay-ref" type="text" className="form-input" maxLength={60} value={form.reference} onChange={set('reference')} placeholder="UTR, UPI ref, cheque no." />

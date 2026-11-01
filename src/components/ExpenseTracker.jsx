@@ -5,6 +5,7 @@ import { formatCurrency, getFYOptions, belongsToProfile, isUnassignedToBusiness 
 import UnassignedBanner from './UnassignedBanner';
 import { toast } from './Toast';
 import { confirmClosedYear } from './useClosedYears';
+import MoneyAccountSelect, { showsBankChoice } from './MoneyAccountSelect';
 import { confirmAction } from './ConfirmModal';
 import HelpButton from './HelpButton';
 import TableExport from './TableExport';
@@ -46,6 +47,7 @@ const EXPENSE_CATEGORIES = [
 const CATEGORY_NAMES = EXPENSE_CATEGORIES.map(c => c.name);
 
 const PAYMENT_MODES = ['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Card', 'Other'];
+const MODE_KEY = { 'Bank Transfer': 'bank-transfer', UPI: 'upi', Cash: 'cash', Cheque: 'cheque', Card: 'card', Other: 'other' };
 
 // v1.10.74 - today's LOCAL date (toISOString is UTC, so before 05:30 IST it
 // gave yesterday). Called when the form opens, not once at load.
@@ -70,6 +72,7 @@ const emptyForm = {
   vendorGstin: '',
   invoiceNo: '',
   paymentMode: 'Bank Transfer',
+  account: '', // Divtech Hisaab - another bank or CC account ('' = Bank)
   note: '',
   // v1.10.83 (#112) - optional; see utils/costCentres.js
   costCentre: '',
@@ -165,6 +168,7 @@ export default function ExpenseTracker() {
       vendorGstin: exp.vendorGstin || '',
       invoiceNo: exp.invoiceNo || '',
       paymentMode: exp.paymentMode || 'Bank Transfer',
+      account: exp.account || '',
       interstate: !!exp.interstate,
       note: exp.note || '',
       costCentre: exp.costCentre || '',
@@ -200,6 +204,7 @@ export default function ExpenseTracker() {
         vendorGstin: form.vendorGstin.trim(),
         invoiceNo: form.invoiceNo.trim(),
         paymentMode: form.paymentMode,
+        account: showsBankChoice(MODE_KEY[form.paymentMode] || form.paymentMode) ? form.account || '' : '',
         interstate: !!form.interstate,
         note: form.note.trim(),
         // Stamp the business this expense belongs to. `vendorGstin` above is
@@ -382,6 +387,7 @@ export default function ExpenseTracker() {
                   {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
+              <MoneyAccountSelect id="exp-account" mode={MODE_KEY[form.paymentMode] || form.paymentMode} value={form.account} label="Paid from" onChange={(v) => updateField('account', v)} />
               {ccOn && (
                 <div className="form-group">
                   <label className="form-label" htmlFor="cost-centre">Cost centre</label>

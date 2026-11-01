@@ -137,13 +137,14 @@ export default [
 
 <section id="stock-adjust">
 <h3>Correcting stock by hand</h3>
-<p>There is no separate stock adjustment screen. After counting your shelves, or for breakage, a free sample or opening stock:</p>
-<ol class="steps">
-  <li><strong>One product</strong>Click its pencil, type the real count in <b>Stock Quantity</b>, and click ${ui('Update')}.</li>
-  <li><strong>Many products</strong>Click ${ui('Bulk edit')}, type the counts in the <b>Stock</b> column, and click ${ui('Save changes')}.</li>
-</ol>
-<p>Stock typed in by hand has no date, so the stock report counts it as if it changed today. Write the reason in the product's description if you want to remember it.</p>
+<p>For shortage, leakage, wastage or damage, or stock found in excess when you count, use <a href="#adjust-stock">Adjust stock</a>: it keeps a dated record and shows the loss in the accounts. Typing a new count in the product's pencil asks whether to record the difference as an adjustment; choose ${ui('Just change it')} only to fix a typing mistake. ${ui('Bulk edit')} changes stock without a record.</p>
 <div class="note info"><p>Stock is one count per product. There are no batches, expiry dates, serial numbers or godowns. See <a href="limitations.html#stock-limits">Limitations</a>.</p></div>
+</section>
+
+<section id="adjust-stock">
+<h3>Adjust stock: shortage, leakage, excess</h3>
+<p>Click the scales button on a product's row. Either ${ui('I counted it')} and type the quantity you counted (the difference is worked out), or ${ui('Enter the quantity')} lost or found. Pick the date and the reason (Shortage, Leakage, Wastage / damage, Used in the shop, Excess found, Other), add a note if you like, and ${ui('Save adjustment')}.</p>
+<p>The stock changes at once. The adjustment shows in the <a href="ledgers.html#item">item ledger</a>, valued at the average purchase cost. In the accounts a shortage is an expense, <b>Stock shortage and wastage</b>, and an excess an income, <b>Stock found in excess</b>; they also show in <a href="reports.html#pl-statement">Reports, Profit &amp; Loss</a>. Earlier adjustments of the item are listed in the same window, where one can be deleted (the stock goes back).</p>
 </section>
 
 <section id="low-stock">

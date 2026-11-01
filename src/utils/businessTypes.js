@@ -18,7 +18,7 @@ const APP_HELPERS = ['guide', 'notifications', 'darkMode', 'controlPanel', 'offl
 // Every type sells, and every business handles cash (the cash book), the
 // bank (Divtech Hisaab: bank book) and its ledgers.
 const SELLING = ['receipts', 'cashBook', 'bankBook', 'ledgers', 'accounts', 'vouchers', 'finalAccounts', 'reports', 'gstReturns', 'incomeTax', 'upiQr', 'googleDrive'];
-const GOODS = ['inventory', 'purchases', 'suppliers', 'expenses'];
+const GOODS = ['inventory', 'purchases', 'suppliers', 'freight', 'expenses'];
 const TRADING = [...GOODS, 'purchaseOrders', 'gstr2b', 'ewayBill', 'tdsTcs'];
 
 // `on` lists what the type turns on; every other switchable module goes off.

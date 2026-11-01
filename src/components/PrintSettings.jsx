@@ -775,8 +775,11 @@ export default function PrintSettings() {
               hint="Prints your invoice N times with corner labels (ORIGINAL FOR RECIPIENT / DUPLICATE FOR TRANSPORTER / etc.). GST rule 48 requires 3 copies for goods, 2 for services." />
             {settings.multiCopyEnabled && (
               <SelectRow label="Number of copies" value={String(settings.multiCopyCount)} onChange={v => set({ multiCopyCount: parseInt(v, 10) })}
-                options={[['2', '2 (Original + Duplicate — services)'], ['3', '3 (Original + Duplicate + Triplicate — goods)']]} />
+                options={[['1', '1 (Original only)'], ['2', '2 (Original + Duplicate — services)'], ['3', '3 (Original + Duplicate + Triplicate — goods)'], ['4', '4 (+ an extra copy)']]} />
             )}
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>
+              This is the default. Each print can use another number: the Copies box beside Print on the invoice.
+            </p>
           </SettingGroup>
           )}
 
@@ -792,13 +795,15 @@ export default function PrintSettings() {
           {/* MARGINS */}
           <SettingGroup title="Print margins (mm)" doc="print-settings#margins">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-              <NumInput label="Top" value={settings.marginTop} onChange={v => set({ marginTop: v })} />
-              <NumInput label="Bottom" value={settings.marginBottom} onChange={v => set({ marginBottom: v })} />
-              <NumInput label="Left" value={settings.marginLeft} onChange={v => set({ marginLeft: v })} />
-              <NumInput label="Right" value={settings.marginRight} onChange={v => set({ marginRight: v })} />
+              <NumInput label="Top" value={settings.marginTop} onChange={v => set({ marginTop: v, marginsSetByUser: true })} />
+              <NumInput label="Bottom" value={settings.marginBottom} onChange={v => set({ marginBottom: v, marginsSetByUser: true })} />
+              <NumInput label="Left" value={settings.marginLeft} onChange={v => set({ marginLeft: v, marginsSetByUser: true })} />
+              <NumInput label="Right" value={settings.marginRight} onChange={v => set({ marginRight: v, marginsSetByUser: true })} />
             </div>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '3px 0 0' }}>
-              For users printing on pre-printed letterhead — shift content down to avoid your logo, or in from the edge to fit binding.
+              {settings.marginsSetByUser
+                ? 'Your margins are used as set. For pre-printed letterhead, shift content down to avoid your logo.'
+                : 'Not set: A4 / A5 invoices get 6 mm on each side, because most printers cannot print right to the edge (the edges came out cut). Type your own to change it.'}
             </p>
           </SettingGroup>
 

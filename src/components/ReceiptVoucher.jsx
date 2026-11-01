@@ -7,6 +7,7 @@ import { formatCurrency, numberToWords, belongsToProfile, isUnassignedToBusiness
 import UnassignedBanner from './UnassignedBanner';
 import { toast } from './Toast';
 import { confirmClosedYear } from './useClosedYears';
+import MoneyAccountSelect, { showsBankChoice } from './MoneyAccountSelect';
 import { confirmAction } from './ConfirmModal';
 import HelpButton from './HelpButton';
 
@@ -21,6 +22,8 @@ const emptyForm = {
   clientAddress: '',
   amount: '',
   paymentMode: 'Bank Transfer',
+  account: '', // Divtech Hisaab - another bank or CC account ('' = Bank)
+  discount: '', // Divtech Hisaab - kasar / discount allowed, settled with this receipt
   referenceNo: '',
   againstInvoice: '',
   note: '',
@@ -107,6 +110,8 @@ export default function ReceiptVoucher() {
       clientAddress: rcp.clientAddress || '',
       amount: String(rcp.amount ?? ''),
       paymentMode: rcp.paymentMode || 'Bank Transfer',
+      account: rcp.account || '',
+      discount: rcp.discount ? String(rcp.discount) : '',
       referenceNo: rcp.referenceNo || '',
       againstInvoice: rcp.againstInvoice || '',
       note: rcp.note || '',
@@ -143,7 +148,7 @@ export default function ReceiptVoucher() {
     const ob = openingFor((latest || []).filter(o => o.party === 'client' && belongsToProfile(o, profile)), 'client', clientName);
     if (!ob) return entry ? 'missing' : 'ok';
     const kept = (ob.payments || []).filter(p => p.receiptNo !== receiptNo);
-    const payments = entry ? [...kept, entry] : kept;
+    const payments = entry ? [...kept, ...(Array.isArray(entry) ? entry : [entry])] : kept;
     if (!entry && kept.length === (ob.payments || []).length) return 'ok';
     const paid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     if (entry && paid > Number(ob.amount) + 0.005) return 'too-much';
@@ -175,10 +180,14 @@ export default function ReceiptVoucher() {
       // to" banner, never as a side effect of fixing a typo while some other
       // business happens to be selected.
       const existing = editingId ? receipts.find(r => r.id === editingId) : null;
+      const modeKeyOf = { 'Bank Transfer': 'bank-transfer', 'UPI': 'upi', 'Cash': 'cash', 'Cheque': 'cheque', 'Card': 'card', 'Other': 'other' };
+      const discount = Math.round((parseFloat(form.discount) || 0) * 100) / 100;
       const receipt = {
         ...form,
         receiptNo,
         amount: parseFloat(form.amount),
+        discount,
+        account: showsBankChoice(modeKeyOf[form.paymentMode]) ? form.account : '',
         ownerGstin: existing ? (existing.ownerGstin || '') : (profile?.gstin || ''),
         ownerName: existing ? (existing.ownerName || '') : (profile?.businessName || ''),
       };
@@ -204,7 +213,7 @@ export default function ReceiptVoucher() {
       const stripReceiptFromBill = async (bill) => {
         if (!bill) return;
         const priorPayments = bill.payments || [];
-        const kept = priorPayments.filter(p => p.receiptNo !== receiptNo);
+        const kept = priorPayments.filter(p => p.receiptNo !== receiptNo && !(editingId && p.discountFor === editingId));
         if (kept.length === priorPayments.length) return;
         const newTotal = kept.reduce((s, p) => s + (Number(p.amount) || 0), 0);
         await saveBill({ ...bill, paidAmount: newTotal, status: statusFor(bill, newTotal), payments: kept }, { overwrite: true });
@@ -229,10 +238,10 @@ export default function ReceiptVoucher() {
       }
       let unmatchedRef = '';
       if (isOpeningRef(form.againstInvoice)) {
-        const res = await syncOpeningPayment(form.clientName, receiptNo, {
-          id: receipt.id, amount: paidAmount, date: form.date, mode: modeMap[form.paymentMode] || 'other',
+        const res = await syncOpeningPayment(form.clientName, receiptNo, [{
+          id: receipt.id, amount: paidAmount, date: form.date, mode: modeMap[form.paymentMode] || 'other', account: receipt.account,
           note: `Receipt ${receiptNo}${form.referenceNo ? ' · ref ' + form.referenceNo : ''}`, receiptNo, receiptId: receipt.id,
-        }).catch(() => 'failed');
+        }, ...(discount > 0 ? [{ id: `${receipt.id}:disc`, amount: discount, date: form.date, mode: 'discount', note: `Discount / kasar on receipt ${receiptNo}`, receiptNo, receiptId: receipt.id }] : [])]).catch(() => 'failed');
         if (res === 'missing') toast(`${form.clientName} has no opening balance, so this receipt is saved on its own.`, 'info', 7000);
         else if (res === 'too-much') toast('This is more than the opening balance still open, so it was not counted against it. Check the amount.', 'warning', 8000);
         else if (res === 'failed') toast('The receipt is saved, but the opening balance could not be updated.', 'warning', 8000);
@@ -241,7 +250,9 @@ export default function ReceiptVoucher() {
           const bill = bills.find(b => b.invoiceNumber === form.againstInvoice.trim() || b.id === form.againstInvoice.trim());
           if (!bill) unmatchedRef = form.againstInvoice.trim(); // v1.10.74 - tell the user below
           if (bill) {
-            const priorPayments = bill.payments || [];
+            // Divtech Hisaab - the receipt's discount (kasar) settles the
+            // rest of the invoice: its own payment line, mode 'discount'.
+            const priorPayments = (bill.payments || []).filter(p => p.discountFor !== receipt.id);
             const priorIdx = priorPayments.findIndex(p => p.receiptNo === receiptNo);
             const nextEntry = {
               // The receipt's id, as payments recorded on the Dashboard carry
@@ -251,13 +262,17 @@ export default function ReceiptVoucher() {
               amount: paidAmount,
               date: form.date,
               mode: modeMap[form.paymentMode] || 'other',
+              ...(receipt.account ? { account: receipt.account } : {}),
               note: `Receipt ${receiptNo}${form.referenceNo ? ' · ref ' + form.referenceNo : ''}`,
               recordedAt: priorIdx >= 0 ? priorPayments[priorIdx].recordedAt : new Date().toISOString(),
               receiptNo,
             };
-            const nextPayments = priorIdx >= 0
+            const withReceipt = priorIdx >= 0
               ? priorPayments.map((p, i) => i === priorIdx ? nextEntry : p)
               : [...priorPayments, nextEntry];
+            const nextPayments = discount > 0
+              ? [...withReceipt, { id: `${receipt.id}:disc`, amount: discount, date: form.date, mode: 'discount', note: `Discount / kasar on receipt ${receiptNo}`, recordedAt: new Date().toISOString(), discountFor: receipt.id }]
+              : withReceipt;
             const newTotal = nextPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
             await saveBill({ ...bill, paidAmount: newTotal, status: statusFor(bill, newTotal), payments: nextPayments }, { overwrite: true });
           }
@@ -453,6 +468,12 @@ export default function ReceiptVoucher() {
                 <select className="form-input" value={form.paymentMode} onChange={e => updateField('paymentMode', e.target.value)}>
                   {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
+              </div>
+              <MoneyAccountSelect id="rcp-account" mode={{ 'Bank Transfer': 'bank-transfer', UPI: 'upi', Cheque: 'cheque', Card: 'card' }[form.paymentMode] || form.paymentMode}
+                value={form.account} onChange={(v) => updateField('account', v)} label="Received in" />
+              <div className="form-group">
+                <label className="form-label" title="A small balance the customer will not pay (rate difference, rounding). It is settled with this receipt and goes to Discount allowed.">Discount / kasar</label>
+                <input type="number" className="form-input" value={form.discount} onChange={e => updateField('discount', e.target.value)} min="0" placeholder="0" />
               </div>
               <div className="form-group">
                 <label className="form-label">Reference / Transaction No</label>

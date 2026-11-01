@@ -95,7 +95,7 @@ export function costCentreReport({ bills = [], purchases = [], expenses = [], ce
   }
   for (const p of purchases) {
     if (!inRange(p?.date, from, to)) continue;
-    rowFor(p).purchases += purchaseTaxable(p);
+    rowFor(p).purchases += (p.isReturn ? -1 : 1) * purchaseTaxable(p); // a return takes it back
   }
   for (const e of expenses) {
     if (!inRange(e?.date, from, to)) continue;

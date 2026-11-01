@@ -183,6 +183,8 @@ export default [
   <li><strong>Amount Received</strong>Type the amount received. The box shows the balance as a hint; for a full payment, type that amount.</li>
   <li><strong>Payment Date</strong>Today to start. Change it if the money came on another day.</li>
   <li><strong>Payment Mode</strong>Bank Transfer (to start), UPI, Cash, Cheque, Card or Other.</li>
+  <li><strong>Received in</strong>Only when you have another bank or a CC / OD account in <a href="accounts.html#bank-accounts">Accounts</a>, and the mode is not cash: which account the money went into. <b>Bank (Bank book)</b> to start.</li>
+  <li><strong>Discount / kasar</strong>Optional. The part of the balance the client will not pay (rate difference, rounding, a small balance left). It is written off to <b>Discount allowed</b> and settles the invoice. ${ui('Rest')} fills in whatever is left after the amount. With no amount, only the kasar is written off.</li>
   <li><strong>Note (optional)</strong>The UTR or UPI transaction ID, the cheque number, or anything that helps you match it later.</li>
   <li><strong>Record it</strong>Click ${ui('Record Payment')}. You see "Payment of ₹… recorded", the status becomes Partial or Paid, and the <a href="#receipt">payment receipt</a> opens, ready to print.</li>
 </ol>

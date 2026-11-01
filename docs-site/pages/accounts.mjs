@@ -16,6 +16,7 @@ export default [
   <tr><td><b>Loan taken: secured</b></td><td>Bank term loan, vehicle loan, machinery loan</td><td>Cr (what you still owe)</td></tr>
   <tr><td><b>Loan taken: unsecured</b></td><td>Loan from a relative or friend</td><td>Cr</td></tr>
   <tr><td><b>Bank CC / OD account</b></td><td>SBI cash credit, HDFC overdraft. Enter the <b>sanctioned limit</b> and the interest rate.</td><td>Cr when you have drawn on it</td></tr>
+  <tr><td><b>Another bank account</b></td><td>A second current or savings account (the first is the Bank book)</td><td>Dr (money in it)</td></tr>
   <tr><td><b>Fixed asset</b></td><td>Shop furniture, tempo, computer, weighing scale. Enter the <b>depreciation rate</b> (written-down value).</td><td>Dr (its written-down value)</td></tr>
   <tr><td><b>Investment</b></td><td>Fixed deposit, shares, mutual funds</td><td>Dr</td></tr>
   <tr><td><b>Loan or advance given</b></td><td>Money lent to someone, staff advance</td><td>Dr (what they owe you)</td></tr>
@@ -27,6 +28,11 @@ export default [
 <p>Each account shows its balance now. ${ui('Ledger')} opens its ledger; edit changes the details; delete works only for an account no voucher uses.</p>
 </section>
 
+<section id="bank-accounts">
+<h2>More than one bank account</h2>
+<p>The <b>Bank</b> account (the <a href="cash-book.html#bank-book">Bank book</a>) is your main bank. Add any other current or savings account as <b>Another bank account</b>, and the CC as <b>Bank CC / OD account</b>. Then receipts, invoice payments, supplier payments and expenses paid by bank transfer, UPI, cheque or card ask <b>Received in</b> / <b>Paid from</b>: pick the account and the money goes to its ledger instead of the Bank book. Cash always goes to the Cash book.</p>
+</section>
+
 <section id="cc">
 <h2>Bank CC / OD account</h2>
 <p>A cash credit or overdraft account is a bank account whose balance runs below zero, up to the sanctioned limit. In Divtech Hisaab it is an account of its own, shown under <b>Cash and bank</b> when you pick an account. Its line on the Accounts screen shows the <b>limit</b>, how much is <b>used</b> and how much is <b>available</b>, with a bar; it turns red when you are over the limit. The same figures are on top of its <a href="ledgers.html">ledger</a>.</p>
@@ -36,7 +42,7 @@ export default [
   <li><b>A customer paying into the CC</b>: a Receipt voucher, received in the CC account from the customer.</li>
   <li><b>Interest charged by the bank</b> (monthly or quarterly): a Journal voucher, Interest Dr, the CC account Cr.</li>
 </ul>
-<p>Receipts, invoice payments and purchase payments recorded by mode Bank transfer or UPI go to the <b>Bank</b> account (the Bank book). If your main account is the CC itself, move the month's total from Bank to the CC with one Contra voucher, or record those payments as vouchers.</p>
+<p>On receipts, invoice payments, supplier payments and expenses paid by bank, UPI, cheque or card, pick the CC account in <b>Received in</b> / <b>Paid from</b> (see <a href="#bank-accounts">More than one bank account</a>) and the money goes straight into it.</p>
 </section>
 
 <section id="loans">

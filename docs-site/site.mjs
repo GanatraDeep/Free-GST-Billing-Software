@@ -8,7 +8,7 @@ export const SITE = {
   folder: 'help',
   url: '/help/',
   publisher: { name: 'Divtech', url: 'https://divtech.in' },
-  version: '1.13.0',
+  version: '1.14.0',
   repo: 'https://github.com/GanatraDeep/free-gst-billing-software',
   // Always the newest release: GitHub resolves this to the latest release's
   // file of exactly this name (see docs/RELEASE_CHECKLIST.md, step 4b).
@@ -48,7 +48,7 @@ export const NAV = [
   { title: 'Start here', pages: ['index', 'install', 'install-mac', 'install-linux', 'update', 'first-run', 'first-invoice', 'gst-basics', 'security'] },
   { title: 'Invoicing', pages: ['invoices', 'invoice-options', 'thermal-printing', 'dashboard'] },
   { title: 'Clients, stock and payments', pages: ['clients', 'products', 'receipts', 'cash-book', 'ledgers', 'recurring'] },
-  { title: 'Buying', pages: ['purchases', 'expenses'] },
+  { title: 'Buying', pages: ['purchases', 'freight', 'expenses'] },
   { title: 'Tax and reports', pages: ['gst-returns', 'reports', 'income-tax'] },
   { title: 'Accounts and year end', pages: ['accounts', 'final-accounts'] },
   { title: 'Setting up', pages: ['settings', 'print-settings', 'backup', 'control-panel'] },
