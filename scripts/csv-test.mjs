@@ -77,6 +77,27 @@ console.log('\n[#101] Bulk CSV import / export of sales and purchase bills');
   const bad = salesCsvToBills('Invoice Number,Date,Client,Item,Qty,Rate\nX1,32-13-2026,A,B,1,5\nX2,2026-10-01,A,B,1,abc\nX3,2026-10-01,,B,1,5', { profile });
   eq(bad.bills.length + ':' + bad.errors.length, '0:3', 'bad date, bad rate and missing client are each reported, nothing half-imported');
 
+  {
+    const { SALES_TEMPLATE_CASH_ROW } = await import('../src/utils/bulkCsv.js');
+    const j = (a, b2, label) => eq(JSON.stringify(a), JSON.stringify(b2), label);
+    j([b.data.details.saleType?.name, b.status, b.payments.length], ['Debit', 'unpaid', 0], 'Sale Type Debit: kept on the invoice, due until a receipt');
+    const cashRes = salesCsvToBills(`${SALES_TEMPLATE}\n${SALES_TEMPLATE_CASH_ROW}`, { profile, products, adjustStock: true });
+    const cs = cashRes.bills.find((x) => x.invoiceNumber === 'INV/2026-27/0102');
+    j([cashRes.errors.length, cs.data.details.saleType?.name, cs.status, cs.payments.map((p) => [p.mode, p.amount, p.date, !!p.cashSale]), cs.paidAmount, cs.totalAmount],
+      [0, 'Cash', 'paid', [['cash', 170, '2026-10-02', true]], 170, 170], 'Sale Type Cash: paid in cash on the invoice date (round off Yes: 169.92 -> 170), as the invoice screen does');
+    const wrong = salesCsvToBills(SALES_TEMPLATE.replace(/,Debit/g, ',Udhaar'), { profile });
+    j([wrong.bills.length, /"Udhaar" is not one of your sale types/.test(wrong.errors.join(' '))], [0, true], 'an unknown Sale Type is an error for that invoice');
+    j(salesCsvToBills(SALES_TEMPLATE.replace(/,Debit/g, ',retail debit'), { profile }).bills[0].data.details.saleType?.name, 'Retail Debit', 'Sale Type matched in any case');
+    const blank = salesCsvToBills(SALES_TEMPLATE.replace(/,Debit/g, ','), { profile });
+    j([blank.bills[0].data.details.saleType, /no Sale Type/.test(blank.warnings.join(' '))], [undefined, true], 'a blank Sale Type with no default type is warned about');
+    const saleTypes = [{ id: 'cash', name: 'Cash', payment: 'cash', isDefault: true }, { id: 'debit', name: 'Debit', payment: 'credit' }];
+    j(salesCsvToBills(SALES_TEMPLATE.replace(/,Debit/g, ','), { profile, saleTypes }).bills[0].status, 'paid', 'a blank Sale Type takes the default type (Cash here)');
+    j(salesCsvToBills(SALES_TEMPLATE.replace(/Tax Invoice/g, 'Quotation').replace(/,Debit/g, ',Cash'), { profile }).bills[0].payments.length, 0, 'a quotation has no sale type and takes no cash');
+    const oldFile = 'Invoice Number,Invoice Date,Client Name,Item Name,Quantity,Rate,GST %\nO1,2026-10-01,Old Client,Rice,1,100,5\n';
+    j(salesCsvToBills(oldFile, { profile }).bills[0].status, 'unpaid', 'a file without the Sale Type column imports as before');
+    const back = salesCsvToBills(billsToSalesCsv(cashRes.bills), { profile, products });
+    j(back.bills.map((x) => `${x.data.details.saleType?.name}/${x.status}/${x.totalAmount}`), ['Debit/unpaid/1026.6', 'Cash/paid/170'], 'export -> import keeps the Sale Type');
+  }
   const again = salesCsvToBills(billsToSalesCsv(res.bills), { profile, products, adjustStock: true });
   eq(again.bills[0].totalAmount, b.totalAmount, 'export -> import gives the same invoice total');
 
@@ -140,7 +161,7 @@ console.log('\n[Review] Day-first and month-first dates');
   const us = salesCsvToBills(head + '1,10/25/2026,A,Pen,10\n2,10/01/2026,B,Ink,10\n', { profile: { country: 'India', state: 'Punjab' } });
   eq(`${us.bills.length}/${us.errors.length}`, '0/1', '...so not even its ambiguous rows are imported with swapped dates');
   const p = purchaseCsvToRecords('Invoice Number,Invoice Date,Supplier Name,Item Name,Rate\nX1,03/04/2026,S,Paper,5\n', {});
-  eq(`${p.purchases.length}/${p.warnings.length}`, '1/1', 'Purchases get the same warning');
+  eq(`${p.purchases.length}/${p.warnings.filter((w) => /read day first|January|April/i.test(w)).length}`, '1/1', 'Purchases get the same warning');
 }
 
 console.log('\n[#132] A GSTIN already saved finds that client, whatever the name');

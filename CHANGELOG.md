@@ -4,6 +4,32 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.14.2] - 2026-11-01
+
+### How to update
+
+**Current version:** 1.14.1  →  **New version:** 1.14.2
+
+1. Open the app and click **Update to v1.14.2** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **Sales CSV import: Sale Type column.** One of your sale types (Cash,
+  Retail Debit, Debit or your own) for each invoice. A Cash invoice is paid
+  in cash on its date and shows in the Cash book, as when typed in; the
+  others stay due until a receipt is recorded. A blank one takes your
+  default type, and the import warns about invoices with no type. The export
+  writes the column, and the template now has a Debit and a Cash example.
+  Files without the column import as before.
+- The purchase CSV import now knows the built-in purchase types (Cash,
+  Debit, URD) even before any are saved in Settings.
+
+---
+
 ## [1.14.1] - 2026-11-01
 
 ### How to update
