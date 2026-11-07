@@ -79,26 +79,61 @@ export default [
 {
   slug: 'final-accounts',
   title: 'Final accounts and the year end',
-  lead: 'The trial balance, trading and profit & loss account and balance sheet for any financial year, the year-end checklist, the CA pack in one Excel file, and closing the year.',
+  lead: 'The trial balance, trading account, profit & loss account and balance sheet for a financial year or any dates, in book (T-form) or modern layout, with the closing stock method of your choice; the year-end checklist, the CA pack in one Excel file, and closing the year.',
   body: `
 <section id="how">
 <h2>Where the figures come from</h2>
-<p>Every invoice, credit note, receipt, purchase bill, payment, expense, Cash / Bank book line, opening balance and voucher is entered in double entry by itself (each has a debit and an equal credit). The ${ui('Final accounts')} screen adds them up for the year you pick at the top. Nothing is typed in here, so it is always up to date, and a change to an entry shows at once.</p>
+<p>Every invoice, credit note, receipt, purchase bill, payment, expense, Cash / Bank book line, opening balance and voucher is entered in double entry by itself (each has a debit and an equal credit). The ${ui('Final accounts')} screen adds them up for the period you pick at the top. Nothing is typed in here, so it is always up to date, and a change to an entry shows at once.</p>
+</section>
+
+<section id="period">
+<h2>Period: a year or any dates</h2>
+<p><b>Period</b> at the top picks a financial year, or <b>Choose dates (from / to)</b>, as in Tally or Miracle. With your own dates:</p>
+<ul>
+  <li>the <b>trial balance</b> and <b>balance sheet</b> show every balance <b>as on the "To" date</b>, so you can tally cash, bank, a party or GST on any day;</li>
+  <li>the <b>trading</b> and <b>profit &amp; loss account</b> cover "From" to "To"; profit before "From" is one line in the capital account (<b>Profit before this period</b>);</li>
+  <li>opening stock is the stock on the day before "From", and closing stock the stock on "To".</li>
+</ul>
+<p>The year end and closing always work on the whole year that the "To" date falls in.</p>
+</section>
+
+<section id="views">
+<h2>Book view and modern view</h2>
+<p><b>View</b> picks how the statements look (it is remembered):</p>
+<ul>
+  <li><b>Book (debit left, credit right)</b>: the T-form as written in an account book, the page divided down the middle. Trading and profit &amp; loss: <b>Dr.</b> on the left ("To Opening stock", "To Purchases", "To Gross profit c/d"), <b>Cr.</b> on the right ("By Sales", "By Closing stock"), both sides adding to the same total; the gross profit is carried down into the profit &amp; loss account ("By Gross profit b/d"). Balance sheet: <b>Liabilities</b> on the left, <b>Assets</b> on the right, each group's total in the outer column and its accounts in the inner column. The trial balance is grouped (capital, loans, creditors...), with each group's total.</li>
+  <li><b>Modern (one column)</b>: vertical, as in Schedule III: sales, less cost of goods sold, gross profit, less expenses, net profit; capital and liabilities, then assets.</li>
+</ul>
+<p>${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} give the statement in the view on screen, with the business name, GSTIN and period at the top.</p>
+</section>
+
+<section id="stock-method">
+<h2>Closing stock method</h2>
+<p><b>Closing stock method</b> at the top picks how stock on hand is valued, as in Tally or Miracle. It changes closing (and opening) stock, cost of goods sold and profit everywhere: Final accounts, Reports, the stock report, item ledgers and the CA pack. All are at cost, without GST.</p>
+<div class="table-wrap"><table>
+  <tr><th>Method</th><th>Stock on hand is valued at</th></tr>
+  <tr><td><b>Weighted average</b> (to start)</td><td>The average cost of what is in stock: each purchase is mixed in with the stock already there.</td></tr>
+  <tr><td><b>FIFO (first in, first out)</b></td><td>The rates of the latest purchases, as the oldest stock is taken to be sold first. Same as Miracle's Stock FIFO report.</td></tr>
+  <tr><td><b>Last purchase rate</b></td><td>Every unit at the item's latest purchase rate up to that date.</td></tr>
+  <tr><td><b>Fixed rate</b></td><td>Every unit at the item's <b>Fixed stock rate</b> (Products, edit, or Bulk edit); an item without one uses its opening stock cost.</td></tr>
+</table></div>
+<p><strong>Example:</strong> 10 tins in stock at ₹100, buy 10 at ₹120, sell 15, buy 5 at ₹130. The 10 left are worth ₹1,200 by average, ₹1,250 by FIFO (5 at ₹120 + 5 at ₹130), ₹1,300 by last purchase rate. Use one method all year, and the same one your CA uses; the notes under each statement name it.</p>
 </section>
 
 <section id="trial-balance">
 <h2>Trial balance</h2>
-<p>Every account with its debit or credit balance. Balance-sheet accounts show their balance on 31 March; income and expense accounts show the year's total; the profit of earlier years is one line, <b>Profit &amp; loss account (earlier years)</b>; <b>Opening stock</b> is the stock at the start of the year. Closing stock is shown under the table, as in Tally. Debit and credit totals agree; if they do not, a red line says by how much. Click an account to open its <a href="ledgers.html">ledger</a>.</p>
+<p>Every account with its debit or credit balance. Balance-sheet accounts show their balance on the last day of the period; income and expense accounts show the year's total; the profit of earlier years is one line, <b>Profit &amp; loss account (earlier years)</b>; <b>Opening stock</b> is the stock at the start of the year. Closing stock is shown under the table, as in Tally. Debit and credit totals agree; if they do not, a red line says by how much. Click an account to open its <a href="ledgers.html">ledger</a>.</p>
 </section>
 
 <section id="profit-loss">
-<h2>Trading and profit &amp; loss account</h2>
-<p><b>Trading account</b>: opening stock, purchases (without GST; GST on URD purchases is part of the cost) and direct expenses (freight, cartage, loading) on one side; sales (without GST) and closing stock on the other. The difference is the <b>gross profit</b>. <b>Profit and loss account</b>: gross profit, other incomes, and indirect expenses (salary, rent, interest, depreciation, bank charges...). The difference is the <b>net profit</b>. Stock is valued at the average purchase rate, without GST.</p>
+<h2>Trading account and profit &amp; loss account</h2>
+<p>The <b>Trading account</b> tab shows the trading account on its own; the <b>Profit &amp; loss</b> tab shows the profit &amp; loss account (in book view with the trading account above it, as written up for the CA).</p>
+<p><b>Trading account</b>: opening stock, purchases (without GST; GST on URD purchases is part of the cost) and direct expenses (freight, cartage, loading) on one side; sales (without GST) and closing stock on the other. The difference is the <b>gross profit</b>. <b>Profit and loss account</b>: gross profit, other incomes, and indirect expenses (salary, rent, interest, depreciation, bank charges...). The difference is the <b>net profit</b>, transferred to the capital account. Stock is valued by the <a href="#stock-method">closing stock method</a>, without GST.</p>
 </section>
 
 <section id="balance-sheet">
 <h2>Balance sheet</h2>
-<p><b>Liabilities</b>: capital (with drawings, the difference in opening balances and the profit: earlier years and this year), loans, CC / OD, sundry creditors, duties and taxes (GST, TDS, TCS payable) and other liabilities. <b>Assets</b>: fixed assets, investments, loans and advances given, deposits, sundry debtors, closing stock, cash and bank. A customer who paid in advance shows under liabilities, a supplier paid in advance under assets, and GST credit carried forward under assets.</p>
+<p><b>Liabilities</b>: the capital account laid out as a CA writes it (capital, <b>Add: Net profit for the period</b>, <b>Add: Profit before this period</b>, <b>Less: Drawings</b>; the difference in opening balances, if any), loans, CC / OD, sundry creditors, duties and taxes (GST, TDS, TCS payable) and other liabilities. <b>Assets</b>: fixed assets, investments, loans and advances given, deposits, sundry debtors, closing stock, cash and bank. A customer who paid in advance shows under liabilities, a supplier paid in advance under assets, and GST credit carried forward under assets.</p>
 </section>
 
 <section id="year-end">

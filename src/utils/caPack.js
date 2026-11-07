@@ -3,10 +3,11 @@
 // cash and bank books, every ledger (customers, suppliers, items, accounts),
 // debtors and creditors, stock, registers and vouchers. Pure: returns sheets
 // for utils/xlsx.js buildWorkbook().
+import { tradingBook, pnlBook, balanceSheetBook, bookExportRows } from './statements.js';
 import { expenseCost, isRcmExpense } from './expenses.js';
 import {
   postings, ledgerView, accountInfo, trialBalance, profitAndLoss, balanceSheet, stockValue, itemLedger,
-  ACCOUNT_GROUPS, side, billTaxable, billGst, purchaseGst, isUrdPurchase,
+  ACCOUNT_GROUPS, side, billTaxable, billGst, purchaseGst, isUrdPurchase, stockMethodName,
 } from './ledgers.js';
 import { salesSign } from '../utils.js';
 import { VOUCHER_TYPES } from './vouchers.js';
@@ -89,6 +90,18 @@ export function caPackSheets(data = {}, { from = '', to = '', profile = null, ti
   bsSide('ASSETS', bs.assets, bs.totalAssets);
   if (Math.abs(bs.difference) >= 0.005) bsRows.push(['Difference (check the trial balance)', '', bs.difference]);
   sheets.push({ name: 'Balance sheet', rows: bsRows });
+  // Divtech Hisaab - the same statements in book form (T-form: debit left,
+  // credit right, "To" / "By"), the way they are written up for the CA.
+  const tHead = ['Dr. Particulars', 'Amount', 'Cr. Particulars', 'Amount'];
+  const trad = tradingBook(pl); const pnl = pnlBook(pl);
+  sheets.push({ name: 'Trading and P&L (book)', rows: [
+    [`TRADING ACCOUNT for ${from || 'the start'} to ${to || 'today'}`, '', '', ''], tHead, ...bookExportRows(trad), [],
+    [`PROFIT & LOSS ACCOUNT for ${from || 'the start'} to ${to || 'today'}`, '', '', ''], tHead, ...bookExportRows(pnl), [],
+    [`Closing stock valued at cost (without GST) by the ${stockMethodName(data.stockMethod)} method.`, '', '', ''],
+  ] });
+  sheets.push({ name: 'Balance sheet (book)', rows: [
+    [`BALANCE SHEET as on ${to || 'today'}`, '', '', ''], ['Liabilities', 'Amount', 'Assets', 'Amount'], ...bookExportRows(balanceSheetBook(bs)),
+  ] });
 
   // Day book: every posting of the period.
   const docOrder = all.filter((p) => inRange(p.date, range)).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.doc).localeCompare(String(b.doc)));
@@ -112,7 +125,7 @@ export function caPackSheets(data = {}, { from = '', to = '', profile = null, ti
 
   // Stock.
   const st = stockValue(data, to || undefined);
-  sheets.push({ name: 'Stock summary', rows: [['Item', 'Unit', 'Quantity', 'Average cost', 'Value (without GST)'], ...st.lines.map((l) => [l.name, l.unit, l.qty, l.avgCost, l.value]), ['Total', '', '', '', st.total]] });
+  sheets.push({ name: 'Stock summary', rows: [[`Valued by ${stockMethodName(data.stockMethod)}`], ['Item', 'Unit', 'Quantity', 'Rate (cost)', 'Value (without GST)'], ...st.lines.map((l) => [l.name, l.unit, l.qty, l.avgCost, l.value]), ['Total', '', '', '', st.total]] });
   const stockRows = [];
   for (const pr of (data.products || []).filter((p) => p?.kind !== 'service').sort((a, b) => String(a.name).localeCompare(String(b.name)))) {
     const L = itemLedger(pr, data);

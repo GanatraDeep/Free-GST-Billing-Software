@@ -13,7 +13,7 @@
 // data folder (data/local-prefs.json, server.js /api/local-prefs) is restored
 // before the app first renders, for keys the browser no longer has.
 
-const MIRRORED = /^(gst_printSettings|gst_regionMode|gst_enabledModules|gst_businessType|gst_offlineMode|gst_menuOrder|gst_customUnits|gst_dashboardColumns|gst_filing_status(_.*)?|gst_itr[A-Za-z]*|freegstbill_onboarded|freegstbill_theme|freegstbill_startedDismissed|freegstbill_supportNudge|freegstbill_welcomeCard|freegstbill_starBanner|freegstbill_sidebarAutoHide)$/;
+const MIRRORED = /^(gst_printSettings|gst_stockMethod|gst_regionMode|gst_enabledModules|gst_businessType|gst_offlineMode|gst_menuOrder|gst_customUnits|gst_dashboardColumns|gst_filing_status(_.*)?|gst_itr[A-Za-z]*|freegstbill_onboarded|freegstbill_theme|freegstbill_startedDismissed|freegstbill_supportNudge|freegstbill_welcomeCard|freegstbill_starBanner|freegstbill_sidebarAutoHide)$/;
 const ENDPOINT = '/api/local-prefs';
 
 export const isMirrored = (key) => MIRRORED.test(String(key));

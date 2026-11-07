@@ -6,6 +6,7 @@ import {
   getAllProducts, getAllOpeningBalances, getAllCashEntries, getAllAccounts, getAllVouchers, getAllStockAdjustments, getAllFreight, getProfile,
 } from '../store';
 import { belongsToProfile } from '../utils';
+import { getStockMethod, STOCK_METHOD_EVENT } from '../utils/stockMethod';
 
 export async function loadBooks() {
   const [bills, receipts, expenses, purchases, clients, suppliers, products, openings, cashEntries, accounts, vouchers, profile, stockAdjustments, freight] = await Promise.all([
@@ -22,6 +23,8 @@ export async function loadBooks() {
       openings: mine(openings), cashEntries: mine(cashEntries), accounts: mine(accounts), vouchers: mine(vouchers),
       stockAdjustments: mine(stockAdjustments), freight: mine(freight),
       clients: clients || [], suppliers: suppliers || [], products: products || [],
+      // How closing stock is valued (Final accounts -> Closing stock method).
+      stockMethod: getStockMethod(),
     },
   };
 }
@@ -33,5 +36,11 @@ export default function useBooks() {
     .catch(() => setState((p) => ({ ...p, error: true }))), []);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { reload(); }, [reload]);
+  // Changing the closing stock method re-values everything on screen.
+  useEffect(() => {
+    const on = () => reload();
+    window.addEventListener(STOCK_METHOD_EVENT, on);
+    return () => window.removeEventListener(STOCK_METHOD_EVENT, on);
+  }, [reload]);
   return { ...state, reload };
 }
