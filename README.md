@@ -6,7 +6,7 @@ the browser, and works without the internet. Data never leaves the computer.
 
 **Contact:** WhatsApp / call +91 94299 11067 · hello@divtech.in · https://divtech.in
 
-**Current version:** 1.15.0 · [Changelog](CHANGELOG.md) · [Releases](../../releases)
+**Current version:** 1.15.1 · [Changelog](CHANGELOG.md) · [Releases](../../releases)
 
 ---
 
@@ -75,7 +75,8 @@ the browser, and works without the internet. Data never leaves the computer.
 
 | Version | Highlights |
 |---|---|
-| **1.15.0** | Rojmel (day book) and day-wise summary; amount totals on the filtered Dashboard list; this README |
+| **1.15.1** | Cash book now matches the final accounts (freight paid in cash was missing) |
+| 1.15.0 | Rojmel (day book) and day-wise summary; amount totals on the filtered Dashboard list; this README |
 | 1.14.3 | Sales CSV import takes stock out (and a repair for earlier imports); HSN-wise inward / outward in the GSTR-3B Excel |
 | 1.14.2 | Sale Type column in the sales CSV import |
 | 1.14.1 | Bill Type and Round Off in the purchase CSV import; negative stock shown as negative; a cancelled cash invoice takes the cash back out; whole-rupee purchase round off |

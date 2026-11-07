@@ -4,6 +4,33 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.15.1] - 2026-11-07
+
+### How to update
+
+**Current version:** 1.15.0  →  **New version:** 1.15.1
+
+1. Open the app and click **Update to v1.15.1** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Fixed
+- **Cash in hand in the Cash book was higher than in the final accounts.**
+  Freight (jakat) paid in cash (or from the bank) was taken out of Cash in
+  the ledgers, trial balance and balance sheet, but was not listed in the
+  Cash book (or the Bank book), so their balance stayed too high by the
+  freight paid. Freight entries now show there, with the transporter, goods
+  and LR. The final accounts were right; nothing needs re-entering.
+- **Cash back on a purchase return** was listed in the Cash book as money
+  going out; it is money coming in.
+- A test now checks that the Cash book and Bank book always show the same
+  balance as the Cash and Bank ledgers.
+
+---
+
 ## [1.15.0] - 2026-11-07
 
 ### How to update

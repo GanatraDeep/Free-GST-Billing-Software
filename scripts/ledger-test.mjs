@@ -332,6 +332,61 @@ console.log('\n[Dashboard: totals of the invoices shown]');
   eq(listTotals([]).count, 0, 'Nothing shown: zero');
 }
 
+console.log('\n[Cash book and Bank book agree with the Cash and Bank ledgers]');
+{
+  const { linkedMoneyLines, ownCashLines, contraLines, voucherMoneyLines, cashTotals, bookOfEntry } = await import('../src/utils/cashBook.js');
+  // Everything that moves cash or bank, as in a real month.
+  const d = {
+    bills: [
+      sale('K-1', '2026-11-02', 'Walk-in', 1, 2000, { status: 'paid', payments: [{ id: 'c1', amount: 2100, date: '2026-11-02', mode: 'cash', cashSale: true }] }),
+      sale('K-2', '2026-11-02', 'Mehta Stores', 2, 1000),
+      { ...sale('K-3', '2026-11-03', 'Walk-in', 1, 500, { payments: [{ id: 'c3', amount: 525, date: '2026-11-03', mode: 'cash' }] }), status: 'cancelled' },
+    ],
+    receipts: [{ id: 'r1', receiptNo: 'RCP/1', date: '2026-11-04', clientName: 'Mehta Stores', amount: 1000, paymentMode: 'cash', againstInvoice: 'K-2' },
+      { id: 'r2', receiptNo: 'RCP/2', date: '2026-11-05', clientName: 'Mehta Stores', amount: 1100, paymentMode: 'upi', againstInvoice: 'K-2' }],
+    purchases: [
+      { id: 'pb1', invoiceNumber: 'S-1', date: '2026-11-03', supplierName: 'Shree Oils', items: [{ name: 'Oil', quantity: 2, rate: 1000, taxPercent: 5 }], totalAmount: 2100, totalTax: 100,
+        payments: [{ id: 'pp1', amount: 2100, date: '2026-11-03', mode: 'cash' }] },
+      { id: 'pr1', invoiceNumber: 'DN-1', isReturn: true, date: '2026-11-06', supplierName: 'Shree Oils', items: [{ name: 'Oil', quantity: 1, rate: 1000, taxPercent: 5 }], totalAmount: 1050, totalTax: 50,
+        payments: [{ id: 'pp2', amount: 1050, date: '2026-11-06', mode: 'cash' }] },
+    ],
+    expenses: [{ id: 'x1', date: '2026-11-03', category: 'Tea & snacks', amount: 150, paymentMode: 'cash' },
+      { id: 'x2', date: '2026-11-03', category: 'Rent', amount: 5000, paymentMode: 'bank-transfer' }],
+    freight: [
+      { id: 'f1', date: '2026-11-04', goods: 'Cottonseed oil', transporter: 'Krishna Roadlines', amount: 4000, rcmRate: 5, paymentMode: 'cash' },
+      { id: 'f2', date: '2026-11-05', goods: 'Groundnut oil', transporter: 'Local tempo', amount: 2500, rcmRate: 0, paymentMode: 'cash' },
+      { id: 'f3', date: '2026-11-05', goods: 'Palm oil', transporter: 'Rajasthan Carriers', amount: 1600, rcmRate: 5, paymentMode: 'credit' },
+      { id: 'f4', date: '2026-11-06', goods: 'Palm oil', transporter: 'Rajasthan Carriers', amount: 900, rcmRate: 5, paymentMode: 'upi' },
+    ],
+    openings: [{ id: 'ob1', party: 'client', name: 'Gokul Traders', amount: 5000, asOn: '2026-10-31', payments: [{ id: 'op1', amount: 2000, date: '2026-11-07', mode: 'cash' }] }],
+    cashEntries: [
+      { id: 'o1', type: 'in', date: '2026-10-31', amount: 50000, category: 'Opening balance' },
+      { id: 'd1', type: 'out', date: '2026-11-03', amount: 10000, category: 'Deposit to bank', name: 'SBI' },
+      { id: 'w1', type: 'out', book: 'bank', date: '2026-11-06', amount: 3000, category: 'Cash withdrawal' },
+    ],
+    vouchers: [{ id: 'v1', type: 'payment', number: 'PV/1', date: '2026-11-07', narration: 'Drawings', lines: [{ account: 'drawings', dr: 700, cr: 0 }, { account: 'cash', dr: 0, cr: 700 }] }],
+    products: [oil],
+  };
+  const screen = (book) => {
+    const own = d.cashEntries;
+    const lines = [
+      ...ownCashLines(own.filter((e) => bookOfEntry(e) === book)),
+      ...contraLines(own, book),
+      ...voucherMoneyLines(d.vouchers, book),
+      ...linkedMoneyLines({ bills: d.bills, receipts: d.receipts, expenses: d.expenses, purchases: d.purchases, openings: d.openings, freight: d.freight }, book),
+    ];
+    const t = cashTotals(lines);
+    return Math.round((t.in - t.out) * 100) / 100;
+  };
+  const ledger = (book) => ledgerView(moneyLedger(book, d)).closing;
+  eq([screen('cash'), ledger('cash')], [ledger('cash'), ledger('cash')], 'Cash book cash in hand = Cash ledger (freight paid in cash, return refund, voucher, contra, opening payment, cancelled invoice)');
+  eq(screen('cash'), 50000 + 2100 + 1000 - 2100 + 1050 - 150 - 4000 - 2500 + 2000 - 10000 + 3000 - 700, 'and is the right figure: 39,700');
+  eq([screen('bank'), ledger('bank')], [ledger('bank'), ledger('bank')], 'Bank book balance = Bank ledger (UPI receipt, rent, freight by UPI, deposit, withdrawal)');
+  const fl = linkedMoneyLines({ freight: d.freight }, 'cash');
+  eq(fl.map((l) => [l.type, l.amount, l.source]), [['out', 4000, 'freight'], ['out', 2500, 'freight']], 'Freight paid in cash is in the Cash book; on credit or by UPI it is not');
+  eq(linkedMoneyLines({ purchases: [d.purchases[1]] }, 'cash')[0].type, 'in', 'Cash back on a purchase return is money in');
+}
+
 console.log('\n[Excel workbook]');
 eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
 {
