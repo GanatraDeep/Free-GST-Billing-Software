@@ -12,6 +12,7 @@ const PRODUCT_FIELDS = {
   hsn: ['hsn', 'hsn code', 'sac', 'sac code', 'hsn/sac'],
   unit: ['unit'],
   purchasePrice: ['purchase price', 'cost', 'cost price'],
+  openingCost: ['opening cost', 'opening stock cost', 'opening rate', 'opening stock rate'],
   sellingPrice: ['selling price', 'rate', 'price', 'sale price'],
   taxPercent: ['gst%', 'gst rate', 'tax%', 'tax', 'taxpercent'],
   stock: ['stock', 'quantity', 'opening stock'],
@@ -50,7 +51,7 @@ export function productsCsvToList(text, existing = []) {
     const type = String(r.type || '').toLowerCase();
     if (type && !/^(goods?|g|products?|services?|s)$/.test(type)) { out.errors.push(`Row ${r._line} (${name}): Type must be Goods or Service`); continue; }
     const service = type.startsWith('s');
-    const nums = { purchasePrice: toNum(r.purchasePrice), sellingPrice: toNum(r.sellingPrice), taxPercent: toNum(r.taxPercent), stock: toNum(r.stock, null) };
+    const nums = { purchasePrice: toNum(r.purchasePrice), sellingPrice: toNum(r.sellingPrice), taxPercent: toNum(r.taxPercent), stock: toNum(r.stock, null), openingCost: toNum(r.openingCost) };
     const bad = Object.entries(nums).find(([k, v]) => (k === 'stock' ? v !== null && !Number.isFinite(v) : !Number.isFinite(v)));
     if (bad) { out.errors.push(`Row ${r._line} (${name}): ${bad[0] === 'stock' ? 'stock' : bad[0] === 'taxPercent' ? 'GST %' : 'price'} must be a number`); continue; }
     if (nums.taxPercent < 0 || nums.taxPercent > 100) { out.errors.push(`Row ${r._line} (${name}): GST % must be 0 to 100`); continue; }
@@ -66,6 +67,9 @@ export function productsCsvToList(text, existing = []) {
       unit: r.unit || 'Nos',
       // A service has no stock; goods with a blank stock are "not tracked yet".
       ...(!service && nums.stock !== null ? { stock: nums.stock } : {}),
+      // Divtech Hisaab - what that stock cost: the Opening Cost column, or
+      // else the purchase price in the file (the cost on the day of import).
+      ...(!service && nums.stock ? { openingCost: nums.openingCost || nums.purchasePrice || 0 } : {}),
       description: r.description || '',
     });
   }
@@ -87,9 +91,9 @@ export function clientsCsvToList(text, existing = []) {
 
 // Sample files (demo data, not real businesses) for "Download sample file".
 export const PRODUCTS_SAMPLE = [
-  toCsvLine(['Name', 'Type', 'HSN/SAC', 'Unit', 'Purchase Price', 'Selling Price', 'GST %', 'Stock', 'Description']),
-  toCsvLine(['Demo A4 Paper Ream 75 GSM', 'Goods', '4802', 'Nos', 220, 280, 18, 50, 'Sample goods row - replace with your own']),
-  toCsvLine(['Demo Printing service', 'Service', '998912', 'Page', '', 5, 18, '', 'Sample service row - a service has no stock']),
+  toCsvLine(['Name', 'Type', 'HSN/SAC', 'Unit', 'Purchase Price', 'Selling Price', 'GST %', 'Stock', 'Description', 'Opening Cost']),
+  toCsvLine(['Demo A4 Paper Ream 75 GSM', 'Goods', '4802', 'Nos', 220, 280, 18, 50, 'Sample goods row - replace with your own', 210]),
+  toCsvLine(['Demo Printing service', 'Service', '998912', 'Page', '', 5, 18, '', 'Sample service row - a service has no stock', '']),
 ].join('\n');
 
 export const CLIENTS_SAMPLE = [

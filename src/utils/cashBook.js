@@ -129,7 +129,7 @@ export function linkedCashLines(src = {}) { return linkedMoneyLines(src, 'cash')
 export function linkedBankLines(src = {}) { return linkedMoneyLines(src, 'bank'); }
 
 // Money recorded elsewhere for one book ('cash' or 'bank'), as read-only lines.
-export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], purchases = [], openings = [] } = {}, book = 'cash') {
+export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], purchases = [], openings = [], freight = [] } = {}, book = 'cash') {
   const inBook = book === 'bank' ? isBankMode : isCash;
   // Divtech Hisaab - money through another bank or a CC account is in that
   // account's ledger, not in the Bank book.
@@ -180,8 +180,9 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
       if (!inBook(x?.mode) || otherAccount(x) || !(Number(x.amount) > 0)) continue;
       lines.push({
         key: `purchase:${p.id}:${x.id || `${x.date}:${x.amount}`}`,
-        source: 'purchase', view: 'purchases', label: `Purchase bill ${p.invoiceNumber || p.id} payment`,
-        type: 'out', date: x.date || p.date || '', amount: r2(x.amount),
+        // Divtech Hisaab - money back on a purchase return comes in.
+        source: 'purchase', view: 'purchases', label: p.isReturn ? `Purchase return ${p.invoiceNumber || p.id} refund` : `Purchase bill ${p.invoiceNumber || p.id} payment`,
+        type: p.isReturn ? 'in' : 'out', date: x.date || p.date || '', amount: r2(x.amount),
         name: p.supplierName || '', note: [x.reference, x.note].filter(Boolean).join(' · '),
         category: '', at: x.recordedAt || '',
       });
@@ -200,6 +201,20 @@ export function linkedMoneyLines({ bills = [], receipts = [], expenses = [], pur
         name: o.name || '', note: x.note || '', category: '', at: '',
       });
     }
+  }
+  // Divtech Hisaab - freight (jakat) paid in cash or from the bank. Its GST
+  // under reverse charge is paid later with GSTR-3B, so only the freight
+  // itself leaves here (as in the ledgers). Freight on credit is owed to the
+  // transporter and moves no money yet.
+  for (const f of freight) {
+    if (!inBook(f?.paymentMode) || otherAccount(f) || !(Number(f.amount) > 0)) continue;
+    lines.push({
+      key: `freight:${f.id}`,
+      source: 'freight', view: 'freight', label: `Freight${f.goods ? ` - ${f.goods}` : ''}${f.lrNo ? ` (LR ${f.lrNo})` : ''}`,
+      type: 'out', date: f.date || '', amount: r2(f.amount),
+      name: f.transporter || '', note: [f.againstBill && `Bill ${f.againstBill}`, f.note].filter(Boolean).join(' · '),
+      category: 'Freight', at: f.createdAt || '',
+    });
   }
   return lines;
 }

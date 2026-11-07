@@ -12,7 +12,7 @@ export const bulkRowToProduct = (product, edits) => {
   if (!name) return { error: 'a product needs a name' };
   const gst = num(merged.taxPercent);
   if (!Number.isFinite(gst) || gst < 0 || gst > 100) return { error: `${name}: GST % must be 0 to 100` };
-  for (const k of ['purchasePrice', 'sellingPrice', 'stock']) {
+  for (const k of ['purchasePrice', 'sellingPrice', 'stock', 'openingCost']) {
     if (!Number.isFinite(num(merged[k]))) return { error: `${name}: ${k === 'stock' ? 'stock' : 'price'} must be a number` };
   }
   const sellingPrice = num(edits.sellingPrice ?? product.sellingPrice ?? product.rate);
@@ -25,6 +25,7 @@ export const bulkRowToProduct = (product, edits) => {
       name,
       hsn: String(merged.hsn ?? '').trim(),
       purchasePrice: num(merged.purchasePrice),
+      ...(isServiceProduct(merged) ? {} : { openingCost: num(merged.openingCost) }),
       sellingPrice,
       rate: sellingPrice,
       taxPercent: gst,
@@ -43,7 +44,7 @@ export const bulkRowToProduct = (product, edits) => {
 // way, from each entry's own stock record (raw materials back, made goods out).
 // v1.10.83 (#121) - services have no stock and are left out.
 // Returns Map(productId -> quantity).
-export const closingStock = (products, bills, purchases, asOf, productions = []) => {
+export const closingStock = (products, bills, purchases, asOf, productions = [], stockAdjustments = []) => {
   const qty = new Map((products || []).filter((p) => !isServiceProduct(p)).map((p) => [p.id, Number(p.stock) || 0]));
   const byName = new Map((products || []).map((p) => [String(p.name || '').trim().toLowerCase(), p.id]));
   for (const pur of purchases || []) {
@@ -64,6 +65,12 @@ export const closingStock = (products, bills, purchases, asOf, productions = [])
     for (const [id, change] of Object.entries(pr.stockApplied || {})) {
       if (qty.has(id)) qty.set(id, qty.get(id) - (Number(change) || 0));
     }
+  }
+  // Divtech Hisaab - stock adjustments (shortage, wastage, excess) made after
+  // the date are taken back too.
+  for (const a of stockAdjustments || []) {
+    if (!a?.date || a.date <= asOf || !qty.has(a.productId)) continue;
+    qty.set(a.productId, qty.get(a.productId) - (Number(a.qty) || 0));
   }
   for (const [id, q] of qty) qty.set(id, Math.round(q * 1000) / 1000);
   return qty;

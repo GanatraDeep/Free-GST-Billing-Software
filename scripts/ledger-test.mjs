@@ -332,6 +332,112 @@ console.log('\n[Dashboard: totals of the invoices shown]');
   eq(listTotals([]).count, 0, 'Nothing shown: zero');
 }
 
+console.log('\n[Cash book and Bank book agree with the Cash and Bank ledgers]');
+{
+  const { linkedMoneyLines, ownCashLines, contraLines, voucherMoneyLines, cashTotals, bookOfEntry } = await import('../src/utils/cashBook.js');
+  // Everything that moves cash or bank, as in a real month.
+  const d = {
+    bills: [
+      sale('K-1', '2026-11-02', 'Walk-in', 1, 2000, { status: 'paid', payments: [{ id: 'c1', amount: 2100, date: '2026-11-02', mode: 'cash', cashSale: true }] }),
+      sale('K-2', '2026-11-02', 'Mehta Stores', 2, 1000),
+      { ...sale('K-3', '2026-11-03', 'Walk-in', 1, 500, { payments: [{ id: 'c3', amount: 525, date: '2026-11-03', mode: 'cash' }] }), status: 'cancelled' },
+    ],
+    receipts: [{ id: 'r1', receiptNo: 'RCP/1', date: '2026-11-04', clientName: 'Mehta Stores', amount: 1000, paymentMode: 'cash', againstInvoice: 'K-2' },
+      { id: 'r2', receiptNo: 'RCP/2', date: '2026-11-05', clientName: 'Mehta Stores', amount: 1100, paymentMode: 'upi', againstInvoice: 'K-2' }],
+    purchases: [
+      { id: 'pb1', invoiceNumber: 'S-1', date: '2026-11-03', supplierName: 'Shree Oils', items: [{ name: 'Oil', quantity: 2, rate: 1000, taxPercent: 5 }], totalAmount: 2100, totalTax: 100,
+        payments: [{ id: 'pp1', amount: 2100, date: '2026-11-03', mode: 'cash' }] },
+      { id: 'pr1', invoiceNumber: 'DN-1', isReturn: true, date: '2026-11-06', supplierName: 'Shree Oils', items: [{ name: 'Oil', quantity: 1, rate: 1000, taxPercent: 5 }], totalAmount: 1050, totalTax: 50,
+        payments: [{ id: 'pp2', amount: 1050, date: '2026-11-06', mode: 'cash' }] },
+    ],
+    expenses: [{ id: 'x1', date: '2026-11-03', category: 'Tea & snacks', amount: 150, paymentMode: 'cash' },
+      { id: 'x2', date: '2026-11-03', category: 'Rent', amount: 5000, paymentMode: 'bank-transfer' }],
+    freight: [
+      { id: 'f1', date: '2026-11-04', goods: 'Cottonseed oil', transporter: 'Krishna Roadlines', amount: 4000, rcmRate: 5, paymentMode: 'cash' },
+      { id: 'f2', date: '2026-11-05', goods: 'Groundnut oil', transporter: 'Local tempo', amount: 2500, rcmRate: 0, paymentMode: 'cash' },
+      { id: 'f3', date: '2026-11-05', goods: 'Palm oil', transporter: 'Rajasthan Carriers', amount: 1600, rcmRate: 5, paymentMode: 'credit' },
+      { id: 'f4', date: '2026-11-06', goods: 'Palm oil', transporter: 'Rajasthan Carriers', amount: 900, rcmRate: 5, paymentMode: 'upi' },
+    ],
+    openings: [{ id: 'ob1', party: 'client', name: 'Gokul Traders', amount: 5000, asOn: '2026-10-31', payments: [{ id: 'op1', amount: 2000, date: '2026-11-07', mode: 'cash' }] }],
+    cashEntries: [
+      { id: 'o1', type: 'in', date: '2026-10-31', amount: 50000, category: 'Opening balance' },
+      { id: 'd1', type: 'out', date: '2026-11-03', amount: 10000, category: 'Deposit to bank', name: 'SBI' },
+      { id: 'w1', type: 'out', book: 'bank', date: '2026-11-06', amount: 3000, category: 'Cash withdrawal' },
+    ],
+    vouchers: [{ id: 'v1', type: 'payment', number: 'PV/1', date: '2026-11-07', narration: 'Drawings', lines: [{ account: 'drawings', dr: 700, cr: 0 }, { account: 'cash', dr: 0, cr: 700 }] }],
+    products: [oil],
+  };
+  const screen = (book) => {
+    const own = d.cashEntries;
+    const lines = [
+      ...ownCashLines(own.filter((e) => bookOfEntry(e) === book)),
+      ...contraLines(own, book),
+      ...voucherMoneyLines(d.vouchers, book),
+      ...linkedMoneyLines({ bills: d.bills, receipts: d.receipts, expenses: d.expenses, purchases: d.purchases, openings: d.openings, freight: d.freight }, book),
+    ];
+    const t = cashTotals(lines);
+    return Math.round((t.in - t.out) * 100) / 100;
+  };
+  const ledger = (book) => ledgerView(moneyLedger(book, d)).closing;
+  eq([screen('cash'), ledger('cash')], [ledger('cash'), ledger('cash')], 'Cash book cash in hand = Cash ledger (freight paid in cash, return refund, voucher, contra, opening payment, cancelled invoice)');
+  eq(screen('cash'), 50000 + 2100 + 1000 - 2100 + 1050 - 150 - 4000 - 2500 + 2000 - 10000 + 3000 - 700, 'and is the right figure: 39,700');
+  eq([screen('bank'), ledger('bank')], [ledger('bank'), ledger('bank')], 'Bank book balance = Bank ledger (UPI receipt, rent, freight by UPI, deposit, withdrawal)');
+  const fl = linkedMoneyLines({ freight: d.freight }, 'cash');
+  eq(fl.map((l) => [l.type, l.amount, l.source]), [['out', 4000, 'freight'], ['out', 2500, 'freight']], 'Freight paid in cash is in the Cash book; on credit or by UPI it is not');
+  eq(linkedMoneyLines({ purchases: [d.purchases[1]] }, 'cash')[0].type, 'in', 'Cash back on a purchase return is money in');
+}
+
+console.log('\n[Expense under reverse charge (rent from an unregistered landlord)]');
+{
+  const { expenseCost, expenseGstFrom, rcmExpenseTotals } = await import('../src/utils/expenses.js');
+  const rent = { id: 'rent10', date: '2026-10-31', category: 'Office Rent', description: 'October rent', amount: 6500, gstPercent: 18, gstAmount: expenseGstFrom(6500, 18, true), rcm: true, paymentMode: 'UPI', account: '' };
+  eq([rent.gstAmount, expenseGstFrom(7670, 18, false)], [1170, 1170], 'GST on top under reverse charge (6,500 -> 1,170); inside the amount otherwise (7,670 -> 1,170)');
+  const d = { ...books, expenses: [rent] };
+  const ps = postings(d).filter((p) => p.doc === 'exp:rent10');
+  const bal = (acc) => Math.round(ps.filter((p) => p.account === acc).reduce((t, p) => t + p.dr - p.cr, 0) * 100) / 100;
+  eq([bal('expense:Office Rent'), bal('gst:cgst'), bal('gst:sgst'), bal('rcm-payable'), bal('bank')], [6500, 585, 585, -1170, -6500], 'Books: rent 6,500, input CGST + SGST 585 each, 1,170 owed under RCM, only 6,500 out of the bank');
+  eq([trialBalance(d, { from: '2026-04-01', to: '2027-03-31' }).difference, balanceSheet(d, { from: '2026-04-01', to: '2027-03-31' }).difference], [0, 0], 'Trial balance and balance sheet agree');
+  eq([expenseCost(rent), expenseCost({ amount: 7670, gstAmount: 1170 })], [6500, 6500], 'Cost before GST is 6,500 either way');
+  eq(rcmExpenseTotals([rent, { amount: 7670, gstAmount: 1170 }]), { taxable: 6500, igst: 0, cgst: 585, sgst: 585, tax: 1170 }, 'Only the reverse-charge expense counts for GSTR-3B 3.1(d)');
+  const pay = gstPaymentLines({ moves: [], cash: {}, rcm: 1170, from: 'bank' });
+  const after = { ...d, vouchers: [{ id: 'gp', type: 'payment', date: '2026-11-20', lines: pay }] };
+  eq(Math.round(postings(after).filter((p) => p.account === 'rcm-payable').reduce((t, p) => t + p.dr - p.cr, 0) * 100) / 100, 0, 'Record GST paid with the RCM clears it');
+}
+
+console.log('\n[Opening stock without a purchase price]');
+{
+  const { openingStockWarnings } = await import('../src/utils/ledgers.js');
+  const prods = [{ id: 'a', name: 'COTTONSEED OIL', unit: 'Tin', stock: 110 }, { id: 'b', name: 'PALM OIL', unit: 'Tin', stock: 5 }];
+  const buys = [{ id: 'pa', date: '2026-10-05', supplierName: 'X', items: [{ name: 'COTTONSEED OIL', quantity: 10, rate: 2500, taxPercent: 5 }], totalAmount: 26250 }];
+  const d = { bills: [], purchases: buys, products: prods, receipts: [], expenses: [], openings: [], cashEntries: [], vouchers: [] };
+  const L = itemLedger(prods[0], d);
+  eq([L.openingQty, L.openingRate, L.openingEstimate, L.avgCost], [100, 2500, 'first-purchase', 2500], 'No purchase price: 100 tins valued at the first purchase rate, so the average cost is not pulled down to nothing');
+  eq(openingStockWarnings(d).map((w) => [w.name, w.how]), [['COTTONSEED OIL', 'first-purchase'], ['PALM OIL', 'no-cost']], 'Both are flagged; one with no purchase at all stays at zero');
+  eq(itemLedger({ ...prods[0], openingCost: 2400 }, d).openingRate, 2400, 'The Opening stock cost on the product is used as it is');
+  eq(openingStockWarnings({ ...d, products: [{ ...prods[0], openingCost: 2400 }, { ...prods[1], openingCost: 2200 }] }).length, 0, 'and no warning');
+  // Purchases overwrite Purchase price with the latest rate; that must not move the opening stock.
+  const later = [...buys, { id: 'pb', date: '2026-11-20', supplierName: 'X', items: [{ name: 'COTTONSEED OIL', quantity: 10, rate: 2900, taxPercent: 5 }], totalAmount: 30450 }];
+  const p0 = { ...prods[0], purchasePrice: 2900, stock: 120 };
+  eq([itemLedger(p0, { ...d, purchases: later }).openingRate, itemLedger({ ...p0, openingCost: 2400 }, { ...d, purchases: later }).openingRate], [2500, 2400], 'A later purchase (which overwrote Purchase price to 2,900) does not change the opening stock value');
+  eq(itemLedger({ id: 'n', name: 'Never bought', stock: 4, purchasePrice: 900 }, d).openingRate, 900, 'An item never bought uses the purchase price typed in');
+}
+
+console.log('\n[Reports profit and loss = Final accounts]');
+{
+  const { booksPnl, monthsIn } = await import('../src/utils/reportsPnl.js');
+  const d = { ...books, freight: [{ id: 'fr1', date: '2026-11-10', goods: 'Groundnut oil 15 kg tin', transporter: 'T', amount: 800, rcmRate: 5, paymentMode: 'cash' }],
+    expenses: [{ id: 'e1', date: '2026-11-12', category: 'Tea & snacks', amount: 300, paymentMode: 'cash' }],
+    vouchers: [{ id: 'v9', type: 'journal', date: '2026-12-31', lines: [{ account: 'expense:Depreciation', dr: 1000, cr: 0 }, { account: 'opening-diff', dr: 0, cr: 1000 }] }] };
+  const range = { from: '2026-04-01', to: '2027-03-31' };
+  const pl = profitAndLoss(d, range);
+  const r = booksPnl(d, range);
+  eq([r.sales, r.grossProfit, r.netProfit], [pl.totals.sales, pl.grossProfit, pl.netProfit], 'Reports shows the same sales, gross profit and net profit as Final accounts');
+  eq(r.directExpenses >= 800 && r.expenses >= 1300, true, 'Freight is a direct expense; the expense and the depreciation voucher are in expenses (the old Reports missed both)');
+  const sumNet = Math.round(r.months.reduce((t, m) => t + m.netProfit, 0) * 100) / 100;
+  eq(sumNet, r.netProfit, 'The months add up to the year');
+  eq(monthsIn('2026-10-15', '2026-12-05').map((m) => [m.from, m.to]), [['2026-10-15', '2026-10-31'], ['2026-11-01', '2026-11-30'], ['2026-12-01', '2026-12-05']], 'Months are clipped to the dates picked');
+}
+
 console.log('\n[Excel workbook]');
 eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
 {

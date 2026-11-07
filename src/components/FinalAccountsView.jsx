@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FileSpreadsheet, Lock, Unlock, CheckCircle, AlertTriangle, Download, BookOpen } from 'lucide-react';
 import { exportAllData } from '../store';
 import { formatCurrency, getFYOptions } from '../utils';
-import { trialBalance, profitAndLoss, balanceSheet, accountBalances, ACCOUNT_GROUPS, side } from '../utils/ledgers';
+import { trialBalance, profitAndLoss, balanceSheet, accountBalances, ACCOUNT_GROUPS, side, openingStockWarnings } from '../utils/ledgers';
 import { caPackSheets } from '../utils/caPack';
 import { buildWorkbook } from '../utils/xlsx';
 import { openLedger } from '../utils/openLedger';
@@ -43,6 +43,8 @@ export default function FinalAccountsView({ onOpenView }) {
 
   const tb = useMemo(() => (data ? trialBalance(data, range) : null), [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
   const pl = useMemo(() => (data ? profitAndLoss(data, range) : null), [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Divtech Hisaab - opening stock with no purchase price (profit estimated).
+  const stockWarn = useMemo(() => (data ? openingStockWarnings(data) : []), [data]);
   const bs = useMemo(() => (data ? balanceSheet(data, range) : null), [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const subtitle = [profile?.businessName, period.label].filter(Boolean).join(', ');
@@ -154,6 +156,13 @@ export default function FinalAccountsView({ onOpenView }) {
             </div>
           )}
 
+          {(tab === 'pl' || tab === 'bs') && stockWarn.length > 0 && (
+            <div className="notice notice-warning" style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
+              <strong>Opening stock without an opening stock cost:</strong>{' '}
+              {stockWarn.map((w) => `${w.name} ${w.qty} ${w.unit || ''} ${w.how === 'first-purchase' ? `valued at the first purchase rate ${formatCurrency(w.rate)}` : 'valued at zero (never bought)'}`).join('; ')}.
+              Stock and profit are only as right as this cost: open <b>Products</b>, edit each one (or use Bulk edit) and enter its <b>Opening stock cost</b> (cost per unit without GST on the day you started).
+            </div>
+          )}
           {tab === 'pl' && (
             <div className="glass-panel">
               <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>

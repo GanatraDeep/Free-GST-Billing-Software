@@ -19,6 +19,7 @@ import { purchaseOwed, purchaseTotal, hasPurchasePayments, purchaseStatus } from
 import { partyKey, OPENING_REF } from './openingBalances.js';
 import { unpairedBillPayments, onCancelledBill, bookOfEntry, isBankMode, DEPOSIT_TO_BANK, CASH_WITHDRAWAL } from './cashBook.js';
 import { freightTax, freightAccountName } from './freight.js';
+import { isRcmExpense, expenseCost, expensePaid, expenseGstSplit, expenseGst } from './expenses.js';
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const r3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
@@ -303,13 +304,14 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
   for (const e of expenses) {
     if ((e.currency && e.currency !== 'INR') || !(Number(e.amount) > 0)) continue;
     const doc = `exp:${e.id}`;
-    const gst = Number(e.gstAmount) || 0;
-    const half = r2(gst / 2);
-    const split = e.interstate ? { igst: gst, cgst: 0, sgst: 0, cess: 0 } : { cgst: half, sgst: r2(gst - half), igst: 0, cess: 0 };
+    const split = { cess: 0, ...expenseGstSplit(e) };
     const who = e.vendorName || e.description || '';
-    post(doc, `expense:${e.category || 'General expenses'}`, (Number(e.amount) || 0) - gst, e.date, [e.category, who].filter(Boolean).join(' - ') || 'Expense', e.invoiceNumber || '', 'expenses', doc);
-    for (const h of HEADS) post(doc, `gst:${h}`, split[h], e.date, `Input tax on expense - ${e.vendorName || e.category || ''}`, e.invoiceNumber || '', 'expenses');
-    post(doc, modeAccount(e.paymentMode, e.account, 'out'), -(Number(e.amount) || 0), e.date, `Expense - ${who}`.replace(/\s+-\s*$/, ''), [e.category, e.note].filter(Boolean).join(' · '), 'expenses');
+    post(doc, `expense:${e.category || 'General expenses'}`, expenseCost(e), e.date, [e.category, who].filter(Boolean).join(' - ') || 'Expense', e.invoiceNumber || '', 'expenses', doc);
+    for (const h of HEADS) post(doc, `gst:${h}`, split[h], e.date, `Input tax on expense${isRcmExpense(e) ? ' (reverse charge)' : ''} - ${e.vendorName || e.category || ''}`, e.invoiceNumber || '', 'expenses');
+    // Divtech Hisaab - under reverse charge the GST is owed to the government
+    // (paid with GSTR-3B), not to the vendor: only the amount leaves the bank.
+    if (isRcmExpense(e)) post(doc, 'rcm-payable', -expenseGst(e), e.date, `GST under reverse charge - ${e.category || ''}${who ? ` - ${who}` : ''}`, e.invoiceNumber || '', 'expenses');
+    post(doc, modeAccount(e.paymentMode, e.account, 'out'), -expensePaid(e), e.date, `Expense - ${who}`.replace(/\s+-\s*$/, ''), [e.category, e.note].filter(Boolean).join(' · '), 'expenses');
   }
 
   // Freight (jakat) for goods brought in, on that goods' freight account. The
@@ -466,7 +468,27 @@ export function itemLedger(product, { bills = [], purchases = [], stockAdjustmen
   const net = moves.filter((m) => m.moved).reduce((s, m) => s + m.qtyIn - m.qtyOut, 0);
   const current = Number(product.stock);
   const openingQty = Number.isFinite(current) && product.stock !== '' && product.stock !== null ? r3(current - net) : 0;
-  const openingRate = r2(product.purchasePrice);
+  // Divtech Hisaab - the cost of the opening stock. It used to be the
+  // product's purchase price, but every purchase overwrites that with its
+  // own rate, so the opening stock (and every month's profit) changed each
+  // time a new bill was saved; and with no price at all it was worth nothing,
+  // which put profit lakhs too high. Now:
+  //   1. the product's Opening stock cost (openingCost), which purchases
+  //      never touch, when set;
+  //   2. otherwise, for an item that has been bought, its first purchase
+  //      rate, marked as estimated so the screens can say so;
+  //   3. for an item never bought, its purchase price as typed (nothing has
+  //      overwritten it), else zero, marked.
+  const openingCost = r2(product.openingCost);
+  const firstBuy = moves.find((m) => m.kind === 'purchase' && m.rate > 0);
+  const typed = r2(product.purchasePrice);
+  const hasOpening = openingQty > 0.0005;
+  let openingRate = 0;
+  let openingEstimate = '';
+  if (openingCost > 0) openingRate = openingCost;
+  else if (firstBuy) { openingRate = firstBuy.rate; openingEstimate = hasOpening ? 'first-purchase' : ''; }
+  else if (typed > 0) openingRate = typed;
+  else openingEstimate = hasOpening ? 'no-cost' : '';
   let qty = openingQty;
   let avg = openingRate;
   const rows = [{ key: 'opening', date: moves[0]?.date || '', kind: 'opening', particulars: 'Opening stock', ref: '', qtyIn: openingQty > 0 ? openingQty : 0, qtyOut: openingQty < 0 ? -openingQty : 0, rate: openingRate, value: r2(openingQty * openingRate), balanceQty: openingQty, avgCost: avg, balanceValue: r2(openingQty * avg) }];
@@ -496,7 +518,7 @@ export function itemLedger(product, { bills = [], purchases = [], stockAdjustmen
     const value = m.kind === 'purchase' || m.kind === 'preturn' ? r2((m.qtyIn || m.qtyOut) * m.rate) : m.kind.startsWith('adjust') ? m.value : (m.saleValue || 0);
     rows.push({ ...m, value, cost, balanceQty: qty, avgCost: r2(avg), balanceValue: r2(qty * avg) });
   }
-  return { product, unit: product.unit || '', rows, closingQty: qty, avgCost: r2(avg), closingValue: r2(qty * avg) };
+  return { product, unit: product.unit || '', rows, closingQty: qty, avgCost: r2(avg), closingValue: r2(qty * avg), openingQty, openingRate, openingEstimate };
 }
 
 // Cost of the goods sold in a period: each sale at the item's average purchase
@@ -569,6 +591,19 @@ export function buildLedger(id, data = {}) {
 
 // ---- final accounts ------------------------------------------------------------
 // Stock value (without GST, at average cost) as on a date: '' = before anything.
+// Products whose opening stock has no purchase price, so their value (and
+// the profit) is estimated: [{ id, name, unit, qty, rate, how }]
+// how: 'first-purchase' (valued at the first purchase rate) or 'no-cost' (at zero).
+export function openingStockWarnings({ products = [], bills = [], purchases = [], stockAdjustments = [] } = {}) {
+  const out = [];
+  for (const pr of products) {
+    if (pr?.kind === 'service') continue;
+    const L = itemLedger(pr, { bills, purchases, stockAdjustments });
+    if (L.openingEstimate) out.push({ id: pr.id, name: pr.name, unit: L.unit, qty: L.openingQty, rate: L.openingRate, how: L.openingEstimate });
+  }
+  return out;
+}
+
 export function stockValue({ products = [], bills = [], purchases = [], stockAdjustments = [] } = {}, onDate) {
   let total = 0;
   const lines = [];

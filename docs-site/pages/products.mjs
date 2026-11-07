@@ -63,7 +63,8 @@ export default [
   <tr><td>Product / Service Name *</td><td>Required. Two products should not share a name: invoices, purchase bills and imports find products by name.</td></tr>
   <tr><td>This is a</td><td><b>Goods (stock counted)</b> (to start) or <b>Service (no stock)</b>. See <a href="#goods-or-service">Goods or service</a>.</td></tr>
   <tr><td>HSN / SAC Code</td><td>HSN for goods, SAC for services. For a service the box is labelled <b>SAC Code</b>. See <a href="#product-hsn">HSN and SAC codes</a>.</td></tr>
-  <tr><td>Purchase Price</td><td>What you pay the supplier for one unit. Filled in on new purchase bills, used to value your stock and to cost things you make.</td></tr>
+  <tr><td>Purchase Price</td><td>What you pay the supplier for one unit. Filled in on new purchase bills (and updated to the latest rate each time you save one), and used to cost things you make.</td></tr>
+  <tr><td>Opening stock cost (per unit)</td><td>Goods only. What one unit of the stock you had <b>when you started using the app</b> cost you, without GST. It values your opening stock in the profit and loss and balance sheet, and purchases never change it. Left empty, the app uses the item's first purchase rate and shows a yellow note in Reports and Final accounts.</td></tr>
   <tr><td>Selling Price</td><td>What you charge for one unit. Filled in on new invoices, and shown as the <b>Rate</b> in the list. Type it the same way your invoices work: before GST, unless you make <a href="invoices.html#tax-inclusive">tax-inclusive</a> invoices.</td></tr>
   <tr><td>GST %</td><td>The GST rate, such as 5 or 18. 0 to 100; blank counts as 0. Since 22 September 2025 most goods are at 5%, 18% or 40%.</td></tr>
   <tr><td>Unit</td><td>Pcs to start. Pcs, Nos, Kg, g, Tonne, Ltr, ml, Mtr, cm, Ft, In, Sq.ft, Sq.m, Hrs, Day, Week, Month, Year, Visit, Session, Project, Word, Page, Box, Dozen, Pair, Set, Bag, Roll, Bottle, Tin, Drum, Carton, Quintal, and your own <a href="invoices.html#items">custom units</a>, marked ★. To add one here (Peti, Jar...), pick <b>+ New unit...</b> at the bottom of the list and type its name: it is then in the list for every product and invoice.</td></tr>
@@ -107,7 +108,7 @@ export default [
 
 <section id="bulk-edit">
 <h2>Bulk edit: changing many products at once</h2>
-<p>Use it when prices go up across the board, after a GST rate change, or to correct stock after counting your shelves. ${ui('Bulk edit')} turns the table into a grid of boxes: <b>Name</b>, <b>HSN/SAC</b>, <b>Purchase price</b>, <b>Selling price</b>, <b>GST %</b>, <b>Unit</b> and <b>Stock</b>.</p>
+<p>Use it when prices go up across the board, after a GST rate change, or to correct stock after counting your shelves. ${ui('Bulk edit')} turns the table into a grid of boxes: <b>Name</b>, <b>HSN/SAC</b>, <b>Purchase price</b>, <b>Selling price</b>, <b>GST %</b>, <b>Unit</b>, <b>Stock</b> and <b>Opening stock cost</b>. It is the quickest way to enter the opening cost of many products at once.</p>
 <ol class="steps">
   <li><strong>Narrow the list (optional)</strong>Search first, for example by an HSN code, to edit only those products. The search box is locked while you edit.</li>
   <li><strong>Start</strong>Click ${ui('Bulk edit')}.</li>
@@ -171,15 +172,16 @@ export default [
   <tr><td><code>HSN/SAC</code> (or <code>HSN</code>, <code>SAC</code>, <code>HSN Code</code>)</td><td>HSN or SAC code</td></tr>
   <tr><td><code>Unit</code></td><td>Nos if left out. Write it as in the app's list (Kg, Ltr, Pcs, Hrs, Page), so the GST returns get the right unit code.</td></tr>
   <tr><td><code>Purchase Price</code> (or <code>Cost</code>)</td><td>What you pay for one unit</td></tr>
+  <tr><td><code>Opening Cost</code></td><td>What one unit of the stock in the file cost you, without GST (the opening stock cost). Left blank, the purchase price in the file is used.</td></tr>
   <tr><td><code>Selling Price</code> (or <code>Rate</code>, <code>Price</code>)</td><td>What you charge for one unit</td></tr>
   <tr><td><code>GST %</code> (or <code>GST Rate</code>, <code>Tax %</code>)</td><td>GST rate, such as 18. 0 to 100.</td></tr>
   <tr><td><code>Stock</code> (or <code>Quantity</code>, <code>Opening Stock</code>)</td><td>Opening stock of goods. Leave it blank for a service, or for goods you do not count.</td></tr>
   <tr><td><code>Description</code></td><td>Optional</td></tr>
 </table></div>
 <p>The sample file looks like this:</p>
-<pre><code>Name,Type,HSN/SAC,Unit,Purchase Price,Selling Price,GST %,Stock,Description
-Demo A4 Paper Ream 75 GSM,Goods,4802,Nos,220,280,18,50,Sample goods row - replace with your own
-Demo Printing service,Service,998912,Page,,5,18,,Sample service row - a service has no stock</code></pre>
+<pre><code>Name,Type,HSN/SAC,Unit,Purchase Price,Selling Price,GST %,Stock,Description,Opening Cost
+Demo A4 Paper Ream 75 GSM,Goods,4802,Nos,220,280,18,50,Sample goods row - replace with your own,210
+Demo Printing service,Service,998912,Page,,5,18,,Sample service row - a service has no stock,</code></pre>
 <p>Products you already have (same name, any capitals) are skipped, and so are repeats inside the file, so importing the same file twice is safe. The CSV saved by the ${ui('CSV')} button above the list uses the same columns, so you can export, edit in Excel and import into another copy of the app.</p>
 <div class="note info"><p><b>Old invoices</b> are imported somewhere else: on the Dashboard, with ${ui('CSV import / export')}, which has its own template. See <a href="dashboard.html#csv">Importing and exporting invoices as CSV</a>. The link at the bottom of the import window goes there too.</p></div>
 <div class="note tip"><strong>Something wrong?</strong><p>A row is listed as a problem, such as "Row 4 (Tea): GST % must be 0 to 100" or "Type must be Goods or Service": fix that row in the file and choose it again (the rows already imported are skipped). Nothing is read: the file is not a plain CSV, or the headings are not in the first row. An <code>.xlsx</code> file renamed to <code>.csv</code> does not work. See <a href="troubleshooting.html#csv-import">A CSV import did not work</a>.</p></div>

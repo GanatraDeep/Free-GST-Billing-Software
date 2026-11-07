@@ -4,9 +4,10 @@
 // this report reads every invoice and purchase, not just the open company's.
 import { useEffect, useState } from 'react';
 import { Package } from 'lucide-react';
-import { getAllBills, getAllProducts, getAllPurchases, getAllProductions } from '../store';
+import { getAllBills, getAllProducts, getAllPurchases, getAllProductions, getAllStockAdjustments } from '../store';
 import { localToday } from '../utils';
 import { closingStock, stockValueOf } from '../utils/products';
+import { itemLedger } from '../utils/ledgers';
 import { toast } from './Toast';
 import TableExport from './TableExport';
 import HelpButton from './HelpButton';
@@ -27,12 +28,13 @@ export default function StockReport({ businessName }) {
   useEffect(() => {
     // v1.10.83 (#115) - production entries move stock too (always read, even
     // with the feature off: entries saved earlier still moved stock).
-    Promise.all([getAllProducts(), getAllBills(), getAllPurchases(), getAllProductions().catch(() => [])])
-      .then(([products, bills, purchases, productions]) => setData({
+    Promise.all([getAllProducts(), getAllBills(), getAllPurchases(), getAllProductions().catch(() => []), getAllStockAdjustments().catch(() => [])])
+      .then(([products, bills, purchases, productions, stockAdjustments]) => setData({
         products: products || [],
         bills: bills || [],
         purchases: purchases || [],
         productions: productions || [],
+        stockAdjustments: stockAdjustments || [],
       }))
       .catch(() => toast('Failed to load stock', 'error'));
   }, []);
@@ -40,10 +42,23 @@ export default function StockReport({ businessName }) {
   if (!data) return <div className="glass-panel" style={{ padding: '1.25rem' }}>Loading stock…</div>;
 
   const asOf = monthEnd(month);
-  const qty = closingStock(data.products, data.bills, data.purchases, asOf, data.productions);
+  const qty = closingStock(data.products, data.bills, data.purchases, asOf, data.productions, data.stockAdjustments);
+  // Divtech Hisaab - valued at the average purchase cost on that date, the
+  // same as the closing stock in the balance sheet; a product never bought
+  // falls back to its purchase price, then its selling price.
+  const avgOn = (p) => {
+    const { rows: led } = itemLedger(p, data);
+    let last = null;
+    for (const r of led) if (String(r.date) <= asOf) last = r;
+    return last && last.avgCost > 0 ? last.avgCost : 0;
+  };
   const rows = data.products
     .filter((p) => qty.has(p.id)) // services have no stock (#121)
-    .map((p) => ({ p, q: qty.get(p.id) ?? 0, ...stockValueOf(p, qty.get(p.id)) }))
+    .map((p) => {
+      const q = qty.get(p.id) ?? 0;
+      const avg = avgOn(p);
+      return avg > 0 ? { p, q, price: avg, value: Math.round(avg * q * 100) / 100, atCost: true } : { p, q, ...stockValueOf(p, q) };
+    })
     .sort((a, b) => String(a.p.name || '').localeCompare(String(b.p.name || '')));
   const total = rows.reduce((s, r) => s + (r.q > 0 ? r.value : 0), 0);
   const asOfLabel = new Date(`${asOf}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -67,7 +82,7 @@ export default function StockReport({ businessName }) {
             {lastMonths.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
           <TableExport title={`Closing stock ${asOfLabel}`} filename={`Closing-stock-${asOf}`}
-            subtitle={`${businessName ? `${businessName}, ` : ''}closing stock as on ${asOfLabel}, valued at purchase price`}
+            subtitle={`${businessName ? `${businessName}, ` : ''}closing stock as on ${asOfLabel}, valued at average purchase cost`}
             headers={['Product', 'HSN/SAC', 'Unit', 'Closing qty', 'Rate', 'Value']} rows={rows.length ? exportRows : []} />
         </div>
       </div>
@@ -89,7 +104,7 @@ export default function StockReport({ businessName }) {
                   <td>{r.p.hsn || '-'}</td>
                   <td>{r.p.unit || 'Nos'}</td>
                   <td style={{ ...num, color: r.q < 0 ? 'var(--danger)' : undefined }}>{r.q}</td>
-                  <td style={num} title={r.atCost ? 'Purchase price' : 'No purchase price, so selling price'}>{amt(r.price)}{r.atCost ? '' : ' *'}</td>
+                  <td style={num} title={r.atCost ? 'Average purchase cost' : 'Never bought and no purchase price, so selling price'}>{amt(r.price)}{r.atCost ? '' : ' *'}</td>
                   <td style={num}>{r.q > 0 ? amt(r.value) : '-'}</td>
                 </tr>
               ))}
@@ -103,7 +118,7 @@ export default function StockReport({ businessName }) {
       )}
       <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0 1.25rem 1rem', margin: 0 }}>
         Worked back from today&apos;s stock using the dates of your invoices, purchase bills{data.productions.length ? ' and production entries' : ''}. Stock you typed in by hand on the Products screen has no date, so it counts as if it changed today.
-        Value is at purchase price; * means no purchase price is saved, so the selling price is used. Negative stock is shown in red and not counted in the total.
+        Value is at the average purchase cost (without GST) on that date, the same as the closing stock in Final accounts; * means the product was never bought and has no purchase price, so the selling price is used. Negative stock is shown in red and not counted in the total.
       </p>
     </div>
   );

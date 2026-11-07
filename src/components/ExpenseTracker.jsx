@@ -12,6 +12,7 @@ import TableExport from './TableExport';
 import { useCostCentres } from './useCostCentres';
 import { CostCentreSelect, CostCentreFilter } from './CostCentrePicker';
 import { matchesCentre, centreFields, centreLabel, UNTAGGED } from '../utils/costCentres';
+import { expenseGstFrom } from '../utils/expenses';
 
 // Each category is tagged with its ITR (Income Tax Return) head so the
 // v1.7.0+ ITR Filing Summary can auto-aggregate expenses under the correct
@@ -68,6 +69,10 @@ const emptyForm = {
   // scenario: AWS / Google / Adobe / SaaS bills from out-of-state offices.
   // Off = intrastate = supplier and buyer in the same state.
   interstate: false,
+  // Divtech Hisaab - reverse charge: the vendor is not registered (rent from
+  // an unregistered landlord). Amount = paid to the vendor, GST on top, owed
+  // to the government with GSTR-3B. Rules: utils/expenses.js.
+  rcm: false,
   vendorName: '',
   vendorGstin: '',
   invoiceNo: '',
@@ -170,6 +175,7 @@ export default function ExpenseTracker() {
       paymentMode: exp.paymentMode || 'Bank Transfer',
       account: exp.account || '',
       interstate: !!exp.interstate,
+      rcm: !!exp.rcm,
       note: exp.note || '',
       costCentre: exp.costCentre || '',
       costCentreName: exp.costCentreName || '',
@@ -206,6 +212,7 @@ export default function ExpenseTracker() {
         paymentMode: form.paymentMode,
         account: showsBankChoice(MODE_KEY[form.paymentMode] || form.paymentMode) ? form.account || '' : '',
         interstate: !!form.interstate,
+        ...(form.rcm ? { rcm: true } : {}),
         note: form.note.trim(),
         // Stamp the business this expense belongs to. `vendorGstin` above is
         // the SUPPLIER — filing an expense under your own supplier would be
@@ -248,10 +255,8 @@ export default function ExpenseTracker() {
   // of either (it used the old amount), and zero it when either is empty/0.
   const updateAmountOrGST = (field, value) => setForm(prev => {
     const next = { ...prev, [field]: value };
-    const base = parseFloat(next.amount) || 0;
-    const pct = parseFloat(next.gstPercent) || 0;
-    const gst = base > 0 && pct > 0 ? (base * pct) / (100 + pct) : 0;
-    return { ...next, gstAmount: Math.round(gst * 100) / 100 };
+    // Under reverse charge the GST is on top of the amount, not inside it.
+    return { ...next, gstAmount: expenseGstFrom(next.amount, next.gstPercent, !!next.rcm) };
   });
 
   // v1.10.77 (#85) - the expense statement: the list as filtered, oldest
@@ -355,7 +360,7 @@ export default function ExpenseTracker() {
                   onChange={e => updateField('description', e.target.value)} placeholder="e.g. AWS Hosting - March" />
               </div>
               <div className="form-group">
-                <label className="form-label">Amount (incl. GST) *</label>
+                <label className="form-label">{form.rcm ? 'Amount paid to vendor (no GST) *' : 'Amount (incl. GST) *'}</label>
                 <input type="number" className="form-input" value={form.amount}
                   onChange={e => updateAmountOrGST('amount', e.target.value)}
                   placeholder="0.00" min="0" />
@@ -364,7 +369,14 @@ export default function ExpenseTracker() {
                 <label className="form-label">GST % (for ITC)</label>
                 <input type="number" className="form-input" value={form.gstPercent}
                   onChange={e => updateAmountOrGST('gstPercent', e.target.value)} placeholder="18" min="0" max="100" />
-                {form.gstAmount > 0 && <p className="field-hint">GST: {formatCurrency(form.gstAmount)}</p>}
+                {form.gstAmount > 0 && <p className="field-hint">GST: {formatCurrency(form.gstAmount)}{form.rcm ? ' (you pay it with GSTR-3B and claim it back)' : ''}</p>}
+              </div>
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.82rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!form.rcm} style={{ marginTop: 3 }}
+                    onChange={e => updateAmountOrGST('rcm', e.target.checked)} />
+                  <span><b>Reverse charge (RCM)</b>: the vendor is not GST-registered and you pay the GST, e.g. shop or office rent from an unregistered landlord. Enter what you paid the vendor; the GST is worked out on top, goes into GSTR-3B 3.1(d) and 4(A)(3), and is paid with Record GST paid.</span>
+                </label>
               </div>
               <div className="form-group">
                 <label className="form-label">Vendor Name</label>
@@ -460,7 +472,7 @@ export default function ExpenseTracker() {
                     <td><span className="type-badge">{exp.category}</span></td>
                     <td className="text-muted">{exp.vendorName || '-'}</td>
                     <td style={{ textAlign: 'right' }} className="font-bold">{formatCurrency(exp.amount)}</td>
-                    <td style={{ textAlign: 'right' }} className="text-muted">{exp.gstAmount ? formatCurrency(exp.gstAmount) : '-'}</td>
+                    <td style={{ textAlign: 'right' }} className="text-muted">{exp.gstAmount ? formatCurrency(exp.gstAmount) : '-'}{exp.rcm && <div style={{ fontSize: '0.7rem', fontWeight: 600 }} title="Reverse charge: paid with GSTR-3B, not to the vendor">RCM</div>}</td>
                     <td className="text-muted">{exp.paymentMode}</td>
                     <td>
                       <div className="table-actions">

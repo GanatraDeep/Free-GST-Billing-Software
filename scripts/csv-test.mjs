@@ -143,6 +143,17 @@ console.log('\n[#101] Bulk CSV import / export of sales and purchase bills');
   eq(back.map((x) => [x.totalAmount, x.purchaseType?.name, x.applyRoundOff].join('/')).join(' '), '7098/Debit/true 4410/Cash/false', 'purchase export -> import round trip keeps Bill Type and Round Off');
 }
 
+console.log('\n[Products CSV: opening stock cost]');
+{
+  const { productsCsvToList } = await import('../src/utils/listCsv.js');
+  const j = (a, b2, label) => eq(JSON.stringify(a), JSON.stringify(b2), label);
+  const own = productsCsvToList('Name,Type,Unit,Purchase Price,GST %,Stock,Opening Cost\nCOTTONSEED OIL,Goods,Tin,2600,5,434,2450\n').products[0];
+  j([own.openingCost, own.purchasePrice], [2450, 2600], 'An Opening Cost column is kept as the opening stock cost');
+  j(productsCsvToList('Name,Type,Unit,Purchase Price,GST %,Stock\nGROUNDNUT OIL,Goods,Tin,2850,5,103\n').products[0].openingCost, 2850, 'Without it, the purchase price in the file is the cost of the stock imported');
+  j(productsCsvToList('Name,Type,Unit,Purchase Price,GST %,Stock\nPALM OIL,Goods,Tin,,5,25\n').products[0].openingCost, 0, 'With neither, it stays empty (the screens then warn)');
+  j('openingCost' in productsCsvToList('Name,Type,Selling Price\nDelivery,Service,100\n').products[0], false, 'A service has none');
+}
+
 console.log('\n[HSN-wise inward summary for GSTR-3B]');
 {
   const { inwardHsnRows, hsnSheetRows } = await import('../src/utils/hsnSummary.js');

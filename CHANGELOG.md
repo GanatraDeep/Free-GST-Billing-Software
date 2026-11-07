@@ -4,6 +4,60 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.15.1] - 2026-11-07
+
+### How to update
+
+**Current version:** 1.15.0  →  **New version:** 1.15.1
+
+1. Open the app and click **Update to v1.15.1** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Fixed
+- **Cash in hand in the Cash book was higher than in the final accounts.**
+  Freight (jakat) paid in cash (or from the bank) was taken out of Cash in
+  the ledgers, trial balance and balance sheet, but was not listed in the
+  Cash book (or the Bank book), so their balance stayed too high by the
+  freight paid. Freight entries now show there, with the transporter, goods
+  and LR. The final accounts were right; nothing needs re-entering.
+- **Cash back on a purchase return** was listed in the Cash book as money
+  going out; it is money coming in.
+- A test now checks that the Cash book and Bank book always show the same
+  balance as the Cash and Bank ledgers.
+- **Profit was far too high when products had no purchase price.** Stock on
+  hand on the day you started was valued at zero, and that zero cost pulled
+  the average cost of later purchases down, so closing stock and profit were
+  wrong by lakhs. And because every purchase overwrites the purchase price
+  with its latest rate, the opening stock (and every month's profit) changed
+  each time a new bill was saved. Products now have an **Opening stock cost**
+  (per unit) that purchases never change; on the product form, in Bulk edit
+  and as an Opening Cost column in the Products CSV. Until it is entered,
+  opening stock is valued at the item's first purchase rate, and Final
+  accounts and Reports show a note naming those products.
+- **Reports showed a different profit from Final accounts.** Reports worked
+  profit out on its own and missed freight, vouchers (depreciation,
+  interest), kasar and round off. The Profit & Loss tab now uses the same
+  books, line for line: sales, cost of goods sold (opening stock + purchases
+  - closing stock), freight and direct expenses, gross profit, expenses,
+  other income, net profit, and a month-by-month table that adds up.
+- **Stock report value** is now at average purchase cost on that date (as in
+  the balance sheet), not purchase or selling price, and stock adjustments
+  after that date are taken back.
+
+### Added
+- **Expenses under reverse charge (RCM)**, e.g. shop or office rent from an
+  unregistered landlord: tick **Reverse charge (RCM)**, enter what you paid
+  the landlord, and the GST is worked out on top. Only the amount paid
+  leaves the bank; the GST is owed on "GST payable under reverse charge",
+  goes into GSTR-3B 3.1(d), 4(A)(3) / ISRC and the tax paid in cash, the
+  HSN inward sheet and the expense registers, and Record GST paid fills it in.
+
+---
+
 ## [1.15.0] - 2026-11-07
 
 ### How to update

@@ -41,6 +41,7 @@ import {
 } from '../utils/itr.js';
 import { getFinancialYearLabel, belongsToProfile, isCancelledBill, salesSign, localToday, parseLocalDate } from '../utils';
 import { billInInr } from '../utils/fx';
+import { expenseCost } from '../utils/expenses';
 
 // Business income is counted without GST (GST collected is not income, and GST
 // paid comes back as credit), in rupees only, from real sales: a quote or a
@@ -55,7 +56,6 @@ const billTurnover = (orig) => {
 // Divtech Hisaab - a purchase return (debit note) takes its cost back off.
 const purchaseCost = (p) => (p.isReturn ? -1 : 1) * (p.taxableAmount != null ? Number(p.taxableAmount) || 0
   : (Number(p.totalAmount) || 0) - (Number(p.totalTax) || 0));
-const expenseCost = (e) => (Number(e.amount) || 0) - (Number(e.gstAmount) || 0);
 import { toast } from './Toast';
 
 // The Income Tax module has three sub-tabs. Keeping them in one file (rather
