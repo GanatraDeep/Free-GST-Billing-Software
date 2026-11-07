@@ -6,7 +6,7 @@ the browser, and works without the internet. Data never leaves the computer.
 
 **Contact:** WhatsApp / call +91 94299 11067 · hello@divtech.in · https://divtech.in
 
-**Current version:** 1.15.1 · [Changelog](CHANGELOG.md) · [Releases](../../releases)
+**Current version:** 1.16.0 · [Changelog](CHANGELOG.md) · [Releases](../../releases)
 
 ---
 
@@ -48,7 +48,11 @@ the browser, and works without the internet. Data never leaves the computer.
   of sales, purchases, expenses, cash and bank
 - Full **double-entry accounts** worked out from everything you enter:
   ledgers for every customer, supplier and account, payment / receipt /
-  contra / journal vouchers, trial balance, profit and loss, balance sheet
+  contra / journal vouchers, trial balance, trading account, profit and
+  loss, balance sheet, for a year or any dates, in book (T-form) or modern
+  layout
+- **Closing stock method**: weighted average, FIFO, last purchase rate or
+  fixed rate, as in Tally
 - **Year end**: close the year, carry balances forward, and a **CA pack**
   (Excel with every ledger, register and the final accounts)
 - Customer and supplier opening balances, outstanding and reminders
@@ -77,7 +81,8 @@ the browser, and works without the internet. Data never leaves the computer.
 
 | Version | Highlights |
 |---|---|
-| **1.15.1** | Cash book matches the final accounts; profit fixed (opening stock without purchase price, Reports = Final accounts); expenses under reverse charge (RCM rent) |
+| **1.16.0** | Closing stock methods (average, FIFO, last purchase rate, fixed); final accounts for any dates; book (T-form) and modern views; Trading account; CA-ready layout |
+| 1.15.1 | Cash book matches the final accounts; profit fixed (opening stock without purchase price, Reports = Final accounts); expenses under reverse charge (RCM rent) |
 | 1.15.0 | Rojmel (day book) and day-wise summary; amount totals on the filtered Dashboard list; this README |
 | 1.14.3 | Sales CSV import takes stock out (and a repair for earlier imports); HSN-wise inward / outward in the GSTR-3B Excel |
 | 1.14.2 | Sale Type column in the sales CSV import |

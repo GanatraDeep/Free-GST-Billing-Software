@@ -438,6 +438,66 @@ console.log('\n[Reports profit and loss = Final accounts]');
   eq(monthsIn('2026-10-15', '2026-12-05').map((m) => [m.from, m.to]), [['2026-10-15', '2026-10-31'], ['2026-11-01', '2026-11-30'], ['2026-12-01', '2026-12-05']], 'Months are clipped to the dates picked');
 }
 
+console.log('\n[Closing stock methods: average, FIFO, last purchase rate, fixed]');
+{
+  const prod = { id: 'sm', name: 'Method oil', unit: 'Tin', stock: 10, openingCost: 100, stockRate: 105 };
+  const d0 = {
+    products: [prod], receipts: [], expenses: [], openings: [], cashEntries: [], vouchers: [], stockAdjustments: [],
+    purchases: [
+      { id: 'm1', date: '2026-11-02', supplierName: 'S', items: [{ name: 'Method oil', quantity: 10, rate: 120, taxPercent: 0 }], totalAmount: 1200 },
+      { id: 'm2', date: '2026-11-04', supplierName: 'S', items: [{ name: 'Method oil', quantity: 5, rate: 130, taxPercent: 0 }], totalAmount: 650 },
+    ],
+    bills: [sale('SM-1', '2026-11-03', 'C', 15, 150, { data: { items: [{ name: 'Method oil', productId: 'sm', quantity: 15, rate: 150, taxPercent: 0 }], totals: { taxableAmount: 2250 } }, totalAmount: 2250, totalTaxAmount: 0 })],
+  };
+  const val = (m) => itemLedger(prod, { ...d0, stockMethod: m });
+  eq(['average', 'fifo', 'last', 'fixed'].map((m) => [val(m).closingQty, val(m).closingValue]), [[10, 1200], [10, 1250], [10, 1300], [10, 1050]], 'Closing 10 units: average 1,200 / FIFO 1,250 (5 @ 120 + 5 @ 130) / last rate 1,300 / fixed rate 1,050');
+  eq([val('average').rows.find((r) => r.kind === 'sale').cost, val('fifo').rows.find((r) => r.kind === 'sale').cost], [1650, 1600], 'Cost of the 15 sold: average 15 x 110, FIFO 10 x 100 + 5 x 120');
+  const range = { from: '2026-04-01', to: '2027-03-31' };
+  for (const m of ['average', 'fifo', 'last', 'fixed']) {
+    const d = { ...d0, stockMethod: m };
+    eq([trialBalance(d, range).difference, balanceSheet(d, range).difference], [0, 0], `${m}: trial balance and balance sheet agree`);
+  }
+  const gp = (m) => profitAndLoss({ ...d0, stockMethod: m }, range).grossProfit;
+  eq(Math.round((gp('fifo') - gp('average')) * 100) / 100, 50, 'FIFO profit is higher by the 50 more closing stock is worth');
+  eq(stockValue({ ...d0, stockMethod: 'fifo' }, '2026-11-03').total, 600, 'On a date: FIFO stock after the sale is the 5 left of the 120 purchase');
+  eq(itemLedger({ ...prod, stockRate: 0 }, { ...d0, stockMethod: 'fixed' }).closingValue, 1000, 'Fixed rate without one on the product: the opening stock cost');
+  eq(itemLedger(prod, { ...d0, stockMethod: 'nonsense' }).closingValue, 1200, 'An unknown method is average');
+}
+
+console.log('\n[Final accounts: book and modern layouts, any dates]');
+{
+  const st = await import('../src/utils/statements.js');
+  const d = { ...books, vouchers: [...(books.vouchers || []), { id: 'dr1', type: 'payment', date: '2026-11-15', lines: [{ account: 'drawings', dr: 500, cr: 0 }, { account: 'cash', dr: 0, cr: 500 }] }] };
+  const range = { from: '2026-04-01', to: '2027-03-31' };
+  const pl = profitAndLoss(d, range); const bs = balanceSheet(d, range);
+  const trad = st.tradingBook(pl); const pnl = st.pnlBook(pl); const bb = st.balanceSheetBook(bs);
+  eq([trad.totalLeft, pnl.totalLeft], [trad.totalRight, pnl.totalRight], 'Book view: the trading and the profit & loss account each total the same on both sides');
+  eq(trad.left[0].label, 'To Opening stock', 'Debit side reads "To ..."');
+  eq(trad.right.some((l) => l.label === 'By Closing stock'), true, 'credit side "By ...", closing stock on the credit side');
+  eq((pl.grossProfit >= 0 ? trad.left : trad.right).some((l) => /Gross (profit|loss) c\/d/.test(l.label)), true, 'Gross profit carried down');
+  eq(pnl.left.concat(pnl.right).some((l) => /Gross (profit|loss) b\/d/.test(l.label)), true, 'and brought down into the profit & loss account');
+  eq([bb.totalLeft, bs.difference], [bb.totalRight, 0], 'Balance sheet book view: liabilities = assets');
+  const cap = bb.left.concat(bb.right).filter((l) => /Net (profit|loss) for the period|Drawings/.test(l.label)).map((l) => l.label);
+  eq(cap.includes('Less: Drawings') && cap.some((x) => /Net (profit|loss) for the period/.test(x)), true, 'Capital account: net profit added, drawings taken off');
+  const mod = st.pnlModern(pl);
+  eq([mod.find((l) => /^Gross (profit|loss)$/.test(l.label)).amount, mod.find((l) => /^Net (profit|loss)$/.test(l.label)).amount], [pl.grossProfit, pl.netProfit], 'Modern view: the same gross and net profit');
+  eq(st.bookExportRows(trad).at(-1), ['Total', trad.totalLeft, 'Total', trad.totalRight], 'Print / Excel rows end with both totals');
+  const tbb = st.trialBalanceBook(trialBalance(d, range));
+  const sumDr = Math.round(tbb.filter((l) => !l.head).reduce((t, l) => t + l.dr, 0) * 100) / 100;
+  eq(sumDr, trialBalance(d, range).dr, 'Trial balance grouped: the lines add up to the debit total');
+  // Any dates: November only, balances as on 30 Nov.
+  const mid = { from: '2026-11-01', to: '2026-11-30' };
+  const bsMid = balanceSheet(d, mid); const plMid = profitAndLoss(d, mid);
+  eq(bsMid.difference, 0, 'From 1 Nov to 30 Nov: the balance sheet as on 30 Nov agrees');
+  const capItems = [...bsMid.liabilities, ...bsMid.assets].find((g) => g.group === 'capital').items;
+  const before = capItems.find((i) => i.id === 'pl-earlier')?.amount || 0;
+  const fyToNov = profitAndLoss(d, { from: '2026-04-01', to: '2026-11-30' }).netProfit;
+  eq(Math.round((before + plMid.netProfit) * 100) / 100, fyToNov, 'Profit before 1 Nov + November profit = profit 1 Apr to 30 Nov');
+  const { accountBalances } = await import('../src/utils/ledgers.js');
+  const cashAsOn = Math.round((accountBalances(d, '2026-11-30').cash || 0) * 100) / 100;
+  eq([...bsMid.assets, ...bsMid.liabilities].flatMap((g) => g.items).filter((i) => i.id === 'cash').map((i) => Math.abs(i.amount))[0] ?? 0, Math.abs(cashAsOn), 'Cash in the balance sheet as on 30 Nov = the Cash account balance on that date');
+}
+
 console.log('\n[Excel workbook]');
 eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
 {

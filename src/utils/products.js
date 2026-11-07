@@ -12,7 +12,7 @@ export const bulkRowToProduct = (product, edits) => {
   if (!name) return { error: 'a product needs a name' };
   const gst = num(merged.taxPercent);
   if (!Number.isFinite(gst) || gst < 0 || gst > 100) return { error: `${name}: GST % must be 0 to 100` };
-  for (const k of ['purchasePrice', 'sellingPrice', 'stock', 'openingCost']) {
+  for (const k of ['purchasePrice', 'sellingPrice', 'stock', 'openingCost', 'stockRate']) {
     if (!Number.isFinite(num(merged[k]))) return { error: `${name}: ${k === 'stock' ? 'stock' : 'price'} must be a number` };
   }
   const sellingPrice = num(edits.sellingPrice ?? product.sellingPrice ?? product.rate);
@@ -25,7 +25,7 @@ export const bulkRowToProduct = (product, edits) => {
       name,
       hsn: String(merged.hsn ?? '').trim(),
       purchasePrice: num(merged.purchasePrice),
-      ...(isServiceProduct(merged) ? {} : { openingCost: num(merged.openingCost) }),
+      ...(isServiceProduct(merged) ? {} : { openingCost: num(merged.openingCost), stockRate: num(merged.stockRate) }),
       sellingPrice,
       rate: sellingPrice,
       taxPercent: gst,

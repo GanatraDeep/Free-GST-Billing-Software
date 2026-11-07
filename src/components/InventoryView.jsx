@@ -1,3 +1,4 @@
+import { getStockMethod } from '../utils/stockMethod';
 import { useState, useEffect } from 'react';
 import { Package, Search, Plus, Edit3, Trash2, X, Save, Upload, Table2, Factory, BookOpen, Scale } from 'lucide-react';
 import StockAdjustModal, { recordStockAdjustment } from './StockAdjustModal';
@@ -22,7 +23,7 @@ import TableExport from './TableExport';
 // dead state removed for clarity.
 const emptyForm = {
   // kind: v1.10.83 (#121) - 'goods' or 'service' (a service has no stock).
-  kind: 'goods', name: '', hsn: '', purchasePrice: '', openingCost: '', sellingPrice: '', taxPercent: '', unit: 'Pcs', stock: '', description: '',
+  kind: 'goods', name: '', hsn: '', purchasePrice: '', openingCost: '', stockRate: '', sellingPrice: '', taxPercent: '', unit: 'Pcs', stock: '', description: '',
   madeHere: false, bom: [],
 };
 
@@ -90,6 +91,7 @@ export default function InventoryView() {
       hsn: product.hsn || '',
       purchasePrice: product.purchasePrice ?? '',
       openingCost: product.openingCost || '',
+      stockRate: product.stockRate || '',
       sellingPrice: product.sellingPrice ?? product.rate ?? '',
       taxPercent: product.taxPercent || '',
       unit: product.unit || 'Nos',
@@ -140,7 +142,7 @@ export default function InventoryView() {
         hsn: form.hsn.trim(),
         purchasePrice,
         // Divtech Hisaab - cost of the stock you started with (purchases never change it).
-        ...(service ? {} : { openingCost: form.openingCost ? parseFloat(form.openingCost) : 0 }),
+        ...(service ? {} : { openingCost: form.openingCost ? parseFloat(form.openingCost) : 0, stockRate: form.stockRate ? parseFloat(form.stockRate) : 0 }),
         sellingPrice,
         rate: sellingPrice, // mirror for legacy readers
         taxPercent: form.taxPercent ? parseFloat(form.taxPercent) : 0,
@@ -301,6 +303,14 @@ export default function InventoryView() {
                     placeholder="0.00" min="0" step="any"
                     title="Cost per unit, without GST, of the stock you had when you started using the app. Purchases never change it. It values your opening stock in the profit and loss and balance sheet." />
                   <p className="field-hint">Cost (without GST) of the stock you started with; purchases never change it.</p>
+                </div>
+              )}
+              {form.kind !== 'service' && getStockMethod() === 'fixed' && (
+                <div className="form-group">
+                  <label className="form-label" htmlFor="stock-rate">Fixed stock rate (per unit)</label>
+                  <input id="stock-rate" type="number" className="form-input" value={form.stockRate ?? ''}
+                    onChange={e => updateField('stockRate', e.target.value)} placeholder="0.00" min="0" step="any" />
+                  <p className="field-hint">Closing stock is valued at this rate (Final accounts: Fixed rate). Empty: the opening stock cost.</p>
                 </div>
               )}
               <div className="form-group">

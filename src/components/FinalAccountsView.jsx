@@ -6,7 +6,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { FileSpreadsheet, Lock, Unlock, CheckCircle, AlertTriangle, Download, BookOpen } from 'lucide-react';
 import { exportAllData } from '../store';
 import { formatCurrency, getFYOptions } from '../utils';
-import { trialBalance, profitAndLoss, balanceSheet, accountBalances, ACCOUNT_GROUPS, side, openingStockWarnings } from '../utils/ledgers';
+import { trialBalance, profitAndLoss, balanceSheet, accountBalances, ACCOUNT_GROUPS, side, openingStockWarnings, STOCK_METHODS, stockMethodName } from '../utils/ledgers';
+import { tradingBook, pnlBook, pnlModern, balanceSheetBook, balanceSheetModern, trialBalanceBook, bookExportRows, modernExportRows } from '../utils/statements';
+import { getStockMethod, setStockMethod } from '../utils/stockMethod';
 import { caPackSheets } from '../utils/caPack';
 import { buildWorkbook } from '../utils/xlsx';
 import { openLedger } from '../utils/openLedger';
@@ -17,7 +19,10 @@ import TableExport from './TableExport';
 import { toast } from './Toast';
 import { confirmAction } from './ConfirmModal';
 
-const TABS = [['tb', 'Trial balance'], ['pl', 'Profit & loss'], ['bs', 'Balance sheet'], ['ye', 'Year end']];
+const TABS = [['tb', 'Trial balance'], ['trading', 'Trading account'], ['pl', 'Profit & loss'], ['bs', 'Balance sheet'], ['ye', 'Year end']];
+const VIEW_KEY = 'divtech_finalAccountsView';
+const readView = () => { try { return localStorage.getItem(VIEW_KEY) === 'modern' ? 'modern' : 'book'; } catch { return 'book'; } };
+const showDate = (d) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 const right = { textAlign: 'right', whiteSpace: 'nowrap' };
 const muted = { color: 'var(--text-muted)', fontSize: '0.8rem' };
 const money = (v) => formatCurrency(v);
@@ -27,7 +32,7 @@ const save = (bytes, name, type) => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 // Ledger ids the statements can open (opening stock and earlier profit cannot).
-const canOpen = (id) => id && !['pl-earlier', 'pl-period', 'closing-stock', 'stock'].includes(id);
+const canOpen = (id) => id && !['pl-earlier', 'pl-period', 'closing-stock', 'stock', 'stock-open'].includes(id);
 
 export default function FinalAccountsView({ onOpenView }) {
   const { data, profile } = useBooks();
@@ -35,25 +40,39 @@ export default function FinalAccountsView({ onOpenView }) {
   const [fy, setFy] = useState(fyOptions[0].value);
   const [tab, setTab] = useState('tb');
   const [closed, setClosed] = useState({});
-  const period = fyOptions.find((f) => f.value === fy) || fyOptions[0];
-  const range = { from: period.from, to: period.to };
+  // Divtech Hisaab - any dates, as in Tally / Miracle: the profit & loss for
+  // from -> to and every balance as on the "to" date. A financial year is the
+  // quick choice; the year end and closing always work on a whole year.
+  const [custom, setCustom] = useState(false);
+  const [dates, setDates] = useState(() => ({ from: fyOptions[0].from, to: fyOptions[0].to }));
+  // Book view (T-form, debit left / credit right) or modern (vertical).
+  const [view, setViewState] = useState(readView);
+  const setView = (v) => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* blocked */ } };
+  const [method, setMethod] = useState(getStockMethod);
+  const fyPeriod = fyOptions.find((f) => f.value === fy) || fyOptions[0];
+  const range = custom && dates.from && dates.to && dates.from <= dates.to ? { from: dates.from, to: dates.to } : { from: fyPeriod.from, to: fyPeriod.to };
+  // The year the "to" date falls in: for the year end tab and closing.
+  const period = custom ? (fyOptions.find((f) => range.to >= f.from && range.to <= f.to) || fyPeriod) : fyPeriod;
   const fyShort = period.label.replace(/^FY /, '');
+  const rangeLabel = custom ? `${showDate(range.from)} to ${showDate(range.to)}` : period.label;
 
   useEffect(() => { if (profile) getClosedYears().then((all) => setClosed(closedYearsOf(all, profile))).catch(() => {}); }, [profile]);
 
-  const tb = useMemo(() => (data ? trialBalance(data, range) : null), [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
-  const pl = useMemo(() => (data ? profitAndLoss(data, range) : null), [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tb = useMemo(() => (data ? trialBalance(data, range) : null), [data, range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pl = useMemo(() => (data ? profitAndLoss(data, range) : null), [data, range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
   // Divtech Hisaab - opening stock with no purchase price (profit estimated).
   const stockWarn = useMemo(() => (data ? openingStockWarnings(data) : []), [data]);
-  const bs = useMemo(() => (data ? balanceSheet(data, range) : null), [data, fy]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bs = useMemo(() => (data ? balanceSheet(data, range) : null), [data, range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const subtitle = [profile?.businessName, period.label].filter(Boolean).join(', ');
-  const fileTag = `${(profile?.businessName || 'Business').replace(/[^\w]+/g, '-')}-${fyShort}`;
+  const subtitle = [profile?.businessName, profile?.gstin && `GSTIN ${profile.gstin}`, rangeLabel].filter(Boolean).join(', ');
+  const fileTag = `${(profile?.businessName || 'Business').replace(/[^\w]+/g, '-')}-${custom ? `${range.from}-to-${range.to}` : fyShort}`;
+  const changeMethod = (m) => { setMethod(m); setStockMethod(m); toast(`Closing stock now valued by ${stockMethodName(m)}`, 'success'); };
+  const stockNote = `Closing stock is valued at cost (without GST) by the ${stockMethodName(method)} method.`;
 
   const downloadPack = () => {
-    const sheets = caPackSheets(data, { ...range, profile, title: `Accounts for ${period.label}` });
+    const sheets = caPackSheets(data, { ...range, profile, title: `Accounts for ${rangeLabel}` });
     save(buildWorkbook(sheets), `CA-pack-${fileTag}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    toast(`CA pack for ${period.label} downloaded: ${sheets.length} sheets`, 'success');
+    toast(`CA pack for ${rangeLabel} downloaded: ${sheets.length} sheets`, 'success');
   };
   const downloadBackup = async () => {
     try {
@@ -111,14 +130,45 @@ export default function FinalAccountsView({ onOpenView }) {
       <div className="page-header">
         <div>
           <h1 className="page-title">Final accounts <HelpButton title="Final accounts" doc="final-accounts" size={16} /></h1>
-          <p className="page-subtitle">Trial balance, profit &amp; loss, balance sheet and the year end</p>
+          <p className="page-subtitle">Trial balance, trading account, profit &amp; loss, balance sheet and the year end, for a year or any dates</p>
         </div>
         <div className="flex gap-2" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-          <select className="filter-select" value={fy} onChange={(e) => setFy(e.target.value)} aria-label="Financial year">
-            {fyOptions.map((f) => <option key={f.value} value={f.value}>{f.label}{closed[f.label.replace(/^FY /, '')] ? ' (closed)' : ''}</option>)}
-          </select>
           <button type="button" className="btn btn-primary" onClick={downloadPack} disabled={!data}><FileSpreadsheet size={16} /> CA pack (Excel)</button>
         </div>
+      </div>
+
+      <div className="glass-panel p-4 mb-4">
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <label className="form-label" htmlFor="fa-period" style={{ fontSize: '0.72rem' }}>Period</label>
+            <select id="fa-period" className="filter-select" value={custom ? 'custom' : fy} onChange={(e) => {
+              if (e.target.value === 'custom') { setCustom(true); setDates({ from: fyPeriod.from, to: fyPeriod.to }); } else { setCustom(false); setFy(e.target.value); }
+            }}>
+              {fyOptions.map((f) => <option key={f.value} value={f.value}>{f.label}{closed[f.label.replace(/^FY /, '')] ? ' (closed)' : ''}</option>)}
+              <option value="custom">Choose dates (from / to)</option>
+            </select>
+          </div>
+          {custom && <>
+            <div><label className="form-label" htmlFor="fa-from" style={{ fontSize: '0.72rem' }}>From</label>
+              <input id="fa-from" type="date" className="form-input" value={dates.from} onChange={(e) => setDates((d) => ({ ...d, from: e.target.value }))} /></div>
+            <div><label className="form-label" htmlFor="fa-to" style={{ fontSize: '0.72rem' }}>To (balances as on)</label>
+              <input id="fa-to" type="date" className="form-input" value={dates.to} onChange={(e) => setDates((d) => ({ ...d, to: e.target.value }))} /></div>
+          </>}
+          <div>
+            <label className="form-label" htmlFor="fa-view" style={{ fontSize: '0.72rem' }}>View</label>
+            <select id="fa-view" className="filter-select" value={view} onChange={(e) => setView(e.target.value)}>
+              <option value="book">Book (debit left, credit right)</option>
+              <option value="modern">Modern (one column)</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="fa-method" style={{ fontSize: '0.72rem' }}>Closing stock method</label>
+            <select id="fa-method" className="filter-select" value={method} onChange={(e) => changeMethod(e.target.value)}>
+              {STOCK_METHODS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+        {custom && dates.from > dates.to && <p style={{ ...muted, color: 'var(--danger)', margin: '0.5rem 0 0' }}>"From" is after "To": showing {fyPeriod.label}.</p>}
       </div>
 
       <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -131,86 +181,71 @@ export default function FinalAccountsView({ onOpenView }) {
           {tab === 'tb' && (
             <div className="glass-panel">
               <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h3>Trial balance <span style={muted}>· as on {period.to}</span>
+                <h3>Trial balance <span style={muted}>· as on {showDate(range.to)}{custom ? ` (income and expenses from ${showDate(range.from)})` : ''}</span>
                   {Math.abs(tb.difference) >= 0.005 && <span style={{ ...muted, color: 'var(--danger)', display: 'block' }}>Does not agree: off by {money(tb.difference)}</span>}</h3>
-                <TableExport title="Trial balance" subtitle={subtitle} filename={`Trial-balance-${fileTag}`} headers={['Group', 'Account', 'Debit', 'Credit']}
-                  rows={[...tb.rows.map((r) => [ACCOUNT_GROUPS[r.group]?.name || r.group, r.name, r.net > 0 ? r.net : '', r.net < 0 ? -r.net : '']), ['', 'Total', tb.dr, tb.cr]]} />
+                <TableExport title={`Trial balance as on ${showDate(range.to)}`} subtitle={subtitle} filename={`Trial-balance-${fileTag}`} headers={['Particulars', 'Debit', 'Credit']}
+                  rows={[...trialBalanceBook(tb, (g) => ACCOUNT_GROUPS[g]?.name || g).map((l) => [`${l.indent ? '   ' : ''}${l.label}`, l.dr || '', l.cr || '']), ['Total', tb.dr, tb.cr]]} />
               </div>
               <div className="table-scroll">
-                <table className="data-table" style={{ minWidth: 620 }}>
-                  <thead><tr><th>Account</th><th>Group</th><th style={right}>Debit</th><th style={right}>Credit</th></tr></thead>
-                  <tbody>
-                    {tb.rows.map((r) => (
-                      <tr key={r.id}>
-                        <td className="font-medium">{nameCell(r.id, r.name)}</td>
-                        <td style={muted}>{ACCOUNT_GROUPS[r.group]?.name || r.group}</td>
-                        <td style={right}>{r.net > 0 ? money(r.net) : ''}</td>
-                        <td style={right}>{r.net < 0 ? money(-r.net) : ''}</td>
-                      </tr>
-                    ))}
-                    <tr style={{ fontWeight: 700 }}><td>Total</td><td /><td style={right}>{money(tb.dr)}</td><td style={right}>{money(tb.cr)}</td></tr>
-                  </tbody>
-                </table>
+                {view === 'book' ? (
+                  <table className="data-table" style={{ minWidth: 620 }}>
+                    <thead><tr><th>Particulars</th><th style={right}>Debit (₹)</th><th style={right}>Credit (₹)</th></tr></thead>
+                    <tbody>
+                      {trialBalanceBook(tb, (g) => ACCOUNT_GROUPS[g]?.name || g).map((l, i) => (
+                        <tr key={`${l.label}-${i}`} style={l.head ? { fontWeight: 700, background: 'var(--bg-secondary, rgba(0,0,0,0.03))' } : undefined}>
+                          <td style={{ paddingLeft: l.indent ? '1.75rem' : undefined }}>{l.head ? l.label : nameCell(l.id, l.label)}</td>
+                          <td style={right}>{l.dr ? money(l.dr) : ''}</td>
+                          <td style={right}>{l.cr ? money(l.cr) : ''}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ fontWeight: 700, borderTop: '2px solid var(--border)' }}><td>Total</td><td style={right}>{money(tb.dr)}</td><td style={right}>{money(tb.cr)}</td></tr>
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="data-table" style={{ minWidth: 620 }}>
+                    <thead><tr><th>Account</th><th>Group</th><th style={right}>Debit</th><th style={right}>Credit</th></tr></thead>
+                    <tbody>
+                      {tb.rows.map((r) => (
+                        <tr key={r.id}>
+                          <td className="font-medium">{nameCell(r.id, r.name)}</td>
+                          <td style={muted}>{ACCOUNT_GROUPS[r.group]?.name || r.group}</td>
+                          <td style={right}>{r.net > 0 ? money(r.net) : ''}</td>
+                          <td style={right}>{r.net < 0 ? money(-r.net) : ''}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ fontWeight: 700 }}><td>Total</td><td /><td style={right}>{money(tb.dr)}</td><td style={right}>{money(tb.cr)}</td></tr>
+                    </tbody>
+                  </table>
+                )}
               </div>
-              <p style={{ ...muted, padding: '0.75rem 1rem' }}>Closing stock on {period.to}: {money(tb.closingStock)} (at average purchase cost, without GST). Income and expense accounts show this year only; earlier years' profit is in one line. Click an account to open its ledger.</p>
+              <p style={{ ...muted, padding: '0.75rem 1rem' }}>Closing stock on {showDate(range.to)}: {money(tb.closingStock)}. {stockNote} Income and expense accounts show {custom ? 'the dates picked' : 'this year'} only; profit before that is in one line. Click an account to open its ledger.</p>
             </div>
           )}
 
-          {(tab === 'pl' || tab === 'bs') && stockWarn.length > 0 && (
+          {['trading', 'pl', 'bs'].includes(tab) && stockWarn.length > 0 && (
             <div className="notice notice-warning" style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.75rem' }}>
               <strong>Opening stock without an opening stock cost:</strong>{' '}
               {stockWarn.map((w) => `${w.name} ${w.qty} ${w.unit || ''} ${w.how === 'first-purchase' ? `valued at the first purchase rate ${formatCurrency(w.rate)}` : 'valued at zero (never bought)'}`).join('; ')}.
               Stock and profit are only as right as this cost: open <b>Products</b>, edit each one (or use Bulk edit) and enter its <b>Opening stock cost</b> (cost per unit without GST on the day you started).
             </div>
           )}
+          {tab === 'trading' && (
+            <Statement title="Trading account" period={`for the period ${showDate(range.from)} to ${showDate(range.to)}`} subtitle={subtitle} fileTag={fileTag} view={view} nameCell={nameCell}
+              book={tradingBook(pl)} modern={pnlModern(pl).slice(0, pnlModern(pl).findIndex((l) => l.label === 'Profit & loss account'))}
+              note={<>{pl.grossProfit >= 0 ? 'Gross profit' : 'Gross loss'}: <strong>{money(Math.abs(pl.grossProfit))}</strong>. Sales and purchases are without GST. {stockNote}</>} />
+          )}
+
           {tab === 'pl' && (
-            <div className="glass-panel">
-              <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h3>Trading and profit &amp; loss account <span style={muted}>· {period.from} to {period.to}</span></h3>
-                <TableExport title="Profit and loss account" subtitle={subtitle} filename={`Profit-and-loss-${fileTag}`} headers={['Particulars', 'Amount', 'Total']}
-                  rows={caPackSheets(data, { ...range, profile }).find((s) => s.name === 'Profit and loss').rows.slice(1)} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', padding: '1rem' }}>
-                <Side title="Debit" rows={[
-                  ['Opening stock', pl.openingStock, null],
-                  ...pl.purchases.map((r) => [r.name, r.net, r.id]), ...pl.directExpenses.map((r) => [r.name, r.net, r.id]),
-                  ...(pl.grossProfit >= 0 ? [['Gross profit c/o', pl.grossProfit, null, true]] : []),
-                ]} nameCell={nameCell} />
-                <Side title="Credit" rows={[
-                  ...pl.sales.map((r) => [r.name, -r.net, r.id]), ...pl.directIncomes.map((r) => [r.name, -r.net, r.id]),
-                  ['Closing stock', pl.closingStock, null],
-                  ...(pl.grossProfit < 0 ? [['Gross loss c/o', -pl.grossProfit, null, true]] : []),
-                ]} nameCell={nameCell} />
-                <Side title="Expenses" rows={[
-                  ...(pl.grossProfit < 0 ? [['Gross loss b/f', -pl.grossProfit, null]] : []),
-                  ...pl.indirectExpenses.map((r) => [r.name, r.net, r.id]),
-                  ...(pl.netProfit >= 0 ? [['Net profit', pl.netProfit, null, true]] : []),
-                ]} nameCell={nameCell} />
-                <Side title="Incomes" rows={[
-                  ...(pl.grossProfit >= 0 ? [['Gross profit b/f', pl.grossProfit, null]] : []),
-                  ...pl.indirectIncomes.map((r) => [r.name, -r.net, r.id]),
-                  ...(pl.netProfit < 0 ? [['Net loss', -pl.netProfit, null, true]] : []),
-                ]} nameCell={nameCell} />
-              </div>
-              <p style={{ ...muted, padding: '0 1rem 1rem' }}>
-                {pl.netProfit >= 0 ? 'Net profit' : 'Net loss'} for {period.label}: <strong>{money(Math.abs(pl.netProfit))}</strong>. Sales and purchases are without GST; GST is in the duties and taxes accounts.
-              </p>
-            </div>
+            <Statement title={view === 'book' ? 'Profit & loss account' : 'Trading and profit & loss account'} period={`for the period ${showDate(range.from)} to ${showDate(range.to)}`} subtitle={subtitle} fileTag={fileTag} view={view} nameCell={nameCell}
+              book={pnlBook(pl)} modern={pnlModern(pl)} before={view === 'book' ? tradingBook(pl) : null}
+              note={<>{pl.netProfit >= 0 ? 'Net profit' : 'Net loss'} for {rangeLabel}: <strong>{money(Math.abs(pl.netProfit))}</strong>, transferred to the capital account. Sales and purchases are without GST; GST is in the duties and taxes accounts. {stockNote}</>} />
           )}
 
           {tab === 'bs' && (
-            <div className="glass-panel">
-              <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h3>Balance sheet <span style={muted}>· as on {period.to}</span>
-                  {Math.abs(bs.difference) >= 0.005 && <span style={{ ...muted, color: 'var(--danger)', display: 'block' }}>Does not agree: off by {money(bs.difference)}</span>}</h3>
-                <TableExport title="Balance sheet" subtitle={subtitle} filename={`Balance-sheet-${fileTag}`} headers={['Particulars', 'Amount', 'Total']}
-                  rows={caPackSheets(data, { ...range, profile }).find((s) => s.name === 'Balance sheet').rows.slice(1)} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', padding: '1rem' }}>
-                <Groups title="Liabilities" groups={bs.liabilities} total={bs.totalLiabilities} nameCell={nameCell} />
-                <Groups title="Assets" groups={bs.assets} total={bs.totalAssets} nameCell={nameCell} />
-              </div>
-            </div>
+            <Statement title="Balance sheet" period={`as on ${showDate(range.to)}`} subtitle={subtitle} fileTag={fileTag} view={view} nameCell={nameCell}
+              book={balanceSheetBook(bs)} modern={balanceSheetModern(bs)}
+              warn={Math.abs(bs.difference) >= 0.005 ? `Does not agree: off by ${money(bs.difference)}` : ''}
+              note={<>{stockNote} Customers who paid in advance and suppliers paid in advance are shown on the other side. Profit up to {showDate(range.to)} is in the capital account.</>} />
           )}
 
           {tab === 'ye' && (
@@ -248,43 +283,79 @@ export default function FinalAccountsView({ onOpenView }) {
   );
 }
 
-function Side({ title, rows, nameCell }) {
-  const total = rows.reduce((s, r) => s + (Number(r[1]) || 0), 0);
+function Statement({ title, period, subtitle, fileTag, view, nameCell, book, modern, before, note, warn }) {
+  const headers = [book.leftTitle ? `${book.leftTitle}` : 'Dr. Particulars', 'Amount (₹)', book.rightTitle ? `${book.rightTitle}` : 'Cr. Particulars', 'Amount (₹)'];
+  const exportRows = view === 'book'
+    ? [...(before ? [[before.title, '', '', ''], ...bookExportRows(before), ['', '', '', '']] : []), ...(before ? [[book.title, '', '', '']] : []), ...bookExportRows(book)]
+    : modernExportRows(modern);
   return (
-    <div>
-      <table className="data-table" style={{ minWidth: 0 }}>
-        <thead><tr><th>{title}</th><th style={right}>Amount</th></tr></thead>
+    <div className="glass-panel">
+      <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h3>{title} <span style={muted}>· {period}</span>{warn && <span style={{ ...muted, color: 'var(--danger)', display: 'block' }}>{warn}</span>}</h3>
+        <TableExport title={`${title} ${period}`} subtitle={subtitle} filename={`${title.replace(/[^\w]+/g, '-')}-${fileTag}`}
+          headers={view === 'book' ? headers : ['Particulars', 'Amount (₹)']} rows={exportRows} landscape={view === 'book'} />
+      </div>
+      <div style={{ padding: '1rem' }}>
+        {view === 'book' ? (
+          <>
+            {before && <BookTable book={before} nameCell={nameCell} />}
+            <BookTable book={book} nameCell={nameCell} />
+          </>
+        ) : <ModernTable rows={modern} nameCell={nameCell} />}
+      </div>
+      {note && <p style={{ ...muted, padding: '0 1rem 1rem', margin: 0 }}>{note}</p>}
+    </div>
+  );
+}
+
+// T-form: debit / liabilities on the left, credit / assets on the right, both
+// sides padded to the same length so the totals line up as in a book.
+function BookTable({ book, nameCell }) {
+  const n = Math.max(book.left.length, book.right.length);
+  const sideCells = (l, key) => {
+    if (!l) return [<td key={`${key}a`} />, <td key={`${key}b`} />, <td key={`${key}c`} style={{ borderRight: key === 'L' ? '2px solid var(--border)' : undefined }} />];
+    const inner = l.indent && !l.head;
+    return [
+      <td key={`${key}a`} style={{ paddingLeft: l.indent ? '1.5rem' : undefined, fontWeight: l.head || l.bold ? 700 : 400 }}>{l.head ? l.label : nameCell(l.id, l.label)}</td>,
+      <td key={`${key}b`} style={{ ...right, color: 'var(--text-secondary)' }}>{inner ? money(l.amount) : ''}</td>,
+      <td key={`${key}c`} style={{ ...right, fontWeight: l.head || l.bold ? 700 : 400, borderRight: key === 'L' ? '2px solid var(--border)' : undefined }}>{inner ? '' : (l.head && !l.groupTotal ? '' : money(l.amount))}</td>,
+    ];
+  };
+  return (
+    <div className="table-scroll" style={{ marginBottom: '1rem' }}>
+      <table className="data-table" style={{ minWidth: 820 }}>
+        <thead>
+          {book.title && <tr><th colSpan={6} style={{ textAlign: 'center', fontSize: '0.95rem' }}>{book.title}</th></tr>}
+          <tr>
+            <th>{book.leftTitle || 'Dr.'}</th><th style={right} /><th style={{ ...right, borderRight: '2px solid var(--border)' }}>₹</th>
+            <th>{book.rightTitle || 'Cr.'}</th><th style={right} /><th style={right}>₹</th>
+          </tr>
+        </thead>
         <tbody>
-          {rows.map(([name, amount, id, bold], i) => (
-            <tr key={`${name}-${i}`} style={bold ? { fontWeight: 700 } : undefined}><td>{nameCell(id, name)}</td><td style={right}>{money(amount)}</td></tr>
-          ))}
-          <tr style={{ fontWeight: 700, borderTop: '2px solid var(--border)' }}><td>Total</td><td style={right}>{money(total)}</td></tr>
+          {Array.from({ length: n }, (_, i) => <tr key={i}>{sideCells(book.left[i], 'L')}{sideCells(book.right[i], 'R')}</tr>)}
+          <tr style={{ fontWeight: 800, borderTop: '2px solid var(--border)', borderBottom: '3px double var(--border)' }}>
+            <td>Total</td><td /><td style={{ ...right, borderRight: '2px solid var(--border)' }}>{money(book.totalLeft)}</td>
+            <td>Total</td><td /><td style={right}>{money(book.totalRight)}</td>
+          </tr>
         </tbody>
       </table>
     </div>
   );
 }
 
-function Groups({ title, groups, total, nameCell }) {
+function ModernTable({ rows, nameCell }) {
   return (
-    <div>
-      <table className="data-table" style={{ minWidth: 0 }}>
-        <thead><tr><th>{title}</th><th style={right}>Amount</th><th style={right}>Total</th></tr></thead>
-        <tbody>
-          {groups.map((g) => (
-            <GroupRows key={g.group + g.name} g={g} nameCell={nameCell} />
-          ))}
-          <tr style={{ fontWeight: 700, borderTop: '2px solid var(--border)' }}><td>Total</td><td /><td style={right}>{money(total)}</td></tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
-function GroupRows({ g, nameCell }) {
-  return (
-    <>
-      <tr style={{ fontWeight: 600 }}><td>{g.name}</td><td /><td style={right}>{money(g.total)}</td></tr>
-      {g.items.map((i) => <tr key={i.id + i.name}><td style={{ paddingLeft: '1.5rem' }}>{nameCell(i.id, i.name)}</td><td style={right}>{money(i.amount)}</td><td /></tr>)}
-    </>
+    <table className="data-table" style={{ minWidth: 0, maxWidth: 720 }}>
+      <thead><tr><th>Particulars</th><th style={right}>₹</th><th style={right}>₹</th></tr></thead>
+      <tbody>
+        {rows.map((l, i) => (
+          <tr key={`${l.label}-${i}`} style={l.head && !l.groupTotal ? { background: 'var(--bg-secondary, rgba(0,0,0,0.03))' } : l.total ? { borderTop: '1px solid var(--border)' } : undefined}>
+            <td style={{ paddingLeft: `${0.75 + (l.indent || 0) * 1.25}rem`, fontWeight: l.head || l.bold || l.total ? 700 : 400 }}>{l.head ? l.label : nameCell(l.id, l.label)}</td>
+            <td style={{ ...right, color: 'var(--text-secondary)' }}>{!l.head && !l.total ? money(l.amount) : ''}</td>
+            <td style={{ ...right, fontWeight: 700 }}>{l.total || l.groupTotal ? money(l.amount) : ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

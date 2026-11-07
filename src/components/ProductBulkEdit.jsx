@@ -21,6 +21,8 @@ const FIELDS = [
   ['stock', 'Stock', 'number', 80],
   // Divtech Hisaab - cost per unit of the stock you started with.
   ['openingCost', 'Opening stock cost', 'number', 110],
+  // Used only when the closing stock method is Fixed rate.
+  ['stockRate', 'Fixed stock rate', 'number', 100],
 ];
 
 const valueOf = (p, k) => {

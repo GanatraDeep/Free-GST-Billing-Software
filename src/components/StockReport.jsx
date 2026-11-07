@@ -7,7 +7,8 @@ import { Package } from 'lucide-react';
 import { getAllBills, getAllProducts, getAllPurchases, getAllProductions, getAllStockAdjustments } from '../store';
 import { localToday } from '../utils';
 import { closingStock, stockValueOf } from '../utils/products';
-import { itemLedger } from '../utils/ledgers';
+import { itemLedger, stockMethodName } from '../utils/ledgers';
+import { getStockMethod } from '../utils/stockMethod';
 import { toast } from './Toast';
 import TableExport from './TableExport';
 import HelpButton from './HelpButton';
@@ -43,11 +44,12 @@ export default function StockReport({ businessName }) {
 
   const asOf = monthEnd(month);
   const qty = closingStock(data.products, data.bills, data.purchases, asOf, data.productions, data.stockAdjustments);
-  // Divtech Hisaab - valued at the average purchase cost on that date, the
-  // same as the closing stock in the balance sheet; a product never bought
-  // falls back to its purchase price, then its selling price.
+  // Divtech Hisaab - valued by the closing stock method (Final accounts),
+  // on that date, the same as the closing stock in the balance sheet; a
+  // product never bought falls back to its purchase price, then selling price.
+  const method = getStockMethod();
   const avgOn = (p) => {
-    const { rows: led } = itemLedger(p, data);
+    const { rows: led } = itemLedger(p, { ...data, stockMethod: method });
     let last = null;
     for (const r of led) if (String(r.date) <= asOf) last = r;
     return last && last.avgCost > 0 ? last.avgCost : 0;
@@ -82,7 +84,7 @@ export default function StockReport({ businessName }) {
             {lastMonths.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
           <TableExport title={`Closing stock ${asOfLabel}`} filename={`Closing-stock-${asOf}`}
-            subtitle={`${businessName ? `${businessName}, ` : ''}closing stock as on ${asOfLabel}, valued at average purchase cost`}
+            subtitle={`${businessName ? `${businessName}, ` : ''}closing stock as on ${asOfLabel}, valued by ${stockMethodName(method)}`}
             headers={['Product', 'HSN/SAC', 'Unit', 'Closing qty', 'Rate', 'Value']} rows={rows.length ? exportRows : []} />
         </div>
       </div>
@@ -118,7 +120,7 @@ export default function StockReport({ businessName }) {
       )}
       <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0 1.25rem 1rem', margin: 0 }}>
         Worked back from today&apos;s stock using the dates of your invoices, purchase bills{data.productions.length ? ' and production entries' : ''}. Stock you typed in by hand on the Products screen has no date, so it counts as if it changed today.
-        Value is at the average purchase cost (without GST) on that date, the same as the closing stock in Final accounts; * means the product was never bought and has no purchase price, so the selling price is used. Negative stock is shown in red and not counted in the total.
+        Value is by the closing stock method chosen in Final accounts ({stockMethodName(method)}), without GST, on that date: the same as the closing stock in Final accounts. * means the product was never bought and has no purchase price, so the selling price is used. Negative stock is shown in red and not counted in the total.
       </p>
     </div>
   );

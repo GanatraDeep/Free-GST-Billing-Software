@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Wallet, BarChart3, Clock, Search, X, Users, P
 import { getAllBills, getAllExpenses, getAllPurchases, getAllProducts, getAllStockAdjustments, getProfile } from '../store';
 import { costOfGoodsSold, stockAdjustmentLoss } from '../utils/ledgers';
 import { booksPnl } from '../utils/reportsPnl';
+import { getStockMethod } from '../utils/stockMethod';
 import useBooks from './useBooks';
 import { formatCurrency, getFYOptions, belongsToProfile, isCancelledBill, salesSign, countsAsSales, calculateLineItemTax, roundQty, parseLocalDate, amountDue } from '../utils';
 import { toast } from './Toast';
@@ -177,11 +178,11 @@ export default function ReportsView() {
   // invoices only, so it is left out when another currency is shown.
   const cogsOn = shownCurrency === 'INR';
   const cogs = cogsOn
-    ? costOfGoodsSold({ bills: allInInr ? bills : bills.filter(b => getBillCurrency(b) === 'INR'), purchases, products, stockAdjustments: adjustments }, periodRange)
+    ? costOfGoodsSold({ bills: allInInr ? bills : bills.filter(b => getBillCurrency(b) === 'INR'), purchases, products, stockAdjustments: adjustments, stockMethod: getStockMethod() }, periodRange)
     : { cost: 0, noCost: 0, byMonth: {} };
   const grossProfit = revenueExTax - cogs.cost;
   // Divtech Hisaab - stock shortage / wastage less excess found, at average cost.
-  const stockLoss = cogsOn ? stockAdjustmentLoss({ bills, purchases, products, stockAdjustments: adjustments }, periodRange) : 0;
+  const stockLoss = cogsOn ? stockAdjustmentLoss({ bills, purchases, products, stockAdjustments: adjustments, stockMethod: getStockMethod() }, periodRange) : 0;
   const netProfit = grossProfit - expenseExGST - stockLoss;
   // Rupees only (the books are in rupees): the statement, cards and months
   // come from the books. With invoices in more than one currency the old

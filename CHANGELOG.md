@@ -4,6 +4,44 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.16.0] - 2026-11-08
+
+### How to update
+
+**Current version:** 1.15.1  →  **New version:** 1.16.0
+
+1. Open the app and click **Update to v1.16.0** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **Closing stock method**, as in Tally and Miracle: **Weighted average**
+  (as before), **FIFO**, **Last purchase rate** or **Fixed rate** (a
+  Fixed stock rate on each product). Chosen at the top of Final accounts,
+  it values stock in Final accounts, Reports, the stock report, item
+  ledgers and the CA pack, and the statements say which method is used.
+- **Final accounts for any dates**: pick a financial year or **Choose
+  dates (from / to)**. The trial balance and balance sheet show every
+  balance as on the "To" date, for tallying on any day; the trading and
+  profit & loss account cover the dates picked, with profit before them in
+  the capital account.
+- **Book view**: the T-form as written in an account book, debit on the
+  left and credit on the right ("To ..." / "By ...", gross profit c/d and
+  b/d, equal totals), for the trading account, profit & loss account and
+  balance sheet (liabilities | assets), and a trial balance grouped with
+  group totals. **Modern view** (one column, as in Schedule III) is the
+  other choice; the screen remembers it. Print, Excel and CSV follow the view.
+- **Trading account** tab of its own.
+- CA-ready: the capital account is laid out with net profit added and
+  drawings taken off; statements carry the business name, GSTIN and period;
+  a note names the stock valuation method; the CA pack adds the trading and
+  profit & loss account and the balance sheet in book form.
+
+---
+
 ## [1.15.1] - 2026-11-07
 
 ### How to update

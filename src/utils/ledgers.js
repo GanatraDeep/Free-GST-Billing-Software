@@ -173,7 +173,7 @@ const CATEGORY_ACCOUNT = {
 
 // All postings of this business's records: [{ key, doc, account, date,
 // particulars, ref, dr, cr, view }]. Rupee documents only.
-export function postings({ bills = [], receipts = [], purchases = [], expenses = [], openings = [], cashEntries = [], vouchers = [], accounts = [], products = [], stockAdjustments = [], freight = [] } = {}) {
+export function postings({ bills = [], receipts = [], purchases = [], expenses = [], openings = [], cashEntries = [], vouchers = [], accounts = [], products = [], stockAdjustments = [], stockMethod = 'average', freight = [] } = {}) {
   const out = [];
   // amount > 0 debits the account, < 0 credits it.
   const post = (doc, account, amount, date, particulars, ref = '', view = '', key = '') => {
@@ -364,7 +364,7 @@ export function postings({ bills = [], receipts = [], purchases = [], expenses =
   // Opening stock: what was in stock before its first purchase or sale here.
   for (const pr of products) {
     if (pr?.kind === 'service') continue;
-    const L = itemLedger(pr, { bills, purchases, stockAdjustments });
+    const L = itemLedger(pr, { bills, purchases, stockAdjustments, stockMethod });
     // Adjustments: a shortage is an expense, an excess an income, both at
     // average cost; the closing stock already counts them.
     for (const r of L.rows.filter((x) => x.kind === 'adjust-out' || x.kind === 'adjust-in')) {
@@ -423,7 +423,22 @@ const productKeys = (product) => new Set([`id:${product.id}`, `name:${partyKey(p
 // Every stock movement of one product, oldest first, with the running quantity,
 // average cost (weighted, from purchases) and stock value. The first row is the
 // opening stock that makes the movements end at the product's current stock.
-export function itemLedger(product, { bills = [], purchases = [], stockAdjustments = [] } = {}) {
+// Divtech Hisaab - how closing stock is valued (as in Tally / Miracle):
+//   average  weighted average purchase cost (the default)
+//   fifo     first in, first out: what is left is the latest purchases
+//   last     every unit at the latest purchase rate up to that date
+//   fixed    every unit at the product's Fixed stock rate (stockRate);
+//            a product without one uses its opening stock cost / first rate
+export const STOCK_METHODS = [
+  ['average', 'Weighted average'],
+  ['fifo', 'FIFO (first in, first out)'],
+  ['last', 'Last purchase rate'],
+  ['fixed', 'Fixed rate (set on each product)'],
+];
+export const stockMethodName = (m) => (STOCK_METHODS.find(([k]) => k === m) || STOCK_METHODS[0])[1];
+const methodOf = (m) => (STOCK_METHODS.some(([k]) => k === m) ? m : 'average');
+
+export function itemLedger(product, { bills = [], purchases = [], stockAdjustments = [], stockMethod = 'average' } = {}) {
   const keys = productKeys(product);
   const moves = [];
   for (const p of purchases) {
@@ -489,50 +504,99 @@ export function itemLedger(product, { bills = [], purchases = [], stockAdjustmen
   else if (firstBuy) { openingRate = firstBuy.rate; openingEstimate = hasOpening ? 'first-purchase' : ''; }
   else if (typed > 0) openingRate = typed;
   else openingEstimate = hasOpening ? 'no-cost' : '';
+  const method = methodOf(stockMethod);
+  const fixedRate = r2(product.stockRate) || openingRate;
   let qty = openingQty;
-  let avg = openingRate;
-  const rows = [{ key: 'opening', date: moves[0]?.date || '', kind: 'opening', particulars: 'Opening stock', ref: '', qtyIn: openingQty > 0 ? openingQty : 0, qtyOut: openingQty < 0 ? -openingQty : 0, rate: openingRate, value: r2(openingQty * openingRate), balanceQty: openingQty, avgCost: avg, balanceValue: r2(openingQty * avg) }];
+  let avg = openingRate; // weighted average cost (method 'average')
+  let lastRate = openingRate; // latest purchase rate so far
+  // FIFO layers of stock on hand, oldest first: [{ q, rate }].
+  let layers = openingQty > 0 ? [{ q: openingQty, rate: openingRate }] : [];
+  const layerValue = () => layers.reduce((t, l) => t + l.q * l.rate, 0);
+  // Take n units off the front (FIFO); units beyond the layers cost the last rate.
+  const takeFront = (n) => {
+    let left = n; let cost = 0;
+    while (left > 0.0005 && layers.length) {
+      const l = layers[0]; const t = Math.min(l.q, left);
+      cost += t * l.rate; l.q = r3(l.q - t); left = r3(left - t);
+      if (l.q <= 0.0005) layers.shift();
+    }
+    return cost + Math.max(0, left) * lastRate;
+  };
+  const takeBack = (n) => { // a return to the supplier leaves from the latest purchases
+    let left = n;
+    while (left > 0.0005 && layers.length) {
+      const l = layers[layers.length - 1]; const t = Math.min(l.q, left);
+      l.q = r3(l.q - t); left = r3(left - t);
+      if (l.q <= 0.0005) layers.pop();
+    }
+  };
+  // Value of the stock on hand and the cost of one unit, by the method.
+  const stockVal = () => {
+    if (qty <= 0) return r2(qty * unitCost());
+    if (method === 'fifo') return r2(layerValue() + Math.max(0, qty - layers.reduce((t, l) => t + l.q, 0)) * lastRate);
+    return r2(qty * unitCost());
+  };
+  function unitCost() {
+    if (method === 'last') return lastRate;
+    if (method === 'fixed') return fixedRate;
+    if (method === 'fifo') { const q = layers.reduce((t, l) => t + l.q, 0); return q > 0.0005 ? layerValue() / q : lastRate; }
+    return avg;
+  }
+  const outCost = (n) => (method === 'fifo' ? takeFront(n) : n * unitCost());
+  const rows = [{ key: 'opening', date: moves[0]?.date || '', kind: 'opening', particulars: 'Opening stock', ref: '', qtyIn: openingQty > 0 ? openingQty : 0, qtyOut: openingQty < 0 ? -openingQty : 0, rate: method === 'fixed' ? fixedRate : openingRate, value: r2(openingQty * (method === 'fixed' ? fixedRate : openingRate)), balanceQty: openingQty, avgCost: r2(method === 'fixed' ? fixedRate : openingRate), balanceValue: r2(openingQty * (method === 'fixed' ? fixedRate : openingRate)) }];
   for (const m of moves) {
     let cost = 0;
     if (m.kind === 'purchase') {
       const inValue = m.qtyIn * m.rate;
       avg = qty + m.qtyIn > 0 ? (Math.max(0, qty) * avg + inValue) / (Math.max(0, qty) + m.qtyIn) : m.rate;
+      if (m.rate > 0) lastRate = m.rate;
+      // Stock below zero is made good first; the rest is a new layer.
+      const fill = qty < 0 ? Math.min(-qty, m.qtyIn) : 0;
+      if (m.qtyIn - fill > 0.0005) layers.push({ q: r3(m.qtyIn - fill), rate: m.rate });
       qty = r3(qty + m.qtyIn);
     } else if (m.kind === 'sale' || m.kind === 'challan') {
-      cost = r2(m.qtyOut * avg);
+      cost = r2(outCost(m.qtyOut));
       qty = r3(qty - m.qtyOut);
     } else if (m.kind === 'preturn' || m.kind === 'adjust-out') {
-      // Back to the supplier at its rate, or written off at average cost.
-      const outValue = m.kind === 'preturn' ? m.qtyOut * m.rate : m.qtyOut * avg;
+      // Back to the supplier at its rate, or written off at cost.
+      let outValue;
+      if (m.kind === 'preturn') { outValue = m.qtyOut * m.rate; if (method === 'fifo') takeBack(m.qtyOut); }
+      else outValue = outCost(m.qtyOut);
       const left = qty - m.qtyOut;
       avg = left > 0 ? Math.max(0, (qty * avg - outValue) / left) : avg;
       if (m.kind === 'adjust-out') m.value = r2(outValue);
       qty = r3(left);
     } else if (m.kind === 'adjust-in') {
-      m.value = r2(m.qtyIn * avg);
+      const rate = unitCost();
+      m.value = r2(m.qtyIn * rate);
+      if (method === 'fifo') layers.push({ q: m.qtyIn, rate });
       qty = r3(qty + m.qtyIn);
     } else {
-      cost = -r2(m.qtyIn * avg); // goods back: the cost comes back too
+      const rate = unitCost();
+      cost = -r2(m.qtyIn * rate); // goods back: the cost comes back too
+      if (method === 'fifo') layers.push({ q: m.qtyIn, rate });
       qty = r3(qty + m.qtyIn);
     }
     const value = m.kind === 'purchase' || m.kind === 'preturn' ? r2((m.qtyIn || m.qtyOut) * m.rate) : m.kind.startsWith('adjust') ? m.value : (m.saleValue || 0);
-    rows.push({ ...m, value, cost, balanceQty: qty, avgCost: r2(avg), balanceValue: r2(qty * avg) });
+    const bal = stockVal();
+    rows.push({ ...m, value, cost, balanceQty: qty, avgCost: r2(qty > 0.0005 ? bal / qty : unitCost()), balanceValue: bal });
   }
-  return { product, unit: product.unit || '', rows, closingQty: qty, avgCost: r2(avg), closingValue: r2(qty * avg), openingQty, openingRate, openingEstimate };
+  const closingValue = stockVal();
+  return { product, unit: product.unit || '', rows, closingQty: qty, avgCost: r2(qty > 0.0005 ? closingValue / qty : unitCost()), closingValue, openingQty, openingRate, openingEstimate, method };
 }
 
 // Cost of the goods sold in a period: each sale at the item's average purchase
 // cost at that time (returns on credit notes take it back). Lines for products
 // that are not in the product list, or have no cost at all, are counted in
 // `noCost` and add nothing. Rupee invoices only.
-export function costOfGoodsSold({ bills = [], purchases = [], products = [], stockAdjustments = [] } = {}, { from = '', to = '' } = {}) {
+export function costOfGoodsSold({ bills = [], purchases = [], products = [], stockAdjustments = [], stockMethod = 'average' } = {}, { from = '', to = '' } = {}) {
   let cost = 0;
   let noCost = 0;
   const byMonth = {};
   const inPeriod = (d) => (!from || d >= from) && (!to || d <= to);
   for (const product of products) {
     if (product?.kind === 'service') continue;
-    const { rows } = itemLedger(product, { bills, purchases, stockAdjustments });
+    const { rows } = itemLedger(product, { bills, purchases, stockAdjustments, stockMethod });
     for (const r of rows) {
       // A delivery challan moves goods but is not a sale.
       if ((r.kind !== 'sale' && r.kind !== 'return') || !inPeriod(r.date) || r.inr === false) continue;
@@ -594,22 +658,22 @@ export function buildLedger(id, data = {}) {
 // Products whose opening stock has no purchase price, so their value (and
 // the profit) is estimated: [{ id, name, unit, qty, rate, how }]
 // how: 'first-purchase' (valued at the first purchase rate) or 'no-cost' (at zero).
-export function openingStockWarnings({ products = [], bills = [], purchases = [], stockAdjustments = [] } = {}) {
+export function openingStockWarnings({ products = [], bills = [], purchases = [], stockAdjustments = [], stockMethod = 'average' } = {}) {
   const out = [];
   for (const pr of products) {
     if (pr?.kind === 'service') continue;
-    const L = itemLedger(pr, { bills, purchases, stockAdjustments });
+    const L = itemLedger(pr, { bills, purchases, stockAdjustments, stockMethod });
     if (L.openingEstimate) out.push({ id: pr.id, name: pr.name, unit: L.unit, qty: L.openingQty, rate: L.openingRate, how: L.openingEstimate });
   }
   return out;
 }
 
-export function stockValue({ products = [], bills = [], purchases = [], stockAdjustments = [] } = {}, onDate) {
+export function stockValue({ products = [], bills = [], purchases = [], stockAdjustments = [], stockMethod = 'average' } = {}, onDate) {
   let total = 0;
   const lines = [];
   for (const pr of products) {
     if (pr?.kind === 'service') continue;
-    const { rows, unit } = itemLedger(pr, { bills, purchases, stockAdjustments });
+    const { rows, unit } = itemLedger(pr, { bills, purchases, stockAdjustments, stockMethod });
     let last = null;
     for (const r of rows) if (onDate === undefined || String(r.date) <= onDate) last = r;
     if (!last) continue;
@@ -767,12 +831,12 @@ export function accountBalances(data = {}, to = '') {
 
 // Net loss from stock adjustments in a period (shortage minus excess), at
 // average cost. Reports' quick profit and loss shows it as its own line.
-export function stockAdjustmentLoss({ bills = [], purchases = [], products = [], stockAdjustments = [] } = {}, { from = '', to = '' } = {}) {
+export function stockAdjustmentLoss({ bills = [], purchases = [], products = [], stockAdjustments = [], stockMethod = 'average' } = {}, { from = '', to = '' } = {}) {
   if (!stockAdjustments.length) return 0;
   let loss = 0;
   for (const pr of products) {
     if (pr?.kind === 'service' || !stockAdjustments.some((a) => a.productId === pr.id)) continue;
-    for (const r of itemLedger(pr, { bills, purchases, stockAdjustments }).rows) {
+    for (const r of itemLedger(pr, { bills, purchases, stockAdjustments, stockMethod }).rows) {
       if (!r.kind?.startsWith('adjust') || (from && r.date < from) || (to && r.date > to)) continue;
       loss += r.kind === 'adjust-out' ? r.value : -r.value;
     }
