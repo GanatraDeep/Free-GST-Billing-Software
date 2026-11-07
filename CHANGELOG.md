@@ -4,6 +4,40 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.15.0] - 2026-11-07
+
+### How to update
+
+**Current version:** 1.14.3  →  **New version:** 1.15.0
+
+1. Open the app and click **Update to v1.15.0** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Added
+- **Rojmel (day book)**, a new item in the menu: money day by day as a
+  rojmel is kept on paper, with each day's opening, every jama (in) and
+  udhar (out) entry, the day's totals and the closing, which carries to the
+  next day. For Cash, Bank, any bank / CC account, or Cash + all banks (cash
+  deposited in the bank is then left out), for today, yesterday, this or last
+  month, the financial year or your own dates. Print and Excel.
+- **Day-wise summary** (second tab of Rojmel): one line per day with sales
+  before GST and the number of invoices, GST on sales, purchases and the
+  number of bills, expenses, and cash and bank in, out and closing, with
+  totals. Print and Excel.
+- **Dashboard totals of what is shown**: under the filters, the invoice list
+  now shows the Amount, Taxable value, GST, Received and Due of the invoices
+  the filters show, not only how many. Credit notes are taken off;
+  quotations, challans and cancelled invoices are not added (the bar says
+  how many); each currency has its own totals.
+- The README on GitHub now lists everything the app does and what is new in
+  each version.
+
+---
+
 ## [1.14.3] - 2026-11-02
 
 ### How to update

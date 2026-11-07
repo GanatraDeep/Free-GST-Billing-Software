@@ -243,6 +243,19 @@ export default [
 <p>Add your own lines the same way as in the Cash book: the bank balance today as <b>Money in</b>, category <b>Opening balance</b>, to start; then bank charges, interest and so on.</p>
 <p><b>Cash into the bank, and back.</b> In the Cash book, add a <b>Money out</b> line with category <b>Deposit to bank</b>: it shows in the Bank book as money in by itself. In the Bank book, a <b>Money out</b> line with category <b>Cash withdrawal</b> shows in the Cash book as money in. Enter each one once, in the book the money leaves.</p>
 </section>
+
+<section id="rojmel">
+<h2>Rojmel (day book)</h2>
+<p>${ui('Rojmel (day book)')} in the sidebar shows money day by day, the way a rojmel is kept on paper: for each day the <b>opening</b> balance, every entry with its <b>Jama (in)</b> or <b>Udhar (out)</b>, the day's totals and the <b>closing</b> balance, which is the next day's opening.</p>
+<ul>
+  <li><b>Dates</b>: Today (to start), Yesterday, This month, Last month, This financial year or your own dates. Everything before the first date is brought forward as the opening.</li>
+  <li><b>Account</b>: Cash (to start), Bank, any bank or CC account you added in <a href="accounts.html#bank-accounts">Accounts</a>, or <b>Cash + all banks</b>. With all of them, cash deposited in the bank is left out, as it only moves money between them.</li>
+  <li>Click a day to open or close its entries; ${ui('Collapse all')} / ${ui('Expand all')} does every day. Each entry says what it is: Sale, Received on invoice, Receipt, Payment, Expense, Freight, Cash / bank book or Voucher.</li>
+  <li>${ui('Print')} and ${ui('Excel')} give the rojmel for the dates picked, day by day with totals.</li>
+</ul>
+<p><b>Day-wise summary</b> (the second tab) gives one line per day: sales before GST and the number of invoices, GST on sales, purchases and the number of bills, expenses, cash in, out and closing, and bank in, out and closing, with totals. Sales are net of credit notes and purchases net of returns.</p>
+<p>Both are worked out from the same entries as the ledgers and final accounts, so the closing cash always agrees with the Cash ledger and the balance sheet.</p>
+</section>
 `,
 },
 

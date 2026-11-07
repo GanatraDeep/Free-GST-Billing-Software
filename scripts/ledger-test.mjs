@@ -282,6 +282,56 @@ console.log('\n[Cancelled invoice is undone, money too]');
   eq(lines(reused).some((l) => /RCP\/9/.test(l.label)), true, 'A receipt is kept when another invoice in force has the same number');
 }
 
+console.log('\n[Rojmel / day book]');
+{
+  const { rojmel, dayWiseSummary, rojmelAccounts, allMoneyIds } = await import('../src/utils/rojmel.js');
+  const d = {
+    bills: [
+      sale('R-1', '2026-11-02', 'Walk-in', 1, 2000, { status: 'paid', payments: [{ id: 'c1', amount: 2100, date: '2026-11-02', mode: 'cash', cashSale: true }] }),
+      sale('R-2', '2026-11-02', 'Mehta Stores', 2, 1000),
+      sale('R-3', '2026-11-03', 'Walk-in', 1, 1000, { status: 'paid', payments: [{ id: 'c3', amount: 1050, date: '2026-11-03', mode: 'cash', cashSale: true }] }),
+    ],
+    receipts: [{ id: 'r9', receiptNo: 'RCP/9', date: '2026-11-03', clientName: 'Mehta Stores', amount: 1000, paymentMode: 'upi', againstInvoice: 'R-2' }],
+    purchases: [], openings: [], vouchers: [], products: [oil],
+    expenses: [{ id: 'x1', date: '2026-11-03', category: 'Tea & snacks', amount: 150, paymentMode: 'cash' }],
+    cashEntries: [
+      { id: 'o1', type: 'in', date: '2026-10-31', amount: 5000, category: 'Opening balance' },
+      { id: 'd1', type: 'out', date: '2026-11-03', amount: 2000, category: 'Deposit to bank', name: 'SBI' },
+    ],
+  };
+  const r = rojmel(d, ['cash'], { from: '2026-11-01', to: '2026-11-30' });
+  eq([r.opening, r.days.map((x) => x.date), r.totalIn, r.totalOut, r.closing], [5000, ['2026-11-02', '2026-11-03'], 3150, 2150, 6000], 'Cash rojmel: opening 5,000 brought forward, in 3,150, out 2,150, closing 6,000');
+  eq(r.days.map((x) => [x.opening, x.in, x.out, x.closing]), [[5000, 2100, 0, 7100], [7100, 1050, 2150, 6000]], 'Each day opens with the day before\'s closing');
+  eq(r.closing, ledgerView(moneyLedger('cash', d)).closing, 'Closing agrees with the Cash ledger');
+  eq(r.days[1].entries.map((e) => e.kind).sort(), ['Cash / bank book', 'Expense', 'Received on invoice'], 'Entries say what they are');
+  const both = rojmel(d, allMoneyIds(d), { from: '2026-11-01', to: '2026-11-30' });
+  eq([both.totalIn, both.totalOut, both.closing], [4150, 150, 9000], 'Cash + bank: the 2,000 deposited in the bank is left out (it moves money between them); the UPI receipt counts');
+  eq(rojmelAccounts({ accounts: [{ id: 'a1', name: 'HDFC CC', group: 'cc' }, { id: 'a2', name: 'Loan', group: 'secured-loans' }] }).map((a) => a.name), ['Cash', 'Bank', 'HDFC CC'], 'Accounts to choose: Cash, Bank and your bank / CC accounts');
+  const s = dayWiseSummary(d, { from: '2026-11-01', to: '2026-11-30' });
+  eq(s.rows.map((x) => [x.date, x.sales, x.invoices, x.gstOnSales, x.expenses, x.cashIn, x.cashOut, x.bankIn, x.cashClosing, x.bankClosing]),
+    [['2026-11-02', 4000, 2, 200, 0, 2100, 0, 0, 7100, 0], ['2026-11-03', 1000, 1, 50, 150, 1050, 2150, 3000, 6000, 3000]], 'Day-wise summary: sales before GST and invoice count, GST, expenses, cash and bank in / out and balances');
+  eq([s.totals.sales, s.totals.invoices, s.cashOpening, s.cashClosing], [5000, 3, 5000, 6000], 'Summary totals');
+  eq(rojmel(d, ['cash'], { from: '2026-11-03', to: '2026-11-03' }).opening, 7100, 'One day: opens with everything before it');
+}
+
+console.log('\n[Dashboard: totals of the invoices shown]');
+{
+  const { listTotals } = await import('../src/utils/listTotals.js');
+  const shown = [
+    sale('T-1', '2026-11-02', 'A', 1, 1000, { status: 'paid' }),
+    sale('T-2', '2026-11-02', 'B', 2, 1000),
+    sale('T-3', '2026-11-03', 'C', 1, 2000, { status: 'partial', paidAmount: 1000 }),
+    { ...sale('CN-1', '2026-11-04', 'B', 1, 100), invoiceType: 'credit-note' },
+    { ...sale('Q-1', '2026-11-04', 'D', 1, 999), invoiceType: 'quotation' },
+    { ...sale('X-1', '2026-11-04', 'E', 1, 500), status: 'cancelled' },
+  ];
+  const t = listTotals(shown);
+  eq([t.count, t.sales, t.creditNotes, t.other, t.cancelled], [6, 3, 1, 1, 1], 'Counts: 3 sales, a credit note, a quotation and a cancelled invoice');
+  eq(t.byCurrency.INR, { amount: 5145, taxable: 4900, tax: 245, received: 2050, due: 3200 }, 'Amount 5,250 less the 105 credit note; received 1,050 + 1,000; due 2,100 + 1,100; quotation and cancelled not added');
+  eq(Object.keys(listTotals([{ ...sale('U-1', '2026-11-02', 'Z', 1, 100), currency: 'USD' }, sale('T-9', '2026-11-02', 'A', 1, 100)]).byCurrency), ['USD', 'INR'], 'Each currency is kept apart');
+  eq(listTotals([]).count, 0, 'Nothing shown: zero');
+}
+
 console.log('\n[Excel workbook]');
 eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
 {
