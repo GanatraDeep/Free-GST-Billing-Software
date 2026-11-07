@@ -11,12 +11,14 @@
 import { hsnUqc, roundQty } from '../utils.js';
 import { purchaseLineTax } from './purchaseOrders.js';
 import { freightTax } from './freight.js';
+import { expenseCost, expenseGst, isRcmExpense } from './expenses.js';
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 export const INWARD_KIND_LABEL = {
   ITC: 'Purchases (ITC)',
   URD: 'Purchases from unregistered dealers (no ITC)',
   RCM: 'Freight under reverse charge (GTA)',
+  RCMX: 'Expenses under reverse charge (e.g. rent)',
   EXP: 'Expenses with GST',
 };
 // SAC for goods transport agency services.
@@ -60,13 +62,15 @@ export function inwardHsnRows({ purchases = [], freight = [], expenses = [], pro
     add('RCM', GTA_SAC, 'Goods transport (freight)', 'NA', x.rate, 0, x.taxable, x.tax, 0, !!f.interstate);
   }
   for (const e of expenses || []) {
-    const gst = Number(e.gstAmount) || 0;
+    const gst = expenseGst(e);
     if (!(gst > 0)) continue;
-    const taxable = (Number(e.amount) || 0) - gst;
+    const taxable = expenseCost(e);
     const rate = taxable > 0 ? Math.round((gst / taxable) * 100 * 2) / 2 : 0;
-    add('EXP', 'N/A', e.category || 'Expense', 'NA', rate, 0, taxable, gst, 0, !!e.interstate);
+    // Divtech Hisaab - an expense under reverse charge (rent from an
+    // unregistered landlord) sits with the other RCM supplies.
+    add(isRcmExpense(e) ? 'RCMX' : 'EXP', 'N/A', e.category || 'Expense', 'NA', rate, 0, taxable, gst, 0, !!e.interstate);
   }
-  const order = { ITC: 0, URD: 1, RCM: 2, EXP: 3 };
+  const order = { ITC: 0, URD: 1, RCM: 2, RCMX: 3, EXP: 4 };
   return [...map.values()]
     .map((r) => {
       const out = { ...r, quantity: roundQty(r.quantity), taxable: r2(r.taxable), igst: r2(r.igst), cgst: r2(r.cgst), sgst: r2(r.sgst), cess: r2(r.cess) };

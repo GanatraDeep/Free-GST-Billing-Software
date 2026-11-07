@@ -22,7 +22,7 @@ import TableExport from './TableExport';
 // dead state removed for clarity.
 const emptyForm = {
   // kind: v1.10.83 (#121) - 'goods' or 'service' (a service has no stock).
-  kind: 'goods', name: '', hsn: '', purchasePrice: '', sellingPrice: '', taxPercent: '', unit: 'Pcs', stock: '', description: '',
+  kind: 'goods', name: '', hsn: '', purchasePrice: '', openingCost: '', sellingPrice: '', taxPercent: '', unit: 'Pcs', stock: '', description: '',
   madeHere: false, bom: [],
 };
 
@@ -89,6 +89,7 @@ export default function InventoryView() {
       name: product.name || '',
       hsn: product.hsn || '',
       purchasePrice: product.purchasePrice ?? '',
+      openingCost: product.openingCost || '',
       sellingPrice: product.sellingPrice ?? product.rate ?? '',
       taxPercent: product.taxPercent || '',
       unit: product.unit || 'Nos',
@@ -138,6 +139,8 @@ export default function InventoryView() {
         name: form.name.trim(),
         hsn: form.hsn.trim(),
         purchasePrice,
+        // Divtech Hisaab - cost of the stock you started with (purchases never change it).
+        ...(service ? {} : { openingCost: form.openingCost ? parseFloat(form.openingCost) : 0 }),
         sellingPrice,
         rate: sellingPrice, // mirror for legacy readers
         taxPercent: form.taxPercent ? parseFloat(form.taxPercent) : 0,
@@ -237,7 +240,7 @@ export default function InventoryView() {
       </div>
       {showImport && (
         <CsvListImport what="products" sample={PRODUCTS_SAMPLE} sampleName="Products-sample.csv" doc="products#import"
-          intro="One product or service per row: Name (required), Type (Goods or Service), HSN/SAC, Unit, Purchase Price, Selling Price, GST % and Stock (leave Stock blank for a service)."
+          intro="One product or service per row: Name (required), Type (Goods or Service), HSN/SAC, Unit, Purchase Price, Selling Price, GST %, Stock (leave it blank for a service) and Opening Cost: what that stock cost per unit, without GST (left blank, the purchase price is used)."
           parse={(text) => { const r = productsCsvToList(text, products); return { list: r.products, skipped: r.skipped, errors: r.errors }; }}
           save={saveProduct} onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); loadProducts(); }} />
       )}
@@ -290,6 +293,16 @@ export default function InventoryView() {
                   placeholder="0.00" min="0" step="any"
                   title="What you pay the supplier. Auto-fills on new Purchase Bills." />
               </div>
+              {form.kind !== 'service' && (
+                <div className="form-group">
+                  <label className="form-label" htmlFor="opening-cost">Opening stock cost (per unit)</label>
+                  <input id="opening-cost" type="number" className="form-input" value={form.openingCost ?? ''}
+                    onChange={e => updateField('openingCost', e.target.value)}
+                    placeholder="0.00" min="0" step="any"
+                    title="Cost per unit, without GST, of the stock you had when you started using the app. Purchases never change it. It values your opening stock in the profit and loss and balance sheet." />
+                  <p className="field-hint">Cost (without GST) of the stock you started with; purchases never change it.</p>
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">Selling Price</label>
                 <input type="number" className="form-input" value={form.sellingPrice}

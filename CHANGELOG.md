@@ -28,6 +28,33 @@ Releases page and run it; it installs over your copy and keeps your data.
   going out; it is money coming in.
 - A test now checks that the Cash book and Bank book always show the same
   balance as the Cash and Bank ledgers.
+- **Profit was far too high when products had no purchase price.** Stock on
+  hand on the day you started was valued at zero, and that zero cost pulled
+  the average cost of later purchases down, so closing stock and profit were
+  wrong by lakhs. And because every purchase overwrites the purchase price
+  with its latest rate, the opening stock (and every month's profit) changed
+  each time a new bill was saved. Products now have an **Opening stock cost**
+  (per unit) that purchases never change; on the product form, in Bulk edit
+  and as an Opening Cost column in the Products CSV. Until it is entered,
+  opening stock is valued at the item's first purchase rate, and Final
+  accounts and Reports show a note naming those products.
+- **Reports showed a different profit from Final accounts.** Reports worked
+  profit out on its own and missed freight, vouchers (depreciation,
+  interest), kasar and round off. The Profit & Loss tab now uses the same
+  books, line for line: sales, cost of goods sold (opening stock + purchases
+  - closing stock), freight and direct expenses, gross profit, expenses,
+  other income, net profit, and a month-by-month table that adds up.
+- **Stock report value** is now at average purchase cost on that date (as in
+  the balance sheet), not purchase or selling price, and stock adjustments
+  after that date are taken back.
+
+### Added
+- **Expenses under reverse charge (RCM)**, e.g. shop or office rent from an
+  unregistered landlord: tick **Reverse charge (RCM)**, enter what you paid
+  the landlord, and the GST is worked out on top. Only the amount paid
+  leaves the bank; the GST is owed on "GST payable under reverse charge",
+  goes into GSTR-3B 3.1(d), 4(A)(3) / ISRC and the tax paid in cash, the
+  HSN inward sheet and the expense registers, and Record GST paid fills it in.
 
 ---
 

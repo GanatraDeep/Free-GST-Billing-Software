@@ -18,6 +18,7 @@
  * invoice details: drafts, edits, duplicates); purchases and expenses keep
  * them on the record itself.
  */
+import { expenseCost } from './expenses.js';
 import { salesSign, businessKeyOf } from '../utils.js';
 
 export const UNTAGGED = '__untagged';
@@ -99,7 +100,7 @@ export function costCentreReport({ bills = [], purchases = [], expenses = [], ce
   }
   for (const e of expenses) {
     if (!inRange(e?.date, from, to)) continue;
-    rowFor(e).expenses += (Number(e.amount) || 0) - (Number(e.gstAmount) || 0);
+    rowFor(e).expenses += expenseCost(e);
   }
 
   if (!rows.has(UNTAGGED)) rows.set(UNTAGGED, blank(UNTAGGED, 'Untagged'));

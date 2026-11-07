@@ -552,7 +552,8 @@ export default [
   <tr><td><b>Category</b></td><td>What kind of cost it is. <b>Other</b> to start. See <a href="#categories">Categories</a>.</td></tr>
   <tr><td><b>Description *</b></td><td>Required. What it was for, such as "Shop rent - October" or "AWS Hosting - March".</td></tr>
   <tr><td><b>Amount (incl. GST) *</b></td><td>Required, above zero. The full amount you paid, with GST.</td></tr>
-  <tr><td><b>GST % (for ITC)</b></td><td>The GST rate on the bill, such as 18. The GST inside the amount is worked out and shown underneath as <b>GST: ₹...</b>. Leave it blank (or 0) when the bill has no GST: rent from an unregistered owner, salary, bank charges without GST.</td></tr>
+  <tr><td><b>GST % (for ITC)</b></td><td>The GST rate on the bill, such as 18. The GST inside the amount is worked out and shown underneath as <b>GST: ₹...</b>. Leave it blank (or 0) when there is no GST at all: salary, bank charges without GST.</td></tr>
+  <tr><td><b>Reverse charge (RCM)</b></td><td>Tick when the vendor is not GST-registered and the law makes <b>you</b> pay the GST, most often <b>shop or office rent from an unregistered landlord</b>. The amount then is what you paid the vendor (no GST in it), and the GST is worked out <b>on top</b>. See <a href="#reverse-charge">Expenses under reverse charge</a>.</td></tr>
   <tr><td><b>Vendor Name</b></td><td>Who you paid. Optional, but needed to claim the credit.</td></tr>
   <tr><td><b>Vendor GSTIN</b></td><td>Their 15-character GSTIN, from their bill. Needed to claim the credit.</td></tr>
   <tr><td><b>Invoice / Bill No</b></td><td>Their bill number. Optional.</td></tr>
@@ -569,6 +570,18 @@ export default [
   <li><strong>Save</strong>Click ${ui('Save')} (${ui('Update')} when editing). The message <b>Expense added</b> appears.</li>
 </ol>
 <p><strong>Example:</strong> internet bill ₹1,180 with 18% GST. Amount 1180, GST % 18: the app shows GST ₹180 (1180 × 18 ÷ 118), and the cost without GST is ₹1,000.</p>
+<section id="reverse-charge">
+<h3>Expenses under reverse charge (RCM)</h3>
+<p>Rent for a shop, godown or office from a landlord who is not GST-registered is under <b>reverse charge</b>: the landlord gets the rent only, and you pay the 18% GST to the government with GSTR-3B, then claim the same amount back as input tax credit.</p>
+<p><strong>Example:</strong> October rent ₹6,500 paid by UPI to an unregistered landlord. Amount <b>6500</b>, GST % <b>18</b>, tick <b>Reverse charge (RCM)</b>. The app shows GST ₹1,170 (6,500 × 18%) and:</p>
+<ul>
+  <li>takes only ₹6,500 out of the bank (that is what you paid);</li>
+  <li>books Office Rent ₹6,500, input CGST ₹585 + SGST ₹585, and ₹1,170 owed on <b>GST payable under reverse charge (RCM)</b>;</li>
+  <li>puts it in GSTR-3B <b>3.1(d)</b> (₹6,500 and ₹1,170), <b>4(A)(3)</b> (₹1,170 credit) and the tax paid in cash, and in the HSN inward sheet;</li>
+  <li><a href="gst-returns.html#gst-paid">Record GST paid</a> fills the ₹1,170 into its <b>Reverse charge</b> box; saving clears the RCM account.</li>
+</ul>
+<p>Not under reverse charge: a landlord who is registered and charges GST on his bill (enter the bill total with GST, untick), and rent of a house used as a home.</p>
+</section>
 <div class="note tip"><strong>Something wrong?</strong>
 <p><b>"Description is required"</b> or <b>"Enter a valid amount"</b>: fill in a description and an amount above zero. <b>"GST % must be between 0 and 100"</b>: type just the number, such as 18.</p>
 <p><b>The GST shown differs a little from the bill</b>: the bill may be rounded. It is worked out from the amount and rate; if the difference matters, check the amount you typed is the bill's total with GST, not before.</p>

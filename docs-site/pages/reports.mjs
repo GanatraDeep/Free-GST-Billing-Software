@@ -82,13 +82,27 @@ export default [
   <tr><td><b>Net Profit</b> or <b>Net Loss</b></td><td>Revenue minus the cost of the goods sold, minus expenses. Green for a profit; red with a minus sign for a loss.</td></tr>
   <tr><td><b>Margin</b></td><td>Profit as a percentage of revenue. ₹20,000 profit on ₹1,00,000 revenue is a 20% margin.</td></tr>
 </table></div>
-<p>Goods you bought and sold count at their cost: the <b>cost of goods sold</b> is each item sold at its average purchase rate without GST (see the <a href="ledgers.html#item">item ledger</a>). Stock still on the shelf is not a cost yet. Cost of goods is counted for rupee invoices only.</p>
+<p><b>The same profit as Final accounts.</b> For rupee invoices, the cards, the statement and the months are worked out from the same books as <a href="final-accounts.html#profit-loss">Final accounts</a>, so freight, vouchers (depreciation, interest), kasar, round off and stock shortage are all in, and the two screens always show one profit. With invoices in more than one currency the screen works the old way, from invoices and expenses only, per currency.</p>
+<p>Goods count at their cost: <b>cost of goods sold</b> is opening stock + purchases − closing stock, with stock at its average purchase rate without GST (see the <a href="ledgers.html#item">item ledger</a>). Stock still on the shelf is not a cost yet.</p>
+<div class="note warn"><strong>Opening stock needs its cost.</strong><p>Stock you had on the day you started is valued at each product's <b>Opening stock cost</b> (Products, edit, or Bulk edit). Purchases never change it. If it is empty, the app uses the item's first purchase rate and shows a yellow note naming the products; an item never bought uses its purchase price, or zero. Enter the real cost per unit (without GST, as in your books on the day you started) for an exact profit.</p></div>
 <p>The same period choice appears on the Client Analytics and Product Performance tabs.</p>
 </section>
 
 <section id="pl-statement">
 <h3>Profit &amp; Loss Statement</h3>
 <p>The card below the four figures sets the sum out line by line, the way an accountant would:</p>
+<p>For rupee invoices it has these lines, the same as Final accounts:</p>
+<div class="table-wrap"><table>
+  <tr><th>Line</th><th>Meaning</th></tr>
+  <tr><td><b>Sales (before GST)</b></td><td>Net of credit notes.</td></tr>
+  <tr><td><b>Less: Cost of goods sold</b></td><td>Opening stock + purchases − closing stock, shown underneath.</td></tr>
+  <tr><td><b>Less: Freight and other direct expenses</b></td><td>Freight (jakat), cartage, loading: the cost of bringing goods in.</td></tr>
+  <tr><td><b>Gross profit</b></td><td>Your trading margin.</td></tr>
+  <tr><td><b>Less: Expenses</b></td><td>Expenses before GST, kasar allowed, interest, round off, stock shortage, and expenses entered as vouchers.</td></tr>
+  <tr><td><b>Add: Other income</b></td><td>Discount or kasar received, interest received, stock found in excess.</td></tr>
+  <tr><td><b>Net Profit</b> / <b>Net Loss</b></td><td>Gross profit − expenses + other income.</td></tr>
+</table></div>
+<p>With more than one currency, the older lines below are used, for the currency picked:</p>
 <div class="table-wrap"><table>
   <tr><th>Line</th><th>Meaning</th></tr>
   <tr><td><b>Total Revenue</b></td><td>Everything billed in the period, GST included, less credit notes.</td></tr>
@@ -107,7 +121,7 @@ export default [
 
 <section id="monthly-breakdown">
 <h3>Monthly Breakdown</h3>
-<p>One row for each month that had sales or expenses in the period, oldest first, with <b>Revenue</b>, <b>Cost of goods</b>, <b>Expenses</b> and <b>Profit/Loss</b> for that month, all without GST. A profit shows in green, a loss in red. Months with nothing in them are left out.</p>
+<p>One row for each month that had sales or expenses in the period, oldest first, all without GST. For rupee invoices: <b>Sales</b>, <b>Cost of goods</b>, <b>Freight / direct</b>, <b>Gross profit</b>, <b>Expenses</b>, <b>Other income</b> and <b>Net profit</b>, and the months add up to the period's total. Otherwise <b>Revenue</b>, <b>Cost of goods</b>, <b>Expenses</b> and <b>Profit/Loss</b>. A profit shows in green, a loss in red. Months with nothing in them are left out.</p>
 <p>The card appears only when the period has some activity. ${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} export it with a <b>Total</b> row at the bottom.</p>
 <ol class="steps">
   <li><strong>Pick the year</strong>Filter By <b>Fiscal Year</b>, and the year.</li>
@@ -247,12 +261,12 @@ export default [
 <div class="table-wrap"><table>
   <tr><th>Column</th><th>Meaning</th></tr>
   <tr><td><b>Product</b>, <b>HSN/SAC</b>, <b>Unit</b></td><td>From the <a href="products.html">product list</a>, A to Z. Unit shows Nos when none is set.</td></tr>
-  <tr><td><b>Closing qty</b></td><td>Worked back from today's stock, using the dates of your invoices, purchase bills and <a href="products.html#manufacturing">production entries</a>. Negative stock shows in red.</td></tr>
-  <tr><td><b>Rate</b></td><td>The purchase price. A product with no purchase price is valued at its selling price, marked with *.</td></tr>
+  <tr><td><b>Closing qty</b></td><td>Worked back from today's stock, using the dates of your invoices, purchase bills, stock adjustments and <a href="products.html#manufacturing">production entries</a>. Negative stock shows in red.</td></tr>
+  <tr><td><b>Rate</b></td><td>The average purchase cost (without GST) on that date, the same rate the closing stock in Final accounts uses. A product never bought and with no purchase price is valued at its selling price, marked with *.</td></tr>
   <tr><td><b>Value</b></td><td>Quantity × rate. A dash for zero or negative stock.</td></tr>
   <tr><td><b>Total stock value</b></td><td>The bottom row: all the values added up. Negative stock is not added in.</td></tr>
 </table></div>
-<p>Stock you typed in by hand on the Products screen has no date, so it counts as if it changed today. Products are shared by all your businesses, so this report covers every business. ${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} export it, "valued at purchase price".</p>
+<p>Stock you typed in by hand on the Products screen has no date, so it counts as if it changed today. Products are shared by all your businesses, so this report covers every business. ${ui('Print / PDF')}, ${ui('Excel')} and ${ui('CSV')} export it, "valued at average purchase cost".</p>
 <div class="note tip"><strong>Something wrong?</strong><p>A red (negative) quantity means more was sold than was bought: a purchase bill is missing, or opening stock was never entered. Add the purchase, or correct the stock on the <a href="products.html#stock">Products</a> screen. Values marked * use the selling price: add a purchase price to the product for a true value. "No products yet." means the product list is empty; stock is tracked only for items in it. See also <a href="limitations.html#stock-limits">what stock does not do</a>.</p></div>
 </section>
 

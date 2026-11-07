@@ -387,6 +387,57 @@ console.log('\n[Cash book and Bank book agree with the Cash and Bank ledgers]');
   eq(linkedMoneyLines({ purchases: [d.purchases[1]] }, 'cash')[0].type, 'in', 'Cash back on a purchase return is money in');
 }
 
+console.log('\n[Expense under reverse charge (rent from an unregistered landlord)]');
+{
+  const { expenseCost, expenseGstFrom, rcmExpenseTotals } = await import('../src/utils/expenses.js');
+  const rent = { id: 'rent10', date: '2026-10-31', category: 'Office Rent', description: 'October rent', amount: 6500, gstPercent: 18, gstAmount: expenseGstFrom(6500, 18, true), rcm: true, paymentMode: 'UPI', account: '' };
+  eq([rent.gstAmount, expenseGstFrom(7670, 18, false)], [1170, 1170], 'GST on top under reverse charge (6,500 -> 1,170); inside the amount otherwise (7,670 -> 1,170)');
+  const d = { ...books, expenses: [rent] };
+  const ps = postings(d).filter((p) => p.doc === 'exp:rent10');
+  const bal = (acc) => Math.round(ps.filter((p) => p.account === acc).reduce((t, p) => t + p.dr - p.cr, 0) * 100) / 100;
+  eq([bal('expense:Office Rent'), bal('gst:cgst'), bal('gst:sgst'), bal('rcm-payable'), bal('bank')], [6500, 585, 585, -1170, -6500], 'Books: rent 6,500, input CGST + SGST 585 each, 1,170 owed under RCM, only 6,500 out of the bank');
+  eq([trialBalance(d, { from: '2026-04-01', to: '2027-03-31' }).difference, balanceSheet(d, { from: '2026-04-01', to: '2027-03-31' }).difference], [0, 0], 'Trial balance and balance sheet agree');
+  eq([expenseCost(rent), expenseCost({ amount: 7670, gstAmount: 1170 })], [6500, 6500], 'Cost before GST is 6,500 either way');
+  eq(rcmExpenseTotals([rent, { amount: 7670, gstAmount: 1170 }]), { taxable: 6500, igst: 0, cgst: 585, sgst: 585, tax: 1170 }, 'Only the reverse-charge expense counts for GSTR-3B 3.1(d)');
+  const pay = gstPaymentLines({ moves: [], cash: {}, rcm: 1170, from: 'bank' });
+  const after = { ...d, vouchers: [{ id: 'gp', type: 'payment', date: '2026-11-20', lines: pay }] };
+  eq(Math.round(postings(after).filter((p) => p.account === 'rcm-payable').reduce((t, p) => t + p.dr - p.cr, 0) * 100) / 100, 0, 'Record GST paid with the RCM clears it');
+}
+
+console.log('\n[Opening stock without a purchase price]');
+{
+  const { openingStockWarnings } = await import('../src/utils/ledgers.js');
+  const prods = [{ id: 'a', name: 'COTTONSEED OIL', unit: 'Tin', stock: 110 }, { id: 'b', name: 'PALM OIL', unit: 'Tin', stock: 5 }];
+  const buys = [{ id: 'pa', date: '2026-10-05', supplierName: 'X', items: [{ name: 'COTTONSEED OIL', quantity: 10, rate: 2500, taxPercent: 5 }], totalAmount: 26250 }];
+  const d = { bills: [], purchases: buys, products: prods, receipts: [], expenses: [], openings: [], cashEntries: [], vouchers: [] };
+  const L = itemLedger(prods[0], d);
+  eq([L.openingQty, L.openingRate, L.openingEstimate, L.avgCost], [100, 2500, 'first-purchase', 2500], 'No purchase price: 100 tins valued at the first purchase rate, so the average cost is not pulled down to nothing');
+  eq(openingStockWarnings(d).map((w) => [w.name, w.how]), [['COTTONSEED OIL', 'first-purchase'], ['PALM OIL', 'no-cost']], 'Both are flagged; one with no purchase at all stays at zero');
+  eq(itemLedger({ ...prods[0], openingCost: 2400 }, d).openingRate, 2400, 'The Opening stock cost on the product is used as it is');
+  eq(openingStockWarnings({ ...d, products: [{ ...prods[0], openingCost: 2400 }, { ...prods[1], openingCost: 2200 }] }).length, 0, 'and no warning');
+  // Purchases overwrite Purchase price with the latest rate; that must not move the opening stock.
+  const later = [...buys, { id: 'pb', date: '2026-11-20', supplierName: 'X', items: [{ name: 'COTTONSEED OIL', quantity: 10, rate: 2900, taxPercent: 5 }], totalAmount: 30450 }];
+  const p0 = { ...prods[0], purchasePrice: 2900, stock: 120 };
+  eq([itemLedger(p0, { ...d, purchases: later }).openingRate, itemLedger({ ...p0, openingCost: 2400 }, { ...d, purchases: later }).openingRate], [2500, 2400], 'A later purchase (which overwrote Purchase price to 2,900) does not change the opening stock value');
+  eq(itemLedger({ id: 'n', name: 'Never bought', stock: 4, purchasePrice: 900 }, d).openingRate, 900, 'An item never bought uses the purchase price typed in');
+}
+
+console.log('\n[Reports profit and loss = Final accounts]');
+{
+  const { booksPnl, monthsIn } = await import('../src/utils/reportsPnl.js');
+  const d = { ...books, freight: [{ id: 'fr1', date: '2026-11-10', goods: 'Groundnut oil 15 kg tin', transporter: 'T', amount: 800, rcmRate: 5, paymentMode: 'cash' }],
+    expenses: [{ id: 'e1', date: '2026-11-12', category: 'Tea & snacks', amount: 300, paymentMode: 'cash' }],
+    vouchers: [{ id: 'v9', type: 'journal', date: '2026-12-31', lines: [{ account: 'expense:Depreciation', dr: 1000, cr: 0 }, { account: 'opening-diff', dr: 0, cr: 1000 }] }] };
+  const range = { from: '2026-04-01', to: '2027-03-31' };
+  const pl = profitAndLoss(d, range);
+  const r = booksPnl(d, range);
+  eq([r.sales, r.grossProfit, r.netProfit], [pl.totals.sales, pl.grossProfit, pl.netProfit], 'Reports shows the same sales, gross profit and net profit as Final accounts');
+  eq(r.directExpenses >= 800 && r.expenses >= 1300, true, 'Freight is a direct expense; the expense and the depreciation voucher are in expenses (the old Reports missed both)');
+  const sumNet = Math.round(r.months.reduce((t, m) => t + m.netProfit, 0) * 100) / 100;
+  eq(sumNet, r.netProfit, 'The months add up to the year');
+  eq(monthsIn('2026-10-15', '2026-12-05').map((m) => [m.from, m.to]), [['2026-10-15', '2026-10-31'], ['2026-11-01', '2026-11-30'], ['2026-12-01', '2026-12-05']], 'Months are clipped to the dates picked');
+}
+
 console.log('\n[Excel workbook]');
 eq(sheetNames(['B2B (4A)', 'a/b', 'X'.repeat(40), 'X'.repeat(40)]), ['B2B (4A)', 'a b', 'X'.repeat(31), `${'X'.repeat(29)} 2`], 'Sheet names: no / : * ? [ ], at most 31 letters, never twice');
 {

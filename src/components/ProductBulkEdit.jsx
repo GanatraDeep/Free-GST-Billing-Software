@@ -19,6 +19,8 @@ const FIELDS = [
   ['taxPercent', 'GST %', 'number', 70],
   ['unit', 'Unit', 'unit', 90],
   ['stock', 'Stock', 'number', 80],
+  // Divtech Hisaab - cost per unit of the stock you started with.
+  ['openingCost', 'Opening stock cost', 'number', 110],
 ];
 
 const valueOf = (p, k) => {

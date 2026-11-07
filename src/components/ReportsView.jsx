@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Wallet, BarChart3, Clock, Search, X, Users, Package, Boxes, Building2, Percent } from 'lucide-react';
 import { getAllBills, getAllExpenses, getAllPurchases, getAllProducts, getAllStockAdjustments, getProfile } from '../store';
 import { costOfGoodsSold, stockAdjustmentLoss } from '../utils/ledgers';
+import { booksPnl } from '../utils/reportsPnl';
+import useBooks from './useBooks';
 import { formatCurrency, getFYOptions, belongsToProfile, isCancelledBill, salesSign, countsAsSales, calculateLineItemTax, roundQty, parseLocalDate, amountDue } from '../utils';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
@@ -59,6 +61,9 @@ export default function ReportsView() {
   // v1.10.83 (#112) - the By cost centre tab needs the business itself.
   const [ownerProfile, setOwnerProfile] = useState(null);
   const [ccOn] = useState(costCentresOn);
+  // Divtech Hisaab - the whole books, for a profit and loss that is the same
+  // as Final accounts (utils/reportsPnl.js).
+  const { data: books } = useBooks();
 
   const fyOptions = getFYOptions();
   const currentYear = new Date().getFullYear();
@@ -178,6 +183,15 @@ export default function ReportsView() {
   // Divtech Hisaab - stock shortage / wastage less excess found, at average cost.
   const stockLoss = cogsOn ? stockAdjustmentLoss({ bills, purchases, products, stockAdjustments: adjustments }, periodRange) : 0;
   const netProfit = grossProfit - expenseExGST - stockLoss;
+  // Rupees only (the books are in rupees): the statement, cards and months
+  // come from the books. With invoices in more than one currency the old
+  // invoice-based figures stay.
+  const booksMode = !!books && shownCurrency === 'INR' && allCurrencies.length <= 1;
+  const { from: pFrom, to: pTo } = periodRange;
+  const bp = useMemo(() => (booksMode ? booksPnl(books, { from: pFrom, to: pTo }) : null), [booksMode, books, pFrom, pTo]);
+  const cardRevenue = bp ? bp.sales : revenueExTax;
+  const cardExpenses = bp ? bp.expenses : expenseExGST;
+  const cardProfit = bp ? bp.netProfit : netProfit;
 
   // Monthly breakdown — per selected currency
   const monthlyPL = {};
@@ -362,25 +376,25 @@ export default function ReportsView() {
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '1.5rem' }}>
             <div className="stat-card">
               <div className="stat-icon stat-icon-green"><TrendingUp size={22} /></div>
-              <div><p className="stat-label">Revenue (ex. tax)</p><h2 className="stat-value stat-value-green">{formatCurrency(revenueExTax, shownCurrency)}</h2></div>
+              <div><p className="stat-label">Revenue (ex. tax)</p><h2 className="stat-value stat-value-green">{formatCurrency(cardRevenue, shownCurrency)}</h2></div>
             </div>
             <div className="stat-card">
               <div className="stat-icon stat-icon-purple"><TrendingDown size={22} /></div>
-              <div><p className="stat-label">Expenses (ex. GST)</p><h2 className="stat-value stat-value-purple">{formatCurrency(expenseExGST, shownCurrency)}</h2></div>
+              <div><p className="stat-label">Expenses (ex. GST)</p><h2 className="stat-value stat-value-purple">{formatCurrency(cardExpenses, shownCurrency)}</h2></div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon" style={{ background: netProfit >= 0 ? 'var(--success-light)' : 'var(--danger-light)', color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              <div className="stat-icon" style={{ background: cardProfit >= 0 ? 'var(--success-light)' : 'var(--danger-light)', color: cardProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                 <Wallet size={22} />
               </div>
               <div>
-                <p className="stat-label">Net {netProfit >= 0 ? 'Profit' : 'Loss'}</p>
+                <p className="stat-label">Net {cardProfit >= 0 ? 'Profit' : 'Loss'}</p>
                 {/* v1.10.74 - a loss shows a minus sign, not just red colour */}
-                <h2 className="stat-value" style={{ color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(netProfit, shownCurrency)}</h2>
+                <h2 className="stat-value" style={{ color: cardProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>{formatCurrency(cardProfit, shownCurrency)}</h2>
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-icon stat-icon-blue"><BarChart3 size={22} /></div>
-              <div><p className="stat-label">Margin</p><h2 className="stat-value">{revenueExTax > 0 ? Math.round((netProfit / revenueExTax) * 100) : 0}%</h2></div>
+              <div><p className="stat-label">Margin</p><h2 className="stat-value">{cardRevenue > 0 ? Math.round((cardProfit / cardRevenue) * 100 * 10) / 10 : 0}%</h2></div>
             </div>
           </div>
 
@@ -397,6 +411,7 @@ export default function ReportsView() {
                 </span>
               )}
             </div>
+            {bp ? <BooksStatement bp={bp} cur={shownCurrency} /> : (
             <div style={{ padding: '1.5rem' }}>
               <table style={{ width: '100%', maxWidth: '500px', margin: '0 auto', borderCollapse: 'collapse' }}>
                 <tbody>
@@ -459,10 +474,11 @@ export default function ReportsView() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
 
           {/* Monthly Breakdown */}
-          {monthlyKeys.length > 0 && (
+          {bp ? <BooksMonths bp={bp} cur={shownCurrency} periodLabel={periodLabel} subtitle={exportSubtitle('before tax, GST left out')} /> : monthlyKeys.length > 0 && (
             <div className="glass-panel">
               <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h3>Monthly Breakdown<HelpButton title="Monthly Breakdown" doc="reports#monthly-breakdown" size={16} /></h3>
@@ -836,6 +852,100 @@ export default function ReportsView() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+// Divtech Hisaab - the statement and months from the books (utils/reportsPnl.js),
+// line for line the same as Final accounts' profit and loss.
+const rowStyle = { borderBottom: '1px solid var(--border)' };
+const sub = { fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 };
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthLabel = (key) => { const [y, m] = key.split('-'); return `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`; };
+
+function StockWarning({ warnings, cur }) {
+  if (!warnings?.length) return null;
+  const est = warnings.filter((w) => w.how === 'first-purchase');
+  const none = warnings.filter((w) => w.how === 'no-cost');
+  return (
+    <div className="notice notice-warning" style={{ display: 'block', fontSize: '0.82rem', margin: '0 0 1rem' }}>
+      <strong>Opening stock without an opening stock cost.</strong>{' '}
+      {est.length > 0 && <>Valued at the first purchase rate: {est.map((w) => `${w.name} ${roundQty(w.qty)} ${w.unit || ''} at ${formatCurrency(w.rate, cur)}`).join(', ')}. </>}
+      {none.length > 0 && <>Valued at zero (no purchase yet): {none.map((w) => `${w.name} ${roundQty(w.qty)} ${w.unit || ''}`).join(', ')}. </>}
+      The profit is only as right as this cost: open <b>Products</b>, edit each one and enter its <b>Opening stock cost</b> (cost per unit without GST, as in your books on the day you started).
+    </div>
+  );
+}
+
+function BooksStatement({ bp, cur }) {
+  const money = (n) => formatCurrency(n, cur);
+  const line = (label, value, { note, bold, sign = '', color, top } = {}) => (
+    <tr style={{ ...rowStyle, ...(top ? { borderTop: '2px solid var(--border)' } : {}) }}>
+      <td style={{ padding: '0.6rem 0', fontWeight: bold ? 700 : 500, color: bold ? undefined : 'var(--text-secondary)' }}>{label}{note && <div style={sub}>{note}</div>}</td>
+      <td style={{ padding: '0.6rem 0', textAlign: 'right', fontWeight: bold ? 700 : 600, color }}>{sign}{money(Math.abs(value))}</td>
+    </tr>
+  );
+  return (
+    <div style={{ padding: '1.5rem' }}>
+      <StockWarning warnings={bp.warnings} cur={cur} />
+      <table style={{ width: '100%', maxWidth: '560px', margin: '0 auto', borderCollapse: 'collapse' }}>
+        <tbody>
+          {line('Sales (before GST)', bp.sales, { note: 'Net of credit notes' })}
+          {line('Less: Cost of goods sold', bp.goodsCost, { sign: '-', color: '#dc2626', note: `Opening stock ${money(bp.openingStock)} + purchases ${money(bp.purchases)} - closing stock ${money(bp.closingStock)}` })}
+          {Math.abs(bp.direct) >= 0.005 && line('Less: Freight and other direct expenses', bp.direct, { sign: bp.direct > 0 ? '-' : '+', color: bp.direct > 0 ? '#dc2626' : '#059669', note: 'Freight (jakat), cartage, loading...' })}
+          {line('Gross profit', bp.grossProfit, { bold: true, top: true, sign: bp.grossProfit < 0 ? '-' : '', color: bp.grossProfit < 0 ? '#dc2626' : undefined })}
+          {line('Less: Expenses', bp.expenses, { sign: '-', color: '#dc2626', note: 'Expenses before GST, kasar allowed, interest, round off, stock shortage, expense vouchers' })}
+          {Math.abs(bp.otherIncome) >= 0.005 && line('Add: Other income', bp.otherIncome, { sign: '+', color: '#059669', note: 'Discount / kasar received, interest received, stock found in excess' })}
+          <tr>
+            <td style={{ padding: '1rem 0', fontWeight: 800, fontSize: '1.1rem' }}>Net {bp.netProfit >= 0 ? 'Profit' : 'Loss'}</td>
+            <td style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 800, fontSize: '1.25rem', color: bp.netProfit >= 0 ? '#059669' : '#dc2626' }}>{bp.netProfit < 0 ? '-' : ''}{money(Math.abs(bp.netProfit))}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style={{ ...sub, textAlign: 'center', marginTop: '0.5rem' }}>The same figures as Final accounts, Profit &amp; loss.</p>
+    </div>
+  );
+}
+
+function BooksMonths({ bp, cur, periodLabel, subtitle }) {
+  if (!bp.months.length) return null;
+  const money = (n) => formatCurrency(n, cur);
+  const right = { textAlign: 'right' };
+  return (
+    <div className="glass-panel">
+      <div className="table-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h3>Monthly Breakdown<HelpButton title="Monthly Breakdown" doc="reports#monthly-breakdown" size={16} /></h3>
+        <TableExport title="Profit and loss by month" filename={`Profit-and-loss-${periodLabel}`} subtitle={subtitle}
+          headers={['Month', 'Sales', 'Cost of goods sold', 'Freight / direct', 'Gross profit', 'Expenses', 'Other income', 'Net profit']}
+          rows={[
+            ...bp.months.map((m) => [monthLabel(m.key), m.sales, m.goodsCost, m.direct, m.grossProfit, m.expenses, m.otherIncome, m.netProfit]),
+            ['Total', bp.sales, bp.goodsCost, bp.direct, bp.grossProfit, bp.expenses, bp.otherIncome, bp.netProfit],
+          ]} />
+      </div>
+      <div className="table-scroll">
+        <table className="data-table" style={{ minWidth: '760px' }}>
+          <thead><tr>
+            <th>Month</th><th style={right}>Sales</th><th style={right}>Cost of goods</th><th style={right}>Freight / direct</th>
+            <th style={right}>Gross profit</th><th style={right}>Expenses</th><th style={right}>Other income</th><th style={right}>Net profit</th>
+          </tr></thead>
+          <tbody>
+            {bp.months.map((m) => (
+              <tr key={m.key}>
+                <td className="font-medium">{monthLabel(m.key)}</td>
+                <td style={right}>{money(m.sales)}</td><td style={right}>{money(m.goodsCost)}</td><td style={right}>{money(m.direct)}</td>
+                <td style={right}>{money(m.grossProfit)}</td><td style={right}>{money(m.expenses)}</td><td style={right}>{money(m.otherIncome)}</td>
+                <td style={{ ...right, fontWeight: 700, color: m.netProfit >= 0 ? '#059669' : '#dc2626' }}>{money(m.netProfit)}</td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 700, borderTop: '2px solid var(--border)' }}>
+              <td>Total</td>
+              <td style={right}>{money(bp.sales)}</td><td style={right}>{money(bp.goodsCost)}</td><td style={right}>{money(bp.direct)}</td>
+              <td style={right}>{money(bp.grossProfit)}</td><td style={right}>{money(bp.expenses)}</td><td style={right}>{money(bp.otherIncome)}</td>
+              <td style={{ ...right, color: bp.netProfit >= 0 ? '#059669' : '#dc2626' }}>{money(bp.netProfit)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 // cash and bank books, every ledger (customers, suppliers, items, accounts),
 // debtors and creditors, stock, registers and vouchers. Pure: returns sheets
 // for utils/xlsx.js buildWorkbook().
+import { expenseCost, isRcmExpense } from './expenses.js';
 import {
   postings, ledgerView, accountInfo, trialBalance, profitAndLoss, balanceSheet, stockValue, itemLedger,
   ACCOUNT_GROUPS, side, billTaxable, billGst, purchaseGst, isUrdPurchase,
@@ -130,8 +131,8 @@ export function caPackSheets(data = {}, { from = '', to = '', profile = null, ti
   sheets.push({ name: 'Purchase register', rows: [['Date', 'Supplier', 'GSTIN', 'Bill number', 'Type', 'Taxable', 'CGST', 'SGST', 'IGST', 'Cess', 'Total', 'ITC'],
     ...purchases.map((p) => { const g = purchaseGst(p); const s = p.isReturn ? -1 : 1; return [p.date, p.supplierName || '', p.supplierGstin || '', p.invoiceNumber || '', p.isReturn ? 'Purchase return (debit note)' : p.purchaseType?.name || '', r2(s * g.taxable), r2(s * g.cgst), r2(s * g.sgst), r2(s * g.igst), r2(s * g.cess), r2(s * (Number(p.totalAmount) || 0)), isUrdPurchase(p) ? 'No (URD)' : 'Yes']; })] });
   const expenses = (data.expenses || []).filter((e) => inRange(e.date || '', range)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  sheets.push({ name: 'Expense register', rows: [['Date', 'Category', 'Description', 'Vendor', 'Payment mode', 'Before GST', 'GST', 'Total'],
-    ...expenses.map((e) => [e.date, e.category || '', e.description || '', e.vendorName || '', e.paymentMode || '', r2((Number(e.amount) || 0) - (Number(e.gstAmount) || 0)), r2(e.gstAmount), r2(e.amount)])] });
+  sheets.push({ name: 'Expense register', rows: [['Date', 'Category', 'Description', 'Vendor', 'Payment mode', 'Before GST', 'GST', 'Paid', 'Reverse charge'],
+    ...expenses.map((e) => [e.date, e.category || '', e.description || '', e.vendorName || '', e.paymentMode || '', expenseCost(e), r2(e.gstAmount), r2(e.amount), isRcmExpense(e) ? 'Yes' : ''])] });
   const receipts = (data.receipts || []).filter((r) => inRange(r.date || '', range)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   sheets.push({ name: 'Receipts', rows: [['Date', 'Receipt no.', 'Customer', 'Against', 'Mode', 'Amount'], ...receipts.map((r) => [r.date, r.receiptNo || '', r.clientName || '', r.againstInvoice || '', r.paymentMode || '', r2(r.amount)])] });
   const vt = Object.fromEntries(VOUCHER_TYPES.map(([id, n]) => [id, n]));

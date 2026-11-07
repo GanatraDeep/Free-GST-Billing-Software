@@ -38,6 +38,8 @@ the browser, and works without the internet. Data never leaves the computer.
   negative stock shown as a negative number
 - **Freight (jakat) under reverse charge**: one freight account per goods,
   the RCM in GSTR-3B and a monthly RCM register for the GST filer
+- **Expenses under reverse charge**, such as rent from an unregistered
+  landlord: GST worked out on top and paid with GSTR-3B, not to the vendor
 
 ### Money and accounts
 - Receipts, Cash book, Bank book, and bank / CC / loan accounts
@@ -75,7 +77,7 @@ the browser, and works without the internet. Data never leaves the computer.
 
 | Version | Highlights |
 |---|---|
-| **1.15.1** | Cash book now matches the final accounts (freight paid in cash was missing) |
+| **1.15.1** | Cash book matches the final accounts; profit fixed (opening stock without purchase price, Reports = Final accounts); expenses under reverse charge (RCM rent) |
 | 1.15.0 | Rojmel (day book) and day-wise summary; amount totals on the filtered Dashboard list; this README |
 | 1.14.3 | Sales CSV import takes stock out (and a repair for earlier imports); HSN-wise inward / outward in the GSTR-3B Excel |
 | 1.14.2 | Sale Type column in the sales CSV import |
