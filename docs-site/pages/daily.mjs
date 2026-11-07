@@ -129,6 +129,7 @@ export default [
   <tr><td>${ui('✕')}</td><td>Shows once any filter is set. Clears all of them at once.</td></tr>
   <tr><td>${ui('Columns')}</td><td>Choose which columns the list shows. See <a href="#columns">Choosing the columns</a>.</td></tr>
 </table>
+<p><b>Totals of what is shown.</b> Under the filters a bar adds up the invoices the list is showing: how many (and out of how many, when filtered), the <b>Amount</b>, <b>Taxable value</b>, <b>GST</b>, <b>Received</b> and <b>Due</b>. It follows every filter, so "Unpaid" with "From 1 Oct To 31 Oct" gives October's unpaid total. A credit note takes away from the amount; quotations, delivery challans and cancelled invoices are not added, and the bar says how many it left out. Invoices in another currency get their own totals.</p>
 <p>What you see on a row:</p>
 <ul>
   <li>A green <b>IRN</b> beside the invoice number: the invoice is registered on the e-invoice portal. Point at it to see the IRN.</li>

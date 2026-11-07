@@ -1927,6 +1927,7 @@ export const MENU_ITEMS = [
   { id: 'recurring', label: 'Recurring', module: 'recurring', section: 'main', help: 'Invoices that repeat every week, month or year.' },
   { id: 'receipts', label: 'Receipts', module: 'receipts', section: 'main', help: 'Payment receipts for money you receive.' },
   { id: 'cashbook', label: 'Cash book', module: 'cashBook', section: 'main', help: 'Cash in and out with names and notes, and the cash in hand.' },
+  { id: 'rojmel', label: 'Rojmel (day book)', module: 'rojmel', section: 'main', help: 'Jama and udhar day by day with each day\'s opening and closing, and a day-wise summary of sales, purchases, cash and bank.' },
   { id: 'bankbook', label: 'Bank book', module: 'bankBook', section: 'main', help: 'Money in and out of the bank: transfers, UPI, cheques, with the bank balance.' },
   { id: 'ledgers', label: 'Ledgers', module: 'ledgers', section: 'main', help: 'Any ledger: a customer, a supplier, an item, GST, cash, bank, sales or purchases.' },
   { id: 'accounts', label: 'Accounts', module: 'accounts', section: 'main', help: 'Capital, loans, CC / OD with its limit, fixed assets, loans and deposits given.' },

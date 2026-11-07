@@ -18,6 +18,7 @@ import PageHeader from './PageHeader';
 import LockButton from './LockButton';
 import ActionsMenu from './ActionsMenu';
 import BulkCsvImport from './BulkCsvImport';
+import { listTotals } from '../utils/listTotals';
 import PrintPreviewModal from './PrintPreviewModal';
 import { toast } from './Toast';
 import { confirmAction } from './ConfirmModal';
@@ -1699,6 +1700,36 @@ export default function Dashboard({ onNew, onEdit, onPrint, onDuplicate, onConve
             <FileText size={15} /> Columns
           </button>
         </div>
+
+        {/* Divtech Hisaab - the amount of what is shown, not only the count. */}
+        {(() => {
+          const t = listTotals(filtered);
+          const curs = Object.entries(t.byCurrency);
+          const cell = { display: 'inline-flex', flexDirection: 'column', minWidth: 110 };
+          const k = { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' };
+          const v = { fontSize: '0.98rem', fontWeight: 700 };
+          return (
+            <div data-testid="list-totals" aria-label="Totals of the invoices shown" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem', alignItems: 'flex-end', padding: '0.6rem 1rem', margin: '0.5rem 0', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <div style={cell}><span style={k}>{hasFilters ? 'Shown' : 'All invoices'}</span><span style={v}>{t.count}{hasFilters ? ` of ${bills.length}` : ''}</span></div>
+              {curs.length === 0 ? <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>No sales among these.</span> : curs.map(([cur, c]) => (
+                <div key={cur} style={{ display: 'contents' }}>
+                  <div style={cell}><span style={k}>Amount{curs.length > 1 ? ` (${cur})` : ''}</span><span style={v}>{formatCurrency(c.amount, cur)}</span></div>
+                  <div style={cell}><span style={k}>Taxable value</span><span style={{ ...v, fontWeight: 600 }}>{formatCurrency(c.taxable, cur)}</span></div>
+                  <div style={cell}><span style={k}>GST</span><span style={{ ...v, fontWeight: 600 }}>{formatCurrency(c.tax, cur)}</span></div>
+                  <div style={cell}><span style={k}>Received</span><span style={{ ...v, color: 'var(--success, #16a34a)' }}>{formatCurrency(c.received, cur)}</span></div>
+                  <div style={cell}><span style={k}>Due</span><span style={{ ...v, color: c.due > 0.005 ? '#dc2626' : undefined }}>{formatCurrency(c.due, cur)}</span></div>
+                </div>
+              ))}
+              {(t.creditNotes > 0 || t.other > 0 || t.cancelled > 0) && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexBasis: '100%' }}>
+                  {[t.creditNotes > 0 && `${t.creditNotes} credit note${t.creditNotes === 1 ? '' : 's'} taken off`,
+                    t.other > 0 && `${t.other} quotation / challan / other not added`,
+                    t.cancelled > 0 && `${t.cancelled} cancelled not added`].filter(Boolean).join(' · ')}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {/* v1.9.4 — column picker popover */}
         {showColumnPicker && (
