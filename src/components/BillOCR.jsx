@@ -1,308 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Upload, Loader, Wand2, Package, Sparkles, Trash2, Plus } from 'lucide-react';
+import { X, Upload, Loader, Wand2, Package, Sparkles, Trash2, Plus, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from './Toast';
 import HelpButton from './HelpButton';
-// v1.10.29 — Pull the installed tesseract.js version straight from its
-// package.json so that when we `npm update tesseract.js`, the CDN paths
-// track automatically. Vite handles JSON imports natively — no bundle
-// bloat beyond the version string.
-// v1.10.35 — Match extracted product names against the saved catalog
-// so users don't retype HSN + GST for products they already have.
-import { getAllProducts } from '../store';
+import { getAllProducts, getAllSuppliers, getProfile } from '../store';
+// Divtech Hisaab - the rules that pick fields out of the OCR text live in
+// utils/billOcrParse.js (tested on real bills in scripts/ocr-test.mjs).
+// Reported: "info populated is wrong" - the old rules here read "To" from
+// "Bill To" as the invoice number, scanner noise as the supplier, and every
+// address / phone line as an item.
+import { parseBillText } from '../utils/billOcrParse';
 
 /*
- * v1.10.22 — Purchase-bill OCR.
- *
- * Reported: "purchase bill ocr for faster and accurate entry".
- *
- * User uploads a photo/scan of a supplier's tax invoice; we OCR the image
- * via tesseract.js (loaded on demand, kept out of the main bundle) and
- * heuristically pull out:
- *
- *   - Supplier GSTIN — 15-char format is strict enough to catch reliably.
- *   - Invoice number — after "Invoice", "Bill", "No." labels.
- *   - Invoice date   — dd/mm/yyyy or dd-mm-yyyy variants.
- *   - Grand total    — the number labelled "Total", "Grand Total", or
- *                      "Amount Payable", with rupee-format tolerance.
- *
- * Line items are NOT auto-parsed — table extraction from OCR text is
- * unreliable across bill layouts and misrouted ITC is worse than a slow
- * manual entry. User confirms the extracted header fields and fills line
- * items themselves.
- *
- * Tesseract.js runs entirely client-side (WebAssembly). No network
- * calls to a paid OCR provider, so the offline-first + free positioning
- * of the app is preserved. First run downloads ~2MB of language data
- * to browser cache; subsequent runs are instant.
+ * Purchase-bill OCR. The user uploads a photo or scan of a supplier's tax
+ * invoice; tesseract.js (loaded on demand, runs in the browser) reads the
+ * text and parseBillText picks out the supplier (by GSTIN, matched to the
+ * supplier list), invoice number and date, the item table (qty x rate =
+ * amount), charges, the GST breakdown and grand total, and checks that
+ * the bill's own figures add up.
  */
-
-// GSTIN: 2-digit state code + 5 letters + 4 digits + 1 letter + entity
-// code (digit/letter) + 'Z' + check digit/letter. Real length: 15.
-const GSTIN_RE = /\b\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]\b/;
-
-// Date variants seen on Indian tax invoices:
-//   14/07/2026, 14-07-2026, 14 Jul 2026, 14th July 2026 (rare).
-const DATE_RES = [
-  /\b(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})\b/,
-  /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{2,4})\b/i,
-];
-
-const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
-
-const parseDateFrom = (text) => {
-  for (const re of DATE_RES) {
-    const m = text.match(re);
-    if (!m) continue;
-    let y, mo, d;
-    if (/^\d/.test(m[2])) {
-      // Numeric month → assume DD-MM-YYYY (India default).
-      d = Number(m[1]); mo = Number(m[2]); y = Number(m[3]);
-    } else {
-      d = Number(m[1]); mo = MONTHS[m[2].slice(0, 3).toLowerCase()]; y = Number(m[3]);
-    }
-    if (y < 100) y = 2000 + y;
-    if (d < 1 || d > 31 || mo < 1 || mo > 12 || y < 2000 || y > 2100) continue;
-    return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  }
-  return '';
-};
-
-// Invoice number: first non-blank token after "Invoice", "Bill", or "No".
-// Length ceiling (25 chars) drops paragraph-continuation false positives.
-const parseInvoiceNumber = (text) => {
-  const m = text.match(/(?:invoice|bill|inv|voucher)\s*(?:no\.?|#|number)?\s*:?\s*([A-Za-z0-9/-]{2,25})/i);
-  return m ? m[1].trim() : '';
-};
-
-// Supplier name — heuristic: the first uppercase-heavy line above the
-// GSTIN. Often a company name is set in all-caps on Indian bills.
-const parseSupplierName = (text) => {
-  const gstinIdx = text.search(GSTIN_RE);
-  const above = gstinIdx > 0 ? text.slice(0, gstinIdx) : text;
-  const lines = above.split(/\n+/).map(l => l.trim()).filter(Boolean);
-  // Look backwards from the GSTIN for a line with >=50% uppercase letters
-  // and >=3 words. That's usually the supplier's registered name.
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i];
-    if (line.length < 4 || line.length > 80) continue;
-    const letters = line.replace(/[^A-Za-z]/g, '');
-    if (letters.length < 4) continue;
-    const upper = letters.replace(/[^A-Z]/g, '').length / letters.length;
-    if (upper >= 0.5) return line;
-  }
-  return '';
-};
-
-// Grand total — walks label patterns from most-specific to most-general,
-// returns the first match as a JS number. Indian rupee formatting has
-// commas we strip; a bare "Total" without a currency prefix is fine.
-const parseGrandTotal = (text) => {
-  const patterns = [
-    /grand\s*total[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    /(?:amount|amt)\s+payable[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    /(?:invoice\s+)?total[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    /net\s+(?:amount|payable)[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-  ];
-  for (const re of patterns) {
-    const m = text.match(re);
-    if (!m) continue;
-    const n = Number(m[1].replace(/,/g, ''));
-    if (isFinite(n) && n > 0) return n;
-  }
-  return 0;
-};
-
-// v1.10.35 — Tax-breakdown extraction. Grabs CGST / SGST / IGST / cess
-// amounts + taxable value + round-off. Indian tax invoices lay these
-// under the item table with labels like "CGST 9% 45.00" or "IGST @18%
-// = 90.00". Regex tolerates the wide space + punctuation variance
-// tesseract introduces when characters split awkwardly across an OCR
-// scan.
-const parseTaxBreakdown = (text) => {
-  const out = { taxableValue: 0, cgst: 0, sgst: 0, igst: 0, cess: 0, roundOff: 0 };
-  const num = (m) => {
-    if (!m) return 0;
-    const n = Number(m[m.length - 1].replace(/,/g, ''));
-    return isFinite(n) && n >= 0 ? n : 0;
-  };
-  const patterns = {
-    taxableValue: [
-      /(?:taxable\s+(?:value|amount))[^0-9-]{0,15}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-      /(?:sub\s?total|subtotal)[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    ],
-    cgst: [
-      /\bcgst[^0-9-]{0,15}(?:@?\s*\d+(?:\.\d+)?%?)?[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    ],
-    sgst: [
-      /\b(?:sgst|utgst)[^0-9-]{0,15}(?:@?\s*\d+(?:\.\d+)?%?)?[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    ],
-    igst: [
-      /\bigst[^0-9-]{0,15}(?:@?\s*\d+(?:\.\d+)?%?)?[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    ],
-    cess: [
-      /\bcess[^0-9-]{0,15}(?:@?\s*\d+(?:\.\d+)?%?)?[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*([\d,]+\.?\d*)/i,
-    ],
-    roundOff: [
-      /(?:round\s*(?:off|ing))[^0-9-]{0,10}(?:rs\.?|inr|₹)?\s*(-?[\d,]+\.?\d*)/i,
-    ],
-  };
-  for (const [key, list] of Object.entries(patterns)) {
-    for (const re of list) {
-      const m = text.match(re);
-      if (m) { out[key] = num(m); break; }
-    }
-  }
-  return out;
-};
-
-// v1.10.35 — Line-item heuristic. Bill layouts vary but a taxable line
-// almost always ends with a numeric column pair (rate, amount). We walk
-// the raw OCR text row-by-row, keep only rows that look like table
-// entries (short-ish, end with 2+ numeric tokens), and pull out:
-//   - name        : leading text up to the first HSN/qty/rate token
-//   - hsn         : nearby 4/6/8-digit code
-//   - quantity    : first bare integer (with optional decimal)
-//   - rate        : the LAST number that's not the row total
-//   - amount      : the LAST number on the row
-//   - taxPercent  : "18%"/"5%" etc if present on the row
-// This won't be perfect on every bill — user reviews + edits before
-// applying. But even 60% accuracy on 5 items beats manual typing.
-const LINE_ITEM_HSN_RE = /\b(\d{4,8})\b/;
-const LINE_ITEM_NUM_RE = /\b(\d+(?:\.\d+)?)\b/g;
-const LINE_ITEM_PCT_RE = /(\d+(?:\.\d+)?)\s*%/;
-// Words that anchor "this line is a total, NOT a line item":
-const NON_ITEM_ANCHORS = /^(?:sub\s?total|subtotal|grand\s+total|total|net\s+(?:amount|payable)|amount\s+payable|cgst|sgst|utgst|igst|cess|round|balance|discount|freight|shipping|packing|handling|tds|tcs|advance|received|paid|dues?|hsn|desc|description|item\s*name|qty|rate|amount|s\.?\s*no|sno)\b/i;
-
-const parseLineItems = (rawText) => {
-  const lines = rawText.split(/\n+/).map(l => l.trim()).filter(Boolean);
-  const items = [];
-  for (const line of lines) {
-    // Skip obvious non-item rows (headers, totals, labels).
-    if (line.length < 8 || line.length > 200) continue;
-    if (NON_ITEM_ANCHORS.test(line)) continue;
-    // Row must end in numbers (at least a rate + amount pair usually).
-    const nums = [...line.matchAll(LINE_ITEM_NUM_RE)].map(m => ({
-      value: Number(m[1]),
-      index: m.index,
-    }));
-    if (nums.length < 2) continue;
-    // Last number = amount; second-to-last = rate (loose heuristic).
-    const amount = nums[nums.length - 1].value;
-    const rate = nums[nums.length - 2].value;
-    if (!isFinite(amount) || amount <= 0) continue;
-    if (!isFinite(rate) || rate <= 0) continue;
-    // If amount < rate, likely misparsed (rate should be per-unit).
-    // Not fatal — we surface both and let the user swap.
-    // Find HSN — first 4/6/8-digit code on the row. Skip codes below
-    // 1000 (probably a qty/rate collision).
-    const hsnMatch = line.match(LINE_ITEM_HSN_RE);
-    let hsn = '';
-    if (hsnMatch && Number(hsnMatch[1]) >= 1000) hsn = hsnMatch[1];
-    // Find tax percent if present on the row.
-    const pctMatch = line.match(LINE_ITEM_PCT_RE);
-    const taxPercent = pctMatch ? Number(pctMatch[1]) : 0;
-    // Quantity: first integer < 10000 before the rate. Falls back to 1
-    // if we can't distinguish (many bills omit qty for single-piece).
-    let quantity = 1;
-    for (const n of nums) {
-      if (n.value === rate || n.value === amount) continue;
-      if (n.value > 0 && n.value < 10000 && Number.isInteger(n.value)) {
-        quantity = n.value;
-        break;
-      }
-    }
-    // Sanity check: qty * rate should be near amount (within 25% or GST margin).
-    const expectedAmount = quantity * rate;
-    const ratio = expectedAmount > 0 ? Math.abs(expectedAmount - amount) / amount : 1;
-    if (ratio > 0.3 && ratio < 0.35) {
-      // Might be tax-inclusive — leave as-is, user will see and can fix.
-    }
-    // Name = the text before the first numeric token, cleaned up.
-    const firstNumIdx = nums[0].index;
-    let name = line.slice(0, firstNumIdx).trim();
-    // Strip leading serial numbers ("1.", "01)", "Item 1 -").
-    name = name.replace(/^(?:item\s*)?\d+\s*[.)\-:]?\s*/i, '').trim();
-    // Strip trailing HSN if it leaked into the name.
-    if (hsn) name = name.replace(new RegExp(`\\b${hsn}\\b`), '').trim();
-    // Skip if name became empty or is just punctuation.
-    if (!name || !/[A-Za-z]{3,}/.test(name)) continue;
-    if (name.length > 100) name = name.slice(0, 100);
-    items.push({ name, hsn, quantity, rate, amount, taxPercent });
-  }
-  return items;
-};
-
-// v1.10.35 — Fuzzy product-catalog matching. When OCR gives us "Copier
-// Paper A4 70gsm" and the user's catalog has "A4 Copier Paper 70 GSM",
-// we want to auto-fill HSN + tax rate from the saved product without
-// exact-string matching. Token-set overlap (Jaccard) is fast, works
-// with word reordering, tolerates spacing/case differences, and is
-// portable to any language. Threshold 0.5 = at least half the tokens
-// overlap → strong match.
-const tokenize = (s) => {
-  if (!s) return new Set();
-  return new Set(
-    String(s)
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter(t => t.length >= 3)
-  );
-};
-const jaccard = (a, b) => {
-  if (!a.size || !b.size) return 0;
-  const intersection = [...a].filter(x => b.has(x)).length;
-  const union = new Set([...a, ...b]).size;
-  return intersection / union;
-};
-const matchProduct = (extractedName, catalog) => {
-  if (!catalog?.length) return null;
-  const tokens = tokenize(extractedName);
-  if (!tokens.size) return null;
-  let best = null, bestScore = 0.5; // threshold
-  for (const p of catalog) {
-    const score = jaccard(tokens, tokenize(p.name));
-    if (score > bestScore) { best = p; bestScore = score; }
-  }
-  return best ? { product: best, score: bestScore } : null;
-};
-
-// Everything above assembled — returns partial patch of PurchaseBills.emptyForm.
-// v1.10.35 — Enriched: line items, tax breakdown, catalog matches.
-const heuristicParseBill = (rawText, catalog = []) => {
-  const text = rawText.replace(/[ \t]+/g, ' ');
-  const gstinMatch = text.match(GSTIN_RE);
-  const items = parseLineItems(rawText);
-  // Enrich each item with catalog match (HSN + tax rate fallback).
-  const enrichedItems = items.map(it => {
-    const match = matchProduct(it.name, catalog);
-    if (match) {
-      return {
-        ...it,
-        // Prefer OCR-extracted HSN, fall back to catalog HSN.
-        hsn: it.hsn || match.product.hsn || '',
-        // Prefer catalog's stored GST rate over the OCR-extracted one —
-        // catalog is user-verified, OCR is noisy.
-        taxPercent: match.product.taxPercent ?? it.taxPercent,
-        // Attach the matched product's id so the caller can link back.
-        _matchedProductId: match.product.id,
-        _matchScore: match.score,
-        _matchedName: match.product.name,
-      };
-    }
-    return it;
-  });
-  return {
-    supplierGstin: gstinMatch ? gstinMatch[0] : '',
-    supplierName: parseSupplierName(text),
-    invoiceNumber: parseInvoiceNumber(text),
-    date: parseDateFrom(text),
-    grandTotal: parseGrandTotal(text),
-    taxBreakdown: parseTaxBreakdown(text),
-    items: enrichedItems,
-    _rawText: rawText,
-  };
-};
 
 export default function BillOCR({ onClose, onExtracted }) {
   const [file, setFile] = useState(null);
@@ -315,10 +30,15 @@ export default function BillOCR({ onClose, onExtracted }) {
   // extracted line items with the user's known HSN + GST rate so they
   // don't have to retype for products they've already saved.
   const [catalog, setCatalog] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [ownGstin, setOwnGstin] = useState('');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     getAllProducts().then(setCatalog).catch(() => setCatalog([]));
+    getAllSuppliers().then((s) => setSuppliers(Array.isArray(s) ? s : [])).catch(() => setSuppliers([]));
+    // Your own GSTIN is on every bill ("Bill to"); it must not be taken as the supplier's.
+    getProfile().then((p) => setOwnGstin(p?.gstin || '')).catch(() => setOwnGstin(''));
   }, []);
 
   const pickFile = (f) => {
@@ -398,7 +118,7 @@ export default function BillOCR({ onClose, onExtracted }) {
       setRawText(data.text);
       // v1.10.35 — Pass the loaded product catalog so line-item HSN +
       // tax rates auto-fill from saved products via fuzzy name match.
-      const p = heuristicParseBill(data.text, catalog);
+      const p = parseBillText(data.text, { catalog, suppliers, ownGstin });
       setParsed(p);
       setStatus('done');
     } catch (err) {
@@ -439,11 +159,14 @@ export default function BillOCR({ onClose, onExtracted }) {
     onExtracted({
       supplierName: parsed.supplierName,
       supplierGstin: parsed.supplierGstin,
+      supplierAddress: parsed.supplierAddress || '',
       invoiceNumber: parsed.invoiceNumber,
       date: parsed.date,
       grandTotal: parsed.grandTotal,
       items: parsed.items || [],
       taxBreakdown: parsed.taxBreakdown || {},
+      interstate: !!parsed.interstate,
+      applyRoundOff: !!parsed.applyRoundOff,
     });
     onClose();
   };
@@ -533,6 +256,20 @@ export default function BillOCR({ onClose, onExtracted }) {
               <FieldPreview label="Date" value={parsed.date} onChange={v => setParsed(p => ({ ...p, date: v }))} type="date" />
               <FieldPreview label="Grand total" value={parsed.grandTotal || ''} onChange={v => setParsed(p => ({ ...p, grandTotal: Number(v) || 0 }))} type="number" />
 
+              {(parsed.matchedSupplier || parsed.checks?.length > 0 || parsed.warnings?.length > 0) && (
+                <div className="ocr-checks" style={{ marginTop: 10, padding: '0.55rem 0.7rem', background: 'var(--bg-primary)', borderRadius: 5, border: '1px solid var(--border)', fontSize: '0.74rem', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {parsed.matchedSupplier && <div style={{ color: 'var(--success, #15803d)' }}><CheckCircle2 size={12} style={{ verticalAlign: '-2px' }} /> Supplier found in your list: <strong>{parsed.matchedSupplier.name}</strong></div>}
+                  {(parsed.checks || []).map((c, i) => (
+                    <div key={`c${i}`} style={{ color: c.ok ? 'var(--success, #15803d)' : 'var(--warning, #b45309)' }}>
+                      {c.ok ? <CheckCircle2 size={12} style={{ verticalAlign: '-2px' }} /> : <AlertTriangle size={12} style={{ verticalAlign: '-2px' }} />} {c.text}
+                    </div>
+                  ))}
+                  {(parsed.warnings || []).map((w, i) => (
+                    <div key={`w${i}`} style={{ color: 'var(--warning, #b45309)' }}><AlertTriangle size={12} style={{ verticalAlign: '-2px' }} /> {w}</div>
+                  ))}
+                </div>
+              )}
+
               {/* v1.10.35 — Tax breakdown from OCR */}
               {parsed.taxBreakdown && (parsed.taxBreakdown.taxableValue || parsed.taxBreakdown.cgst || parsed.taxBreakdown.igst) > 0 && (
                 <div style={{ marginTop: 10, padding: '0.55rem 0.7rem', background: 'var(--bg-primary)', borderRadius: 5, border: '1px solid var(--border)' }}>
@@ -582,6 +319,9 @@ export default function BillOCR({ onClose, onExtracted }) {
                             <Trash2 size={12} />
                           </button>
                         </div>
+                        {it.billName && it.billName !== it.name && (
+                          <div style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginBottom: 2 }}>On the bill: {it.billName}</div>
+                        )}
                         {it._matchedProductId && (
                           <div style={{ fontSize: '0.68rem', color: 'var(--primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Sparkles size={10} /> Matched saved product: <em>{it._matchedName}</em> ({Math.round((it._matchScore || 0) * 100)}%)
