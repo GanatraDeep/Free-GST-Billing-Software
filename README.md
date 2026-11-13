@@ -81,7 +81,8 @@ the browser, and works without the internet. Data never leaves the computer.
 
 | Version | Highlights |
 |---|---|
-| **1.16.0** | Closing stock methods (average, FIFO, last purchase rate, fixed); final accounts for any dates; book (T-form) and modern views; Trading account; CA-ready layout |
+| **1.16.1** | Purchase bill OCR reads the right fields: supplier by GSTIN (scan mistakes put right, your own GSTIN skipped), invoice no., only real item rows (qty × rate = amount), charges, GST rate and round off, with checks that the bill adds up |
+| 1.16.0 | Closing stock methods (average, FIFO, last purchase rate, fixed); final accounts for any dates; book (T-form) and modern views; Trading account; CA-ready layout |
 | 1.15.1 | Cash book matches the final accounts; profit fixed (opening stock without purchase price, Reports = Final accounts); expenses under reverse charge (RCM rent) |
 | 1.15.0 | Rojmel (day book) and day-wise summary; amount totals on the filtered Dashboard list; this README |
 | 1.14.3 | Sales CSV import takes stock out (and a repair for earlier imports); HSN-wise inward / outward in the GSTR-3B Excel |

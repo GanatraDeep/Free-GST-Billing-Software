@@ -4,6 +4,45 @@ All notable changes to **Divtech Hisaab** are listed here, newest first.
 
 ---
 
+## [1.16.1] - 2026-11-13
+
+### How to update
+
+**Current version:** 1.16.0  →  **New version:** 1.16.1
+
+1. Open the app and click **Update to v1.16.1** in the menu, or
+   **Settings → App Updates → Update Now** (needs an active subscription).
+2. The app closes, updates and opens again by itself.
+
+If the button does not work, download **Divtech-Hisaab-Setup.exe** from the
+Releases page and run it; it installs over your copy and keeps your data.
+
+### Fixed
+- **Purchase → Import from image (OCR) filled in the wrong values.** The
+  reading of the photo was fine; the rules that pick the fields out of the
+  text were not. On a scanned Gulab Oil bill it took "To" (from "Bill To")
+  as the invoice number, a line of scanner noise as the supplier, missed
+  the GSTIN over one misread letter, and turned addresses, phone numbers
+  and IRN lines into eleven junk items. Now:
+  - **GSTIN**: letters the scan confuses (0/O, 1/I, 2/Z, 5/S, 8/B) are put
+    right using the GSTIN pattern and its check character; your own GSTIN
+    (the "Bill to" one) is skipped.
+  - **Supplier**: taken from your supplier list by GSTIN, exactly as saved;
+    otherwise the company-name line at the top of the bill.
+  - **Invoice no.** only after "Invoice No", "Bill No" or "Inv. No".
+  - **Items** only from the item table, with the quantity, rate and amount
+    that agree (50 TIN × 2,800 = 1,40,000), skipping an MRP column and coping
+    with an amount whose decimal point the scan lost. A bill name such as
+    "Gulab Groundnut Oil 15 Kg Tin" matches your product GROUNDNUT OIL.
+  - **Charges** under the table (insurance & packing, freight) come in as a
+    row; the **GST rate** is worked out from the tax on the bill; **CGST /
+    SGST** amounts are no longer mistaken for the rate; **Round off** is
+    ticked when the bill has one.
+  - **Checks**: the window shows whether the items add up to the basic
+    amount, the GST matches and the total matches the grand total.
+
+---
+
 ## [1.16.0] - 2026-11-08
 
 ### How to update

@@ -186,8 +186,11 @@ export default function PurchaseBills() {
       supplierName: extracted.supplierName || '',
       supplierGstin: extracted.supplierGstin || '',
       invoiceNumber: extracted.invoiceNumber || '',
+      supplierAddress: extracted.supplierAddress || '',
       items,
-      interstate: Number(tb.igst) > 0 && !Number(tb.cgst),
+      interstate: extracted.interstate ?? (Number(tb.igst) > 0 && !Number(tb.cgst)),
+      // Divtech Hisaab - the bill shows a round off, so round the total here too.
+      applyRoundOff: !!extracted.applyRoundOff,
     });
     setShowForm(true);
     const msg = Array.isArray(extracted.items) && extracted.items.length > 0
